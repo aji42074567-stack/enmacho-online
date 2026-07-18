@@ -1255,13 +1255,25 @@ function loadGroundTile(key,src){
 }
 loadGroundTile('path','assets/map_tile_path.png');
 loadGroundTile('stone','assets/map_tile_stone.png');
+loadGroundTile('sand','assets/map_tile_sand.png');
+loadGroundTile('sea','assets/map_tile_sea.png');
+function loadCaveTile(key,src){
+  const img=new Image();
+  img.onload=()=>{groundTiles[key]=img;if(CAVE)renderGroundCave();};
+  img.src=src;
+}
+loadCaveTile('cavefloor','assets/map_cave_floor.png');
+loadCaveTile('cavewall','assets/map_cave_wall.png');
 function renderGround(){
   const tgt=FIELD?FIELD.ground:ground;   // 画像の遅延読み込み後も必ずフィールド側へ描く
+  const tkF=FIELD?FIELD.tileKind:tileKind;   // どのゾーンに居ても自分のマップで描く
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
   tgt.width=gW;tgt.height=gH;
   const g=tgt.getContext('2d');
   const terrainPattern=terrainTexture.complete&&terrainTexture.naturalWidth
     ?g.createPattern(terrainTexture,'repeat'):null;
+  const seaPattern=groundTiles.sea?g.createPattern(groundTiles.sea,'repeat'):null;
+  const sandPattern=groundTiles.sand?g.createPattern(groundTiles.sand,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   // なめらかノイズ: 隣のマスと色が近くなる→格子に見えない
@@ -1284,11 +1296,16 @@ function renderGround(){
   }
   // 1) 草地: なめらかなグラデーションで塗る(海・砂浜はここで分岐)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    const k0=tileKind[y*MAP+x];
+    const k0=tkF[y*MAP+x];
     if(k0===4){  // 海
       const n2=vnoise(x/3+11,y/3+5);
-      g.fillStyle=`rgb(${16+n2*14|0},${42+n2*20|0},${58+n2*24|0})`;
-      diamond(x,y);g.fill();
+      if(seaPattern){
+        g.fillStyle=seaPattern;diamond(x,y);g.fill();
+        g.fillStyle=`rgba(6,20,32,${0.10+0.22*n2})`;diamond(x,y);g.fill();
+      }else{
+        g.fillStyle=`rgb(${16+n2*14|0},${42+n2*20|0},${58+n2*24|0})`;
+        diamond(x,y);g.fill();
+      }
       if(vnoise(x/1.3,y/1.3)>0.72){
         g.fillStyle='rgba(190,220,230,0.10)';
         g.beginPath();g.ellipse(GX(x,y),GY(x,y),18,4,0,0,6.29);g.fill();
@@ -1297,8 +1314,13 @@ function renderGround(){
     }
     if(k0===3){  // 砂浜
       const n2=vnoise(x/4+3,y/4+8);
-      g.fillStyle=`rgb(${118+n2*26|0},${104+n2*22|0},${76+n2*16|0})`;
-      diamond(x,y);g.fill();
+      if(sandPattern){
+        g.fillStyle=sandPattern;diamond(x,y);g.fill();
+        g.fillStyle=`rgba(30,24,12,${0.10+0.16*n2})`;diamond(x,y);g.fill();
+      }else{
+        g.fillStyle=`rgb(${118+n2*26|0},${104+n2*22|0},${76+n2*16|0})`;
+        diamond(x,y);g.fill();
+      }
       continue;
     }
     const n=vnoise(x/5,y/5)*0.65+vnoise(x/13+7,y/13+3)*0.35;
@@ -1312,9 +1334,27 @@ function renderGround(){
       diamond(x,y);g.fill();
     }
   }
+  // 1.5) 波打ち際: 陸に接する海マスへ淡い白波
+  for(let y=1;y<MAP-1;y++)for(let x=1;x<MAP-1;x++){
+    if(tkF[y*MAP+x]!==4)continue;
+    let land=false;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])
+      if(tkF[(y+dy)*MAP+(x+dx)]!==4){land=true;break;}
+    if(!land)continue;
+    // 浅瀬のぼかし(線ではなく面で)
+    g.fillStyle='rgba(150,200,210,0.09)';
+    diamond(x,y);g.fill();
+    const fv=vnoise(x/1.7+21,y/1.7+13);
+    if(fv>0.45){
+      g.fillStyle=`rgba(205,230,234,${0.10+fv*0.10})`;
+      g.beginPath();
+      g.ellipse(GX(x,y)+(fv-0.5)*16,GY(x,y)+(hash2(x,y)-0.5)*8,13,3.5,0,0,6.29);
+      g.fill();
+    }
+  }
   // 2) 土の道: マス形ではなく柔らかい楕円を重ねて不定形の道に
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(tileKind[y*MAP+x]!==1)continue;
+    if(tkF[y*MAP+x]!==1)continue;
     const n=vnoise(x/4+3,y/4+9);
     const cx=GX(x,y)+(hash2(x,y)-0.5)*14, cy=GY(x,y)+(hash2(y,x)-0.5)*7;
     const img=groundTiles.path;
@@ -1330,7 +1370,7 @@ function renderGround(){
   }
   // 3) 村の石畳: ダイヤ模様をやめ、丸石を敷き詰める
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(tileKind[y*MAP+x]!==2)continue;
+    if(tkF[y*MAP+x]!==2)continue;
     const cx=GX(x,y),cy=GY(x,y);
     const img=groundTiles.stone;
     if(img){
@@ -1344,7 +1384,7 @@ function renderGround(){
     }
   }
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(tileKind[y*MAP+x]!==2)continue;
+    if(tkF[y*MAP+x]!==2)continue;
     if(groundTiles.stone)continue;
     const cx=GX(x,y),cy=GY(x,y);
     for(let i=0;i<3;i++){
@@ -1358,7 +1398,7 @@ function renderGround(){
   // 4) まだら模様: 複数マスをまたぐ影と光で自然な地面に
   for(let i=0;i<420;i++){
     const x=rnd(0,MAP-0.01),y=rnd(0,MAP-0.01);
-    if(tileKind[Math.floor(y)*MAP+Math.floor(x)]!==0)continue;
+    if(tkF[Math.floor(y)*MAP+Math.floor(x)]!==0)continue;
     const cx=GX(x,y),cy=GY(x,y);
     const r=rnd(30,110);
     const dark=Math.random()<0.6;
@@ -1368,7 +1408,7 @@ function renderGround(){
   // 5) 草むら・小石: マスの境界を無視して散らす
   for(let i=0;i<1600;i++){
     const x=rnd(1,MAP-1.01),y=rnd(1,MAP-1.01);
-    if(tileKind[Math.round(y)*MAP+Math.round(x)]!==0)continue;
+    if(tkF[Math.round(y)*MAP+Math.round(x)]!==0)continue;
     const cx=GX(x,y),cy=GY(x,y);
     const h=hash2(x*17,y*23);
     if(h<0.75){
@@ -1386,9 +1426,13 @@ renderGround();
 
 /* ================= 洞窟(最初の試練)とゾーン切替 ================= */
 function renderGroundCave(){
+  const tgt=CAVE?CAVE.ground:ground;   // 画像の遅延読み込み後も洞窟側へ描く
+  const tkC=CAVE?CAVE.tileKind:tileKind;
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
-  ground.width=gW;ground.height=gH;
-  const g=ground.getContext('2d');
+  tgt.width=gW;tgt.height=gH;
+  const g=tgt.getContext('2d');
+  const fp=groundTiles.cavefloor?g.createPattern(groundTiles.cavefloor,'repeat'):null;
+  const wp=groundTiles.cavewall?g.createPattern(groundTiles.cavewall,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   function hash2(x,y){const n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
@@ -1401,24 +1445,34 @@ function renderGroundCave(){
     g.closePath();
   };
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(tileKind[y*MAP+x]!==5)continue;
+    if(tkC[y*MAP+x]!==5)continue;
     const v=hash2(x*3,y*7);
-    g.fillStyle=`rgb(${36+v*10|0},${33+v*9|0},${31+v*8|0})`;
-    dia(x,y);g.fill();
+    if(fp){
+      g.fillStyle=fp;dia(x,y);g.fill();
+      g.fillStyle=`rgba(0,0,0,${0.03+0.07*v})`;dia(x,y);g.fill();
+    }else{
+      g.fillStyle=`rgb(${36+v*10|0},${33+v*9|0},${31+v*8|0})`;
+      dia(x,y);g.fill();
+    }
     if(v>0.9){g.fillStyle='rgba(90,150,180,0.13)';
       g.beginPath();g.ellipse(GX(x,y),GY(x,y),10,4,0,0,6.29);g.fill();}
   }
   // 壁のふち(床に接する岩)
   for(let y=1;y<MAP-1;y++)for(let x=1;x<MAP-1;x++){
-    if(tileKind[y*MAP+x]===5)continue;
+    if(tkC[y*MAP+x]===5)continue;
     let near=false;
     for(let dy=-1;dy<=1&&!near;dy++)for(let dx=-1;dx<=1;dx++)
-      if(tileKind[(y+dy)*MAP+(x+dx)]===5){near=true;break;}
+      if(tkC[(y+dy)*MAP+(x+dx)]===5){near=true;break;}
     if(!near)continue;
     const v=hash2(x*7,y*3);
-    g.fillStyle=`rgb(${18+v*7|0},${18+v*6|0},${22+v*7|0})`;
-    dia(x,y);g.fill();
-    g.fillStyle='rgba(70,72,84,0.35)';
+    if(wp){
+      g.fillStyle=wp;dia(x,y);g.fill();
+      g.fillStyle=`rgba(0,0,0,${0.25+0.15*v})`;dia(x,y);g.fill();
+    }else{
+      g.fillStyle=`rgb(${18+v*7|0},${18+v*6|0},${22+v*7|0})`;
+      dia(x,y);g.fill();
+    }
+    g.fillStyle='rgba(70,72,84,0.25)';
     g.beginPath();g.ellipse(GX(x,y),GY(x,y)-8,14,6,0,0,6.29);g.fill();
   }
 }
