@@ -1188,6 +1188,8 @@ loadSprite('player_m_walk','assets/char_player_m_walk.png');
 loadSprite('player_m_attack','assets/char_player_m_attack.png');
 loadSprite('player_m_hit','assets/char_player_m_hit.png');
 loadSprite('player_m_death','assets/char_player_m_death.png');
+loadSprite('player_f_hit','assets/char_player_f_hit.png');
+loadSprite('player_f_death','assets/char_player_f_death.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1247,9 +1249,9 @@ function drawKnight(sx,sy,e){
 function drawPlayer(sx,sy,e){
   const g=e.gender||'m';
   const base=SPRITES['player_'+g]||SPRITES.player_m;
-  const walkS=SPRITES['player_'+g+'_walk']||SPRITES.player_m_walk;
-  const atkS=SPRITES['player_'+g+'_attack']||SPRITES.player_m_attack;
-  const hitS=SPRITES['player_'+g+'_hit']||SPRITES.player_m_hit;
+  const walkS=SPRITES['player_'+g+'_walk'];   // 性別専用(無ければ立ち絵で代用)
+  const atkS=SPRITES['player_'+g+'_attack'];
+  const hitS=SPRITES['player_'+g+'_hit'];
   if(!base&&!walkS){drawKnight(sx,sy,e);return;}
   drawShadow(sx,sy+2,10);
   const F=128,D=48,k=D/F;
@@ -1293,9 +1295,9 @@ function drawPlayer(sx,sy,e){
   ctx.restore();
 }
 function drawPlayerCorpse(sx,sy,e){
-  const img=SPRITES['player_'+(e.gender||'m')+'_death']||SPRITES.player_m_death;
+  const img=SPRITES['player_'+(e.gender||'m')+'_death'];
   drawShadow(sx,sy+2,12);
-  if(img)ctx.drawImage(img,0,0,128,128,-24,-45,48,48);
+  if(img)ctx.drawImage(img,0,0,128,128,sx-24,sy-45,48,48);
 }
 function drawCorpse(sx,sy,c){
   const fade=c.age>4.5?Math.max(0,1-(c.age-4.5)/1.5):1;
