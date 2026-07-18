@@ -120,7 +120,15 @@
   .itemrow{display:flex;align-items:center;gap:10px;padding:9px 2px;
     border-bottom:1px solid #33291a;font-family:var(--sans);font-size:13px;
     color:var(--parchment);text-align:left}
-  .itemrow .icn{width:26px;height:26px;flex:none}
+  .itemrow .icn{width:26px;height:26px;flex:none;image-rendering:pixelated}
+  #pickRow{display:flex;justify-content:center;gap:14px;margin-bottom:4px}
+  .pick{width:84px;height:84px;border:1px solid var(--panel-edge);border-radius:6px;
+    cursor:pointer;opacity:.45;background:#141009 0 0/400% 100% no-repeat}
+  #pickM{background-image:url(assets/char_player_m.png)}
+  #pickF{background-image:url(assets/char_player_f.png)}
+  .pick:hover{opacity:.8}
+  .pick.on{opacity:1;border-color:var(--gold);box-shadow:0 0 10px rgba(201,162,74,.35)}
+  .pick:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   .itemrow .nm{flex:1}
   .itemrow .fx{color:var(--dim);font-size:11px}
   .itemrow .pr{color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -201,8 +209,11 @@
 
   <div class="overlay" id="intro">
     <div class="scroll">
-      <div style="width:88px;height:88px;margin:0 auto 6px;
-        background:url(assets/char_player.png) 0 0/400% 100% no-repeat"></div>
+      <div id="pickRow">
+        <div class="pick" id="pickM" role="button" tabindex="0" aria-label="男の子を選ぶ"></div>
+        <div class="pick" id="pickF" role="button" tabindex="0" aria-label="女の子を選ぶ"></div>
+      </div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
       <h1>閻魔庁ONLINE</h1>
       <div class="sub">死後に知る。生前こそが地獄だった。</div>
       <div class="rule"></div>
@@ -287,10 +298,10 @@ const ITEMS={
   long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120,icon:'icon_katana.png'},
   bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400,icon:'icon_greatsword.png'},
   drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true,icon:'icon_greatsword.png'},
-  cloth:       {slot:'armor', name:'経帷子',      def:1, price:0},
-  leather:     {slot:'armor', name:'鬼革の胴着',  def:3, price:100},
-  chain:       {slot:'armor', name:'鎖帷子',      def:6, price:350},
-  plate:       {slot:'armor', name:'冥府の具足',  def:10,price:900},
+  cloth:       {slot:'armor', name:'経帷子',      def:1, price:0,  icon:'icon_armor_cloth.png'},
+  leather:     {slot:'armor', name:'鬼革の胴着',  def:3, price:100,icon:'icon_armor_leather.png'},
+  chain:       {slot:'armor', name:'鎖帷子',      def:6, price:350,icon:'icon_armor_chain.png'},
+  plate:       {slot:'armor', name:'冥府の具足',  def:10,price:900,icon:'icon_armor_plate.png'},
 };
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate'];
 const POTION_PRICE=30;
@@ -429,7 +440,8 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,atk:6,
   xp:0,gold:0,potions:3,
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
-  target:null,talkTarget:null,atkCd:0,repath:0,swing:0,dead:false,face:1,dir:'down',moving:false
+  target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
+  dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 let kills=0,time=0,started=false,hasSaveData=false;
 const xpNext=lv=>Math.floor(55*Math.pow(lv,1.55));
@@ -440,7 +452,8 @@ function save(){
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       v:1,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
-      items:player.items,weapon:player.weapon,armor:player.armor,kills
+      items:player.items,weapon:player.weapon,armor:player.armor,kills,
+      gender:player.gender
     }));
   }catch(e){}
 }
@@ -450,6 +463,7 @@ function load(){
     if(!d||d.v!==1)return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
     player.items=d.items;player.weapon=d.weapon;player.armor=d.armor;
+    player.gender=d.gender==='f'?'f':'m';
     kills=d.kills||0;
     player.maxHp=80+14*(player.lv-1);
     player.maxMp=30+7*(player.lv-1);
@@ -677,7 +691,7 @@ function faceToward(e,t){
 }
 function playerAttack(){
   const m=player.target;if(!m||m.dead)return;
-  player.atkCd=0.85;player.swing=0.25;
+  player.atkCd=0.85;player.swing=0.25;player.swingKind='melee';
   faceToward(player,m);
   const crit=Math.random()<0.1;
   const dmg=Math.round((atkTotal()+rnd(0,4))*(crit?1.6:1));
@@ -695,7 +709,7 @@ function castBolt(){
   const t=pickSpellTarget(7);
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=8;player.target=t;player.swing=0.25;
+  player.mp-=8;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
@@ -718,7 +732,7 @@ function castFire(){
   const t=pickSpellTarget(7);
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=20;player.target=t;player.swing=0.25;
+  player.mp-=20;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
@@ -754,7 +768,8 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 function renderShop(){
   const list=$('shopList');
   let html='';
-  html+=`<div class="itemrow"><span class="nm">甘露水 <span class="fx">HP+65</span></span>
+  html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
+    <span class="nm">甘露水 <span class="fx">HP+65</span></span>
     <span class="pr">${POTION_PRICE} 六文銭</span>
     <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
   for(const id of SHOP_STOCK){
@@ -1036,10 +1051,19 @@ const ground=document.createElement('canvas');
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
 const SPRITES={};
-(function(){
+function loadSprite(key,src){
   const img=new Image();
-  img.onload=()=>{SPRITES.player=img;};
-  img.src='assets/char_player.png';
+  img.onload=()=>{SPRITES[key]=img;};
+  img.src=src;
+}
+loadSprite('player_m','assets/char_player_m.png');
+loadSprite('player_f','assets/char_player_f.png');
+(function(){  // 武器振りエフェクト用にアイコン画像も読む
+  const seen=new Set();
+  for(const id in ITEMS){
+    const ic=ITEMS[id].icon;
+    if(ic&&!seen.has(ic)){seen.add(ic);loadSprite(ic,'assets/'+ic);}
+  }
 })();
 const DIR_FRAME={down:0,up:1,left:2,right:3};
 
@@ -1082,19 +1106,36 @@ function drawKnight(sx,sy,e){
   ctx.restore();
 }
 function drawPlayer(sx,sy,e){
-  const img=SPRITES.player;
+  const img=SPRITES['player_'+(e.gender||'m')]||SPRITES.player_m;
   if(!img){drawKnight(sx,sy,e);return;}
   const bob=e.moving?Math.sin(time*14)*1.6:0;
   drawShadow(sx,sy+2,10);
   const F=128,D=48;  // Fはシートの1コマ、Dは画面上の描画サイズ
   const fi=DIR_FRAME[e.dir]||0;
+  const t=e.swing>0?(0.25-e.swing)/0.25:-1;
   ctx.save();ctx.translate(sx,sy+bob);
-  if(e.swing>0){
-    const t=(0.25-e.swing)/0.25;
-    ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t*Math.PI)*0.22);
-  }
+  if(t>=0)ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t*Math.PI)*0.12);
   ctx.drawImage(img,fi*F,0,F,F,-D/2,-D+3,D,D);
   ctx.restore();
+  if(t>=0&&e.swingKind==='melee'){
+    // 装備中の武器を振り下ろす+斬撃の軌跡
+    const side=e.dir==='left'?-1:1;
+    const wimg=SPRITES[ITEMS[e.weapon].icon];
+    ctx.save();ctx.translate(sx,sy+bob-20);ctx.scale(side,1);
+    ctx.save();ctx.translate(9,2);ctx.rotate(-1.9+t*2.7);
+    if(wimg)ctx.drawImage(wimg,-7,-25,28,28);
+    ctx.restore();
+    const a=0.55*(1-t);
+    if(a>0.03){
+      ctx.strokeStyle=`rgba(240,242,255,${a})`;
+      ctx.lineWidth=3;ctx.lineCap='round';
+      ctx.beginPath();ctx.arc(2,2,17,-1.5,-1.5+2.6*Math.min(1,t*1.4));ctx.stroke();
+      ctx.strokeStyle=`rgba(190,220,255,${a*0.5})`;
+      ctx.lineWidth=6;
+      ctx.beginPath();ctx.arc(2,2,14,-1.3,-1.3+2.2*Math.min(1,t*1.4));ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 function drawGoblin(sx,sy,m){
   const s=m.def.size,bob=m.moving?Math.sin(time*12+m.phase)*1.5:0;
@@ -1510,6 +1551,17 @@ $('sndBtn').addEventListener('click',()=>{
   if(bgmGain)bgmGain.gain.value=soundOn?0.5:0;
   $('sndBtn').textContent=soundOn?'🔊':'🔇';
 });
+function setGender(g){
+  player.gender=g;
+  $('pickM').classList.toggle('on',g==='m');
+  $('pickF').classList.toggle('on',g==='f');
+  sfx.click();
+  if(started||hasSaveData)save();  // 未開始の新規プレイヤーにセーブを作らない
+}
+for(const [id,g] of [['pickM','m'],['pickF','f']]){
+  $(id).addEventListener('click',()=>setGender(g));
+  $(id).addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' ')setGender(g);});
+}
 $('startBtn').addEventListener('click',()=>{
   $('intro').classList.add('hidden');
   started=true;audio();startBgm();
@@ -1535,6 +1587,7 @@ $('reviveBtn').addEventListener('click',()=>{
 
 /* ================= 起動 ================= */
 hasSaveData=load();
+$('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');

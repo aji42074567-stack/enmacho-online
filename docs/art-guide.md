@@ -77,13 +77,18 @@ enmacho-online/
 - 画像を入れた時点でアーティファクト版(単一ファイル)は原則卒業し、
   GitHub Pages URLに一本化(少量ならdata URI埋め込みで延命可)
 
-### 実装済み(v0.4)
+### 実装済み(v0.4〜v0.4.1)
 
-- プレイヤー: `assets/char_player.png` = 128×128 ×4コマの横並びシート。
+- プレイヤー: `assets/char_player_m.png` / `char_player_f.png` = 128×128 ×4コマの横並びシート。
   コマ順 = **下向き / 上向き / 左向き / 右向き**(`DIR_FRAME`参照)。
-  画面上は48pxで描画。`e.dir`はアイソメ変換後の見た目方向で判定
+  画面上は48pxで描画。`e.dir`はアイソメ変換後の見た目方向で判定。
+  タイトル画面で男女選択(`player.gender`、セーブに保存)
 - 武器アイコン: `assets/icon_{tanto,katana,greatsword,bow}.png` = 64×64、45度回転済み。
-  `ITEMS[].icon` に指定すると店・装備画面に表示される(弓は未使用の予備)
+  `ITEMS[].icon` に指定すると店・装備画面に表示される(弓は未使用の予備)。
+  近接攻撃時は装備中の武器アイコンが振り下ろされ、斬撃の軌跡が出る(drawPlayer内)
+- 防具・薬アイコン: `assets/icon_armor_{cloth,leather,chain,plate}.png` / `icon_potion.png` =
+  Claudeがコードで描いた16×16ドット絵の4倍拡大(仮アイコン)。
+  同じ画風のAI生成画像をもらえたら差し替え推奨
 - 元画像の加工手順(ニセ透過の除去→分割→シート化)は
   会話でChatGPT生成画像を渡せばClaudeが再現できる(scratchpadのprocess_sprites.py方式)
 - 今後同様に `mob_*.png` を渡されたら drawGoblin 等を同方式で差し替える
