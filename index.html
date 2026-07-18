@@ -844,20 +844,67 @@ function toggleEquip(){
 }
 
 /* ================= 移動・更新 ================= */
-function moveAlong(e,dt,speed){
-  e.moving=false;
-  if(!e.path.length)return;
-  const n=e.path[0];
-  const dx=n.x-e.x,dy=n.y-e.y;
-  const d=Math.hypot(dx,dy);
-  if(d<0.08){e.x=n.x;e.y=n.y;e.path.shift();return;}
-  const step=Math.min(d,speed*dt);
-  e.x+=dx/d*step;e.y+=dy/d*step;
-  e.walkT=(e.walkT||0)+step;  // 実際に進んだ距離に歩行コマを同期
-  if(Math.abs(dx)>0.05)e.face=dx>=0?1:-1;
+function walkDirection(e){
+  const look=e.path[Math.min(2,e.path.length-1)]||e.path[0];
+  if(!look)return e.dir||'down';
+  const dx=look.x-e.x,dy=look.y-e.y;
   const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向
-  e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
-  e.moving=true;
+  const ax=Math.abs(sdx),ay=Math.abs(sdy);
+  const horizontal=sdx>=0?'right':'left';
+  const vertical=sdy>=0?'down':'up';
+
+  // 斜めに近い移動は現在の軸を維持し、正面と横向きの往復を防ぐ
+  if(ax<ay*1.25&&ay<ax*1.25){
+    if((e.dir==='left'||e.dir==='right')&&e.dir===horizontal)return e.dir;
+    if((e.dir==='up'||e.dir==='down')&&e.dir===vertical)return e.dir;
+  }
+  return ax>ay?horizontal:vertical;
+}
+function updateWalkDirection(e,nextDir,dt,wasMoving){
+  if(!wasMoving||!e.dir){
+    e.dir=nextDir;e.walkNextDir=null;e.walkDirHold=0;return;
+  }
+  if(nextDir===e.dir){
+    e.walkNextDir=null;e.walkDirHold=0;return;
+  }
+  if(e.walkNextDir!==nextDir){
+    e.walkNextDir=nextDir;e.walkDirHold=0;return;
+  }
+  e.walkDirHold=(e.walkDirHold||0)+dt;
+  if(e.walkDirHold>=0.11){
+    e.dir=nextDir;e.walkNextDir=null;e.walkDirHold=0;
+  }
+}
+function moveAlong(e,dt,speed){
+  const wasMoving=e.moving;
+  e.moving=false;
+  if(!e.path.length){
+    e.walkNextDir=null;e.walkDirHold=0;return;
+  }
+  updateWalkDirection(e,walkDirection(e),dt,wasMoving);
+
+  // 1フレーム分の移動量を複数の経路ノードへ連続適用する。
+  // ノード到着のたび停止絵が1フレーム挟まる点滅を防ぐ。
+  let remaining=speed*dt,moved=0;
+  while(remaining>0&&e.path.length){
+    const n=e.path[0];
+    const dx=n.x-e.x,dy=n.y-e.y;
+    const d=Math.hypot(dx,dy);
+    if(d<0.0001){
+      e.x=n.x;e.y=n.y;e.path.shift();continue;
+    }
+    const step=Math.min(d,remaining);
+    e.x+=dx/d*step;e.y+=dy/d*step;
+    moved+=step;remaining-=step;
+    if(Math.abs(dx)>0.05)e.face=dx>=0?1:-1;
+    if(step>=d-0.0001){
+      e.x=n.x;e.y=n.y;e.path.shift();
+    }
+  }
+  if(moved>0){
+    e.walkT=(e.walkT||0)+moved;  // 実際に進んだ距離に歩行コマを同期
+    e.moving=true;
+  }
 }
 function update(dt){
   time+=dt;
