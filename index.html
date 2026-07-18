@@ -483,6 +483,7 @@ window.addEventListener('beforeunload',save);
 /* ================= モンスター ================= */
 const MOBS={
   goblin:  {name:'ガキ',        lv:1,hp:30, dmg:[3,6],  xp:14, gold:[3,8],   speed:1.7,aggro:0,  atkCd:1.7,size:.75},
+  goblin_red:{name:'アカガキ',  lv:4,hp:70, dmg:[8,13], xp:45, gold:[10,20], speed:1.9,aggro:3.8,atkCd:1.6,size:.8},
   wolf:    {name:'イヌガミ',    lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:2.4,aggro:4.5,atkCd:1.5,size:.85},
   orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:1.9,aggro:4.2,atkCd:1.9,size:1},
   skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:1.6,aggro:4.0,atkCd:1.8,size:1.05},
@@ -507,6 +508,7 @@ function spawnMob(type,x,y){
     }
   };
   ring(32,41,5,8,'goblin');
+  ring(38,35,4,3,'goblin_red');
   ring(41,30,5,5,'wolf');  ring(22,34,5,5,'wolf');
   ring(42,16,4,4,'orc');   ring(16,24,4,4,'orc');
   ring(16,11,4,4,'skeleton');
@@ -1192,6 +1194,8 @@ loadSprite('player_f_hit','assets/char_player_f_hit.png');
 loadSprite('player_f_death','assets/char_player_f_death.png');
 loadSprite('player_f_walk','assets/char_player_f_walk.png');
 loadSprite('player_f_attack','assets/char_player_f_attack.png');
+loadSprite('mob_goblin','assets/mob_goblin.png');
+loadSprite('mob_goblin_red','assets/mob_goblin_red.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1306,9 +1310,9 @@ function drawCorpse(sx,sy,c){
   ctx.save();
   ctx.globalAlpha=0.85*fade;
   ctx.translate(sx,sy);ctx.rotate(1.25*(c.face>=0?1:-1));ctx.scale(0.92,0.92);
-  const fake={def:MOBS[c.type],moving:false,face:c.face,phase:0,swing:0};
+  const fake={type:c.type,def:MOBS[c.type],moving:false,face:c.face,phase:0,swing:0};
   switch(c.type){
-    case 'goblin':drawGoblin(0,0,fake);break;
+    case 'goblin':case 'goblin_red':drawGoblin(0,0,fake);break;
     case 'wolf':drawWolf(0,0,fake);break;
     case 'orc':drawOrc(0,0,fake);break;
     case 'skeleton':drawSkeleton(0,0,fake);break;
@@ -1316,7 +1320,29 @@ function drawCorpse(sx,sy,c){
   }
   ctx.restore();
 }
+function drawMobImg(sx,sy,m,key){
+  // 立ち絵1枚方式: ゆれ・攻撃の踏み込み・向き反転をコードで付ける
+  const img=SPRITES[key];
+  if(!img)return false;
+  const sz=m.def.size;
+  drawShadow(sx,sy+2,10*sz);
+  const D=Math.round(64*sz);
+  const t=m.swing>0?(0.35-m.swing)/0.35:-1;
+  ctx.save();
+  ctx.translate(sx,sy-(m.moving?Math.abs(Math.sin((m.walkT||0)*7))*2:0));
+  if(m.face>=0)ctx.scale(-1,1);   // 元画像は左向き
+  if(t>=0){
+    ctx.translate(-Math.sin(Math.min(1,t)*Math.PI)*7,0);
+    ctx.rotate(-Math.sin(t*Math.PI)*0.2);
+  }else if(m.moving){
+    ctx.rotate(Math.sin((m.walkT||0)*7)*0.05);
+  }
+  ctx.drawImage(img,0,0,128,128,-D/2,-D+3,D,D);
+  ctx.restore();
+  return true;
+}
 function drawGoblin(sx,sy,m){
+  if(drawMobImg(sx,sy,m,m.type==='goblin_red'?'mob_goblin_red':'mob_goblin'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*12+m.phase)*1.5:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,8*s);
@@ -1597,7 +1623,7 @@ function render(){
       case 'player':drawPlayer(sx,sy,it.o);break;
       case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
       case 'corpse':drawCorpse(sx,sy,it.o);break;
-      case 'goblin':drawGoblin(sx,sy,it.o);break;
+      case 'goblin':case 'goblin_red':drawGoblin(sx,sy,it.o);break;
       case 'wolf':drawWolf(sx,sy,it.o);break;
       case 'orc':drawOrc(sx,sy,it.o);break;
       case 'skeleton':drawSkeleton(sx,sy,it.o);break;
