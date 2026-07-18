@@ -425,15 +425,26 @@ let elderIdx=0;
   }
 })();
 
-// 磯岩: 海岸線の輪郭に沿って自動配置。白波の位置も一緒に拾う
+// 磯岩: 海岸線の輪郭に沿って、互いに重ならない間隔で疎らに配置する
 const FOAM_PTS=[];
 (function shoreDecor(){
   const h=(x,y)=>{const n=Math.sin(x*91.7+y*137.3)*43758.5453;return n-Math.floor(n);};
+  const rockCandidates=[];
   for(let y=1;y<MAP-1;y++)for(let x=1;x<MAP-1;x++){
     const f=islandF(x,y);
-    if(f>1.9&&f<3.3&&h(x,y)<0.26){
-      const v=1+Math.floor(h(x*3,y*7)*3);
-      props.push({x:x+h(x,y*2)*0.8,y:y+h(x*2,y)*0.8,kind:'shoal',v,s:0.7+h(x*5,y*3)*0.5});
+    if(f>1.75&&f<2.95&&h(x,y)<0.28){
+      // 格子の右下へだけずらしていた旧配置をやめ、岸の接線方向へ中央寄せで散らす
+      const e=0.35;
+      let nx=islandF(x+e,y)-islandF(x-e,y),ny=islandF(x,y+e)-islandF(x,y-e);
+      const nl=Math.hypot(nx,ny)||1;nx/=nl;ny/=nl;
+      const tx=-ny,ty=nx;
+      const jt=(h(x*3,y*7)-0.5)*1.1,jn=(h(x*11,y*5)-0.5)*0.28;
+      const v=1+Math.floor(h(x*17+1,y*5+9)*3);
+      rockCandidates.push({
+        x:x+tx*jt+nx*jn,y:y+ty*jt+ny*jn,kind:'shoal',v,
+        s:0.52+h(x*5,y*3)*0.36,rot:(h(x*13,y*17)-0.5)*0.26,
+        order:h(x*19,y*23)
+      });
     }
     if(Math.abs(f-2.3)<0.5&&h(x*7,y*5)<0.75){
       const e=0.4;
@@ -444,6 +455,16 @@ const FOAM_PTS=[];
       FOAM_PTS.push({x:x+h(x,y)*0.6,y:y+h(y,x)*0.6,ph:h(x*11,y*13),
         tx:sxx,ty:syy,nx:-syy,ny:sxx});
     }
+  }
+  // 候補を乱数順に採用し、画像の大きさも加味した最小間隔を保証する
+  rockCandidates.sort((a,b)=>a.order-b.order);
+  const shoreRocks=[];
+  for(const p of rockCandidates){
+    const clear=shoreRocks.every(q=>{
+      const minGap=1.9+0.38*(p.s+q.s);
+      return Math.hypot(p.x-q.x,p.y-q.y)>=minGap;
+    });
+    if(clear){shoreRocks.push(p);props.push(p);}
   }
 })();
 
@@ -485,10 +506,13 @@ const PIER_POSTS=[
   }
   if(PIER){
     const px=Math.round(PIER.x+0.5);
-    // shore_rockは実際のデッキ(6×3タイル)と重なるものだけ除去する
-    props=props.filter(pp=>!(pp.kind==='shoal'&&
-      pp.x>=px-0.5&&pp.x<px+PIER_DECK_LENGTH-0.5&&
-      pp.y>=PIER.y-PIER_DECK_HALF_WIDTH-0.5&&pp.y<PIER.y+PIER_DECK_HALF_WIDTH+0.5));
+    // デッキと砂浜側の進入口には余白を設け、岩が橋脚の下で瓦礫状に固まるのを防ぐ
+    props=props.filter(pp=>{
+      if(pp.kind!=='shoal')return true;
+      const along=pp.x-PIER.x,across=Math.abs(pp.y-PIER.y);
+      return !(along>-1.35&&along<PIER_DECK_LENGTH+0.75&&
+        across<PIER_DECK_HALF_WIDTH+1.3);
+    });
     // 見た目の幅に合わせ、中央線だけでなく3タイル幅を歩行可能にする
     for(let dy=-PIER_DECK_HALF_WIDTH;dy<=PIER_DECK_HALF_WIDTH;dy++)
       for(let dx=0;dx<PIER_DECK_LENGTH;dx++)blocked[(PIER.y+dy)*MAP+px+dx]=0;
@@ -2134,25 +2158,53 @@ function drawPierBase(sx,sy){
   const b=pierDrawBox(sx,sy);
   if(!b)return;
   const {img,w,h,x:x0,y:y0}=b;
-  // 砂の陰影→傾斜した板の順に敷き、直線的な陸側の切れ目をなじませる
+  // 陸側へ同じ向きの板を延ばし、平行な継ぎ目と一本の敷居で砂浜へ接続する
+  const landL={x:x0-26,y:y0+18},landR={x:x0+34,y:y0-4};
+  const deckL={x:x0+2,y:y0+62},deckR={x:x0+62,y:y0+40};
+  const approachPath=()=>{
+    ctx.beginPath();ctx.moveTo(landL.x,landL.y);ctx.lineTo(landR.x,landR.y);
+    ctx.lineTo(deckR.x,deckR.y);ctx.lineTo(deckL.x,deckL.y);ctx.closePath();
+  };
+  // 板の下の影は進入口の輪郭と揃え、砂側へ薄く溶かす
+  ctx.save();ctx.translate(0,6);approachPath();
+  const shadow=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
+  shadow.addColorStop(0,'rgba(42,29,17,0.12)');shadow.addColorStop(1,'rgba(30,21,13,0.38)');
+  ctx.fillStyle=shadow;ctx.fill();ctx.restore();
   ctx.save();
-  ctx.fillStyle='rgba(45,31,18,0.28)';
-  ctx.beginPath();ctx.ellipse(x0+14,y0+35,58,22,-0.32,0,6.29);ctx.fill();
-  ctx.restore();
-  ctx.save();
-  ctx.beginPath();ctx.moveTo(x0-26,y0+18);ctx.lineTo(x0+34,y0-4);ctx.lineTo(x0+62,y0+40);ctx.lineTo(x0+2,y0+62);ctx.closePath();
-  ctx.fillStyle='#5d4a30';ctx.fill();
+  approachPath();
+  const wood=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
+  wood.addColorStop(0,'#6a5436');wood.addColorStop(0.55,'#5a462e');wood.addColorStop(1,'#463623');
+  ctx.fillStyle=wood;ctx.fill();
   ctx.clip();
-  ctx.strokeStyle='rgba(151,124,78,0.28)';ctx.lineWidth=3;
-  ctx.beginPath();ctx.moveTo(x0-24,y0+20);ctx.lineTo(x0+34,y0-1);ctx.stroke();
-  ctx.strokeStyle='rgba(30,22,12,0.55)';ctx.lineWidth=2;
-  for(let i=0;i<8;i++){ctx.beginPath();ctx.moveTo(x0-30+i*9,y0+66);ctx.lineTo(x0+30+i*9,y0-10);ctx.stroke();}
+  // すべての板の継ぎ目を同一の横断方向・等間隔にする
+  ctx.lineCap='butt';
+  for(let i=1;i<7;i++){
+    const t=i/7;
+    const lx=landL.x+(deckL.x-landL.x)*t,ly=landL.y+(deckL.y-landL.y)*t;
+    const rx=landR.x+(deckR.x-landR.x)*t,ry=landR.y+(deckR.y-landR.y)*t;
+    ctx.strokeStyle='rgba(27,20,13,0.62)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(rx,ry);ctx.stroke();
+    ctx.strokeStyle='rgba(154,126,78,0.20)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(lx,ly-1);ctx.lineTo(rx,ry-1);ctx.stroke();
+  }
+  // 控えめな木目も桟橋の長手方向だけに通す
+  ctx.strokeStyle='rgba(190,157,98,0.13)';ctx.lineWidth=1;
+  for(let i=1;i<4;i++){
+    const t=i/4;
+    ctx.beginPath();
+    ctx.moveTo(landL.x+(landR.x-landL.x)*t,landL.y+(landR.y-landL.y)*t);
+    ctx.lineTo(deckL.x+(deckR.x-deckL.x)*t,deckL.y+(deckR.y-deckL.y)*t);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 砂との境目は暗い影＋明るい上端の一本の敷居にして、切り口を意図的に見せる
+  ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle='rgba(35,25,15,0.72)';ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(landL.x,landL.y);ctx.lineTo(landR.x,landR.y);ctx.stroke();
+  ctx.strokeStyle='rgba(176,145,89,0.52)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(landL.x,landL.y-1);ctx.lineTo(landR.x,landR.y-1);ctx.stroke();
   ctx.restore();
   ctx.drawImage(img,x0,y0,w,h);
-  // 残した磯岩を肩として添え、砂浜と板の境界を不規則にぼかす
-  const r2=SPRITES.shore_rock_2,r3=SPRITES.shore_rock_3;
-  if(r3){const rw=44,rh=rw*r3.height/r3.width;ctx.drawImage(r3,x0-30,y0-14,rw,rh);}
-  if(r2){const rw=46,rh=rw*r2.height/r2.width;ctx.drawImage(r2,x0-14,y0+52,rw,rh);}
 }
 function drawPierPost(sx,sy,p){
   const b=pierDrawBox(sx,sy);
@@ -2167,7 +2219,9 @@ function drawShoal(sx,sy,p){
   if(!img){drawRock(sx,sy,{s:p.s});return;}
   const w=(p.v===1?92:p.v===2?78:88)*p.s;
   const h=w*img.height/img.width;
-  ctx.drawImage(img,sx-w/2,sy-h+6,w,h);
+  ctx.save();ctx.translate(sx,sy);ctx.rotate(p.rot||0);
+  ctx.drawImage(img,-w/2,-h+6,w,h);
+  ctx.restore();
 }
 function drawCaveEntrance(sx,sy){
   const img=SPRITES.map_cave_entrance;
