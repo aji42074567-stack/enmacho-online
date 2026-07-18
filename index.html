@@ -336,7 +336,7 @@ const BOSS_HOME={x:10,y:7};
 })();
 
 /* ================= 構造物・NPC ================= */
-const props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop
+const props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/lamp/well
 function placeBuilding(bx,by,kind,roof1,roof2){
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
   props.push({x:bx+0.5,y:by+0.5,kind,roof1,roof2});
@@ -347,6 +347,10 @@ placeBuilding(26,55,'house','#6e3a2e','#5a2f26');
 placeBuilding(35,54,'shop','#7a5a2a','#645022');
 blocked[50*MAP+32]=1;
 props.push({x:32,y:50,kind:'stone'});
+blocked[56*MAP+31]=1;
+props.push({x:31,y:56,kind:'well'});
+props.push({x:29,y:54,kind:'lamp'});
+props.push({x:37,y:52,kind:'lamp'});
 
 const npcs=[
   {x:34,y:56,kind:'merchant',name:'ダツエバ'},
@@ -964,10 +968,23 @@ function update(dt){
 
 /* ================= 地面の事前描画 ================= */
 const ground=document.createElement('canvas');
-(function renderGround(){
+const terrainTexture=new Image();
+terrainTexture.onload=renderGround;
+terrainTexture.src='assets/map_forest_ground.png';
+const groundTiles={};
+function loadGroundTile(key,src){
+  const img=new Image();
+  img.onload=()=>{groundTiles[key]=img;renderGround();};
+  img.src=src;
+}
+loadGroundTile('path','assets/map_tile_path.png');
+loadGroundTile('stone','assets/map_tile_stone.png');
+function renderGround(){
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
   ground.width=gW;ground.height=gH;
   const g=ground.getContext('2d');
+  const terrainPattern=terrainTexture.complete&&terrainTexture.naturalWidth
+    ?g.createPattern(terrainTexture,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   // なめらかノイズ: 隣のマスと色が近くなる→格子に見えない
@@ -991,26 +1008,50 @@ const ground=document.createElement('canvas');
   // 1) 草地: なめらかなグラデーションで塗る
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     const n=vnoise(x/5,y/5)*0.65+vnoise(x/13+7,y/13+3)*0.35;
-    g.fillStyle=`rgb(${lerp(34,56,n)|0},${lerp(58,86,n)|0},${lerp(42,60,n)|0})`;
-    diamond(x,y);g.fill();
+    if(terrainPattern){
+      g.fillStyle=terrainPattern;
+      diamond(x,y);g.fill();
+      g.fillStyle=`rgba(${lerp(20,50,n)|0},${lerp(32,62,n)|0},${lerp(24,44,n)|0},0.28)`;
+      diamond(x,y);g.fill();
+    }else{
+      g.fillStyle=`rgb(${lerp(34,56,n)|0},${lerp(58,86,n)|0},${lerp(42,60,n)|0})`;
+      diamond(x,y);g.fill();
+    }
   }
   // 2) 土の道: マス形ではなく柔らかい楕円を重ねて不定形の道に
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(tileKind[y*MAP+x]!==1)continue;
     const n=vnoise(x/4+3,y/4+9);
     const cx=GX(x,y)+(hash2(x,y)-0.5)*14, cy=GY(x,y)+(hash2(y,x)-0.5)*7;
-    g.fillStyle=`rgba(${lerp(78,100,n)|0},${lerp(60,76,n)|0},${lerp(40,52,n)|0},0.9)`;
-    g.beginPath();g.ellipse(cx,cy,TW*0.62,TH*0.62,0,0,6.29);g.fill();
+    const img=groundTiles.path;
+    if(img){
+      const w=TW*1.65,h=w*img.height/img.width;
+      g.globalAlpha=0.86;
+      g.drawImage(img,cx-w/2,cy-h/2,w,h);
+      g.globalAlpha=1;
+    }else{
+      g.fillStyle=`rgba(${lerp(78,100,n)|0},${lerp(60,76,n)|0},${lerp(40,52,n)|0},0.9)`;
+      g.beginPath();g.ellipse(cx,cy,TW*0.62,TH*0.62,0,0,6.29);g.fill();
+    }
   }
   // 3) 村の石畳: ダイヤ模様をやめ、丸石を敷き詰める
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(tileKind[y*MAP+x]!==2)continue;
     const cx=GX(x,y),cy=GY(x,y);
-    g.fillStyle='rgba(56,57,60,0.95)';
-    g.beginPath();g.ellipse(cx,cy,TW*0.6,TH*0.6,0,0,6.29);g.fill();
+    const img=groundTiles.stone;
+    if(img){
+      const w=TW*1.46,h=w*img.height/img.width;
+      g.globalAlpha=0.88;
+      g.drawImage(img,cx-w/2,cy-h/2,w,h);
+      g.globalAlpha=1;
+    }else{
+      g.fillStyle='rgba(56,57,60,0.95)';
+      g.beginPath();g.ellipse(cx,cy,TW*0.6,TH*0.6,0,0,6.29);g.fill();
+    }
   }
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(tileKind[y*MAP+x]!==2)continue;
+    if(groundTiles.stone)continue;
     const cx=GX(x,y),cy=GY(x,y);
     for(let i=0;i<3;i++){
       const h1=hash2(x*3+i,y*7),h2=hash2(x*7,y*3+i),h3=hash2(x+i*13,y+i*5);
@@ -1046,7 +1087,8 @@ const ground=document.createElement('canvas');
       g.beginPath();g.ellipse(cx,cy,2.2,1.3,0,0,6.29);g.fill();
     }
   }
-})();
+}
+renderGround();
 
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
@@ -1058,6 +1100,15 @@ function loadSprite(key,src){
 }
 loadSprite('player_m','assets/char_player_m.png');
 loadSprite('player_f','assets/char_player_f.png');
+loadSprite('map_house_red','assets/map_house_red.png');
+loadSprite('map_house_blue','assets/map_house_blue.png');
+loadSprite('map_shop_green','assets/map_shop_green.png');
+loadSprite('map_pine_tall','assets/map_pine_tall.png');
+loadSprite('map_pine_full','assets/map_pine_full.png');
+loadSprite('map_rock_spire','assets/map_rock_spire.png');
+loadSprite('map_rock_cluster','assets/map_rock_cluster.png');
+loadSprite('map_lamp_post','assets/map_lamp_post.png');
+loadSprite('map_stone_well','assets/map_stone_well.png');
 (function(){  // 武器振りエフェクト用にアイコン画像も読む
   const seen=new Set();
   for(const id in ITEMS){
@@ -1248,6 +1299,12 @@ function drawDrake(sx,sy,m){
 }
 function drawTree(sx,sy,p){
   const s=p.s;
+  const img=SPRITES[(Math.round(p.x*7+p.y*13)&1)?'map_pine_tall':'map_pine_full'];
+  if(img){
+    const h=118*s,w=h*img.width/img.height;
+    ctx.drawImage(img,sx-w/2,sy-h+8,w,h);
+    return;
+  }
   drawShadow(sx,sy+2,12*s);
   ctx.save();ctx.translate(sx,sy);ctx.scale(s,s);
   ctx.fillStyle='#4a3826';
@@ -1262,6 +1319,13 @@ function drawTree(sx,sy,p){
 }
 function drawRock(sx,sy,p){
   const s=p.s;
+  const tall=(Math.round(p.x*11+p.y*5)&1)===0;
+  const img=SPRITES[tall?'map_rock_spire':'map_rock_cluster'];
+  if(img){
+    const h=(tall?58:46)*s,w=h*img.width/img.height;
+    ctx.drawImage(img,sx-w/2,sy-h+7,w,h);
+    return;
+  }
   drawShadow(sx,sy+2,10*s);
   ctx.save();ctx.translate(sx,sy);ctx.scale(s,s);
   ctx.fillStyle='#6a6e75';
@@ -1270,6 +1334,18 @@ function drawRock(sx,sy,p){
   ctx.fillStyle='#7d828a';
   ctx.beginPath();ctx.moveTo(-7,-10);ctx.lineTo(2,-13);ctx.lineTo(6,-8);ctx.lineTo(-3,-6);ctx.closePath();ctx.fill();
   ctx.restore();
+}
+function drawVillageProp(sx,sy,p){
+  const img=SPRITES[p.kind==='well'?'map_stone_well':'map_lamp_post'];
+  if(!img)return;
+  const h=p.kind==='well'?76:82,w=h*img.width/img.height;
+  ctx.drawImage(img,sx-w/2,sy-h+7,w,h);
+  if(p.kind==='lamp'){
+    const glow=ctx.createRadialGradient(sx-9,sy-h+31,0,sx-9,sy-h+31,34);
+    glow.addColorStop(0,'rgba(255,184,88,0.2)');
+    glow.addColorStop(1,'rgba(255,150,60,0)');
+    ctx.fillStyle=glow;ctx.fillRect(sx-43,sy-h-3,68,68);
+  }
 }
 function drawStone(sx,sy){
   drawShadow(sx,sy+2,12);
@@ -1285,6 +1361,16 @@ function drawStone(sx,sy){
   ctx.restore();
 }
 function drawHouse(sx,sy,p){
+  const key=p.kind==='shop'
+    ?'map_shop_green'
+    :((Math.floor(p.x)&1)?'map_house_red':'map_house_blue');
+  const img=SPRITES[key];
+  if(img){
+    const w=p.kind==='shop'?202:180;
+    const h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy+34-h,w,h);
+    return;
+  }
   const h=34;
   ctx.fillStyle='rgba(0,0,0,0.25)';
   ctx.beginPath();ctx.ellipse(sx,sy,62,28,0,0,6.29);ctx.fill();
@@ -1375,6 +1461,7 @@ function render(){
     switch(it.k){
       case 'tree':drawTree(sx,sy,it.o);break;
       case 'rock':drawRock(sx,sy,it.o);break;
+      case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'stone':drawStone(sx,sy);break;
       case 'house':case 'shop':drawHouse(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
