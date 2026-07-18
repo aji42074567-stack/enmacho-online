@@ -320,8 +320,13 @@ const SHOP_STOCK=['long_sword','bastard','leather','chain','plate'];
 const POTION_PRICE=30,HASTE_PRICE=60,CRIT_PRICE=80;
 
 /* ================= マップ生成 ================= */
-const blocked=new Uint8Array(MAP*MAP);
-const tileKind=new Uint8Array(MAP*MAP);   // 0草 1土の道 2石畳
+let blocked=new Uint8Array(MAP*MAP);
+let tileKind=new Uint8Array(MAP*MAP);   // 0草 1道 2石畳 3砂浜 4海 5洞窟床
+let zone='field',FIELD=null,CAVE=null;
+const CAVE_DOOR={x:50.5,y:21.8};   // 試練の洞窟の入口(フィールド東)
+const CAVE_TRIG={x:49.2,y:23.2};   // ここに触れると洞窟へ
+const CAVE_ENTRY={x:13,y:30};
+const CAVE_EXIT={x:11,y:30};
 const isB=(x,y)=>x<0||y<0||x>=MAP||y>=MAP||blocked[y*MAP+x];
 const SPAWN={x:32,y:53};
 const BOSS_HOME={x:10,y:7};
@@ -340,16 +345,17 @@ const BOSS_HOME={x:10,y:7};
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<6.2)tileKind[y*MAP+x]=2;
   }
-  // 外周の森(2重)
-  for(let i=0;i<MAP;i++){
-    for(const [x,y] of [[i,0],[i,1],[0,i],[1,i],[i,MAP-1],[i,MAP-2],[MAP-1,i],[MAP-2,i]]){
-      blocked[y*MAP+x]=1;
-    }
+  // 離小島: 外周を海と砂浜に
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    const de=Math.min(x,y,MAP-1-x,MAP-1-y);
+    const wob=Math.sin(x*0.55+y*0.85)*0.9+Math.sin(x*0.23-y*0.41)*0.6;
+    if(de<=1.8+wob*0.5){tileKind[y*MAP+x]=4;blocked[y*MAP+x]=1;}       // 海
+    else if(de<=4.2+wob){if(tileKind[y*MAP+x]!==1)tileKind[y*MAP+x]=3;} // 砂浜
   }
 })();
 
 /* ================= 構造物・NPC ================= */
-const props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/lamp/well
+let props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/lamp/well/cave/torch/cavexit
 function placeBuilding(bx,by,kind,roof1,roof2){
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
   props.push({x:bx+0.5,y:by+0.5,kind,roof1,roof2});
@@ -365,7 +371,7 @@ props.push({x:31,y:56,kind:'well'});
 props.push({x:29,y:54,kind:'lamp'});
 props.push({x:37,y:52,kind:'lamp'});
 
-const npcs=[
+let npcs=[
   {x:34,y:56,kind:'merchant',name:'オババ'},
   {x:30,y:51,kind:'elder',name:'オキナ'},
 ];
@@ -388,7 +394,7 @@ const JUDGE_COMMENTS=[
 let elderIdx=0;
 
 (function genProps(){
-  const clear=(x,y)=>Math.hypot(x-SPAWN.x,y-SPAWN.y)<9||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5;
+  const clear=(x,y)=>Math.hypot(x-SPAWN.x,y-SPAWN.y)<9||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6;
   let n=0,tries=0;
   while(n<240&&tries++<8000){
     const x=rndi(2,MAP-3),y=rndi(2,MAP-3);
@@ -404,6 +410,10 @@ let elderIdx=0;
     props.push({x,y,kind:'rock',s:rnd(0.7,1.1)});n++;
   }
 })();
+
+// 試練の洞窟の入口(東の岩山)
+for(const [bx,by] of [[49,21],[50,21],[51,21],[50,22],[51,22],[52,22]])blocked[by*MAP+bx]=1;
+props.push({x:CAVE_DOOR.x,y:CAVE_DOOR.y,kind:'cave'});
 
 /* ================= 経路探索 (A*) ================= */
 function nearestWalkable(tx,ty){
@@ -458,7 +468,7 @@ const player={
   stats:{str:0,con:0,agi:0,int:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,
-  name:'',
+  name:'',quests:{trial:0},
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
   target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
@@ -488,7 +498,8 @@ function save(){
       items:player.items,weapon:player.weapon,armor:player.armor,kills,
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
-      hastePots:player.hastePots,critPots:player.critPots
+      hastePots:player.hastePots,critPots:player.critPots,
+      quests:player.quests
     }));
   }catch(e){}
 }
@@ -510,6 +521,7 @@ function load(){
       player.stats={str:0,con:0,agi:0,int:0};
       player.statPts=5+Math.floor(player.lv/10);
     }
+    player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -525,10 +537,11 @@ const MOBS={
   wolf:    {name:'イヌガミ',    lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:2.4,aggro:4.5,atkCd:1.5,size:.85},
   orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:1.9,aggro:4.2,atkCd:1.9,size:1},
   skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:1.6,aggro:4.0,atkCd:1.8,size:1.05},
-  drake:   {name:'ゴウリュウ',  lv:9,hp:420,dmg:[18,28],xp:420,gold:[150,250],speed:2.1,aggro:5, atkCd:2.1,size:1.5,bar:124,boss:true}
+  oni_blue:{name:'アオオニ',    lv:8,hp:380,dmg:[16,26],xp:300,gold:[80,140], speed:2.0,aggro:5.5,atkCd:1.7,size:1.15,bar:72},
+  drake:   {name:'ゴウリュウ',  lv:9,hp:680,dmg:[24,36],xp:700,gold:[200,320],speed:2.1,aggro:5, atkCd:2.1,size:1.5,bar:124,boss:true}
 };
 const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1]};
-const mobs=[];
+let mobs=[];
 function spawnMob(type,x,y){
   const d=MOBS[type];
   const t=nearestWalkable(x,y);if(!t)return;
@@ -750,6 +763,14 @@ function killMob(m){
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
   if(m.def.boss){banner={txt:'ゴウリュウ鎮魂！',age:0};log('賽の森が静まりかえった…(90秒後にまた迷い出る)','sys');}
+  if(m.type==='oni_blue'&&player.quests.trial<2){
+    player.quests.trial=2;
+    player.statPts+=2;player.gold+=300;
+    banner={txt:'最初の試練 達成！',age:0};
+    log('洞窟の主アオオニを鎮めた！ 魂の資質+2、300モンを得た','gain');
+    if(!player.items.includes('bastard'))gainItem('bastard');
+    log('これで業龍に挑む資格を得た…','sys');
+  }
   save();
 }
 function gainXp(n){
@@ -996,7 +1017,16 @@ function renderEquip(){
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
   else{
-    $('talkText').textContent=ELDER_LINES[elderIdx++%ELDER_LINES.length];
+    let line;
+    if(player.quests.trial===0){
+      line='「よう来たな、亡者よ。業龍に挑むにはまだ早い。東の岩山に試練の洞窟がある。骨の武者どもを越え、主のアオオニを鎮めて力を示すのじゃ」';
+      player.quests.trial=1;save();
+    }else if(player.quests.trial===1){
+      line='「試練の洞窟は東じゃ。森を東へ抜ければ岩山の口が見える。中は暗く、帰り道は入口の青い光。甘露水を忘れるなよ」';
+    }else{
+      line=ELDER_LINES[elderIdx++%ELDER_LINES.length];
+    }
+    $('talkText').textContent=line;
     $('talk').classList.remove('hidden');
   }
   sfx.click();
@@ -1118,7 +1148,12 @@ function update(dt){
       }
     }
     if(player.attackDur<=0)moveAlong(player,dt,speedNow());  // 攻撃中は足を止める
-    const inVillage=dist(player,SPAWN)<6.5;
+    if(zone==='field'&&dist(player,CAVE_TRIG)<0.9){
+      switchZone('cave',CAVE_ENTRY.x,CAVE_ENTRY.y);
+    }else if(zone==='cave'&&dist(player,CAVE_EXIT)<0.8){
+      switchZone('field',CAVE_TRIG.x-1.2,CAVE_TRIG.y+1.4);
+    }
+    const inVillage=zone==='field'&&dist(player,SPAWN)<6.5;
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2));
     if(inVillage||!player.moving)
       player.hp=Math.min(player.maxHp,player.hp+dt*(inVillage?6:1.5));
@@ -1152,7 +1187,7 @@ function update(dt){
         }
       }
     }else if(m.state==='chase'){
-      if(player.dead||dh>12||dist(player,SPAWN)<6){m.state='return';m.path=[];}
+      if(player.dead||dh>12||(zone==='field'&&dist(player,SPAWN)<6)){m.state='return';m.path=[];}
       else if(dp<=RANGE){m.path=[];if(m.atkCd<=0)mobAttack(m);}
       else{
         m.repath-=dt;
@@ -1208,7 +1243,7 @@ function update(dt){
 }
 
 /* ================= 地面の事前描画 ================= */
-const ground=document.createElement('canvas');
+let ground=document.createElement('canvas');
 const terrainTexture=new Image();
 terrainTexture.onload=renderGround;
 terrainTexture.src='assets/map_forest_ground.png';
@@ -1221,9 +1256,10 @@ function loadGroundTile(key,src){
 loadGroundTile('path','assets/map_tile_path.png');
 loadGroundTile('stone','assets/map_tile_stone.png');
 function renderGround(){
+  const tgt=FIELD?FIELD.ground:ground;   // 画像の遅延読み込み後も必ずフィールド側へ描く
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
-  ground.width=gW;ground.height=gH;
-  const g=ground.getContext('2d');
+  tgt.width=gW;tgt.height=gH;
+  const g=tgt.getContext('2d');
   const terrainPattern=terrainTexture.complete&&terrainTexture.naturalWidth
     ?g.createPattern(terrainTexture,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
@@ -1246,8 +1282,25 @@ function renderGround(){
     g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1.5,cy);
     g.closePath();
   }
-  // 1) 草地: なめらかなグラデーションで塗る
+  // 1) 草地: なめらかなグラデーションで塗る(海・砂浜はここで分岐)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    const k0=tileKind[y*MAP+x];
+    if(k0===4){  // 海
+      const n2=vnoise(x/3+11,y/3+5);
+      g.fillStyle=`rgb(${16+n2*14|0},${42+n2*20|0},${58+n2*24|0})`;
+      diamond(x,y);g.fill();
+      if(vnoise(x/1.3,y/1.3)>0.72){
+        g.fillStyle='rgba(190,220,230,0.10)';
+        g.beginPath();g.ellipse(GX(x,y),GY(x,y),18,4,0,0,6.29);g.fill();
+      }
+      continue;
+    }
+    if(k0===3){  // 砂浜
+      const n2=vnoise(x/4+3,y/4+8);
+      g.fillStyle=`rgb(${118+n2*26|0},${104+n2*22|0},${76+n2*16|0})`;
+      diamond(x,y);g.fill();
+      continue;
+    }
     const n=vnoise(x/5,y/5)*0.65+vnoise(x/13+7,y/13+3)*0.35;
     if(terrainPattern){
       g.fillStyle=terrainPattern;
@@ -1331,6 +1384,76 @@ function renderGround(){
 }
 renderGround();
 
+/* ================= 洞窟(最初の試練)とゾーン切替 ================= */
+function renderGroundCave(){
+  const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
+  ground.width=gW;ground.height=gH;
+  const g=ground.getContext('2d');
+  const GX=(x,y)=>(x-y)*TW/2+gW/2;
+  const GY=(x,y)=>(x+y)*TH/2+TH/2;
+  function hash2(x,y){const n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
+  g.fillStyle='#050609';g.fillRect(0,0,gW,gH);
+  const dia=(x,y)=>{
+    const cx=GX(x,y),cy=GY(x,y);
+    g.beginPath();
+    g.moveTo(cx,cy-TH/2-1);g.lineTo(cx+TW/2+1.5,cy);
+    g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1.5,cy);
+    g.closePath();
+  };
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    if(tileKind[y*MAP+x]!==5)continue;
+    const v=hash2(x*3,y*7);
+    g.fillStyle=`rgb(${36+v*10|0},${33+v*9|0},${31+v*8|0})`;
+    dia(x,y);g.fill();
+    if(v>0.9){g.fillStyle='rgba(90,150,180,0.13)';
+      g.beginPath();g.ellipse(GX(x,y),GY(x,y),10,4,0,0,6.29);g.fill();}
+  }
+  // 壁のふち(床に接する岩)
+  for(let y=1;y<MAP-1;y++)for(let x=1;x<MAP-1;x++){
+    if(tileKind[y*MAP+x]===5)continue;
+    let near=false;
+    for(let dy=-1;dy<=1&&!near;dy++)for(let dx=-1;dx<=1;dx++)
+      if(tileKind[(y+dy)*MAP+(x+dx)]===5){near=true;break;}
+    if(!near)continue;
+    const v=hash2(x*7,y*3);
+    g.fillStyle=`rgb(${18+v*7|0},${18+v*6|0},${22+v*7|0})`;
+    dia(x,y);g.fill();
+    g.fillStyle='rgba(70,72,84,0.35)';
+    g.beginPath();g.ellipse(GX(x,y),GY(x,y)-8,14,6,0,0,6.29);g.fill();
+  }
+}
+function buildCave(){
+  blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+  tileKind=new Uint8Array(MAP*MAP);
+  props=[];npcs=[];mobs=[];
+  const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*MAP+x]=0;tileKind[y*MAP+x]=5;}};
+  carve(11,27,17,33);   // 入口の間
+  carve(17,29,27,31);   // 通路
+  carve(27,25,35,35);   // 中の間
+  carve(35,28,41,32);   // 通路
+  carve(41,23,53,37);   // 主の間
+  for(const [tx,ty] of [[11,27],[11,33],[17,29],[27,25],[27,35],[35,28],[35,32],[41,23],[41,37],[47,23],[47,37],[53,23],[53,37]]){
+    props.push({x:tx,y:ty,kind:'torch'});
+  }
+  props.push({x:CAVE_EXIT.x-0.6,y:CAVE_EXIT.y,kind:'cavexit'});
+  spawnMob('skeleton',30,27);spawnMob('skeleton',33,33);spawnMob('skeleton',28,31);
+  spawnMob('skeleton',43,26);spawnMob('skeleton',44,35);
+  spawnMob('oni_blue',49,30);   // 洞窟の主
+  ground=document.createElement('canvas');
+  renderGroundCave();
+  CAVE={blocked,tileKind,props,npcs,mobs,ground};
+}
+function switchZone(z,px,py){
+  zone=z;
+  const W2=z==='cave'?CAVE:FIELD;
+  blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
+  npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
+  corpses.length=0;bolts.length=0;
+  player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
+  player.attackDur=0;player.attackT=0;
+  player.x=px;player.y=py;camInit=false;
+  if(started)log(z==='cave'?'試練の洞窟に足を踏み入れた…':'賽の森へ戻ってきた','sys');
+}
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
 const SPRITES={};
@@ -1367,6 +1490,8 @@ loadSprite('mob_drake_death','assets/mob_drake_death.png');
 loadSprite('fx_breath','assets/fx_breath.png');
 loadSprite('npc_obaba','assets/npc_obaba.png');
 loadSprite('npc_okina','assets/npc_okina.png');
+loadSprite('mob_orc_blue','assets/mob_orc_blue.png');
+loadSprite('mob_orc_blue_attack','assets/mob_orc_blue_attack.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1491,7 +1616,7 @@ function drawCorpse(sx,sy,c){
   switch(c.type){
     case 'goblin':case 'goblin_red':drawGoblin(0,0,fake);break;
     case 'wolf':drawWolf(0,0,fake);break;
-    case 'orc':drawOrc(0,0,fake);break;
+    case 'orc':case 'oni_blue':drawOrc(0,0,fake);break;
     case 'skeleton':drawSkeleton(0,0,fake);break;
     case 'drake':drawDrake(0,0,fake);break;
   }
@@ -1568,7 +1693,7 @@ function drawWolf(sx,sy,m){
   ctx.restore();
 }
 function drawOrc(sx,sy,m){
-  if(drawMobImg(sx,sy,m,'mob_orc'))return;
+  if(drawMobImg(sx,sy,m,m.type==='oni_blue'?'mob_orc_blue':'mob_orc'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*10+m.phase)*1.5:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,11*s);
@@ -1775,6 +1900,49 @@ function drawHouse(sx,sy,p){
   }
   ctx.restore();
 }
+function drawCaveEntrance(sx,sy){
+  drawShadow(sx,sy+4,34);
+  ctx.save();ctx.translate(sx,sy);
+  ctx.fillStyle='#3a3d44';
+  ctx.beginPath();ctx.moveTo(-46,6);ctx.quadraticCurveTo(-40,-38,0,-46);
+  ctx.quadraticCurveTo(40,-38,46,6);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#4a4e57';
+  ctx.beginPath();ctx.moveTo(-30,4);ctx.quadraticCurveTo(-26,-30,0,-36);
+  ctx.quadraticCurveTo(26,-30,30,4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#07070a';
+  ctx.beginPath();ctx.moveTo(-16,6);ctx.quadraticCurveTo(-14,-18,0,-20);
+  ctx.quadraticCurveTo(14,-18,16,6);ctx.closePath();ctx.fill();
+  const fl=0.5+Math.sin(time*7)*0.2;
+  const g3=ctx.createRadialGradient(0,-6,0,0,-6,26);
+  g3.addColorStop(0,`rgba(255,150,60,${0.25*fl})`);g3.addColorStop(1,'rgba(255,150,60,0)');
+  ctx.fillStyle=g3;ctx.fillRect(-26,-30,52,40);
+  ctx.fillStyle='#cfc2a0';ctx.font='9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('試練の洞窟',0,18);
+  ctx.restore();
+}
+function drawTorch(sx,sy){
+  ctx.save();ctx.translate(sx,sy);
+  ctx.strokeStyle='#4a3a26';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-22);ctx.stroke();
+  const fl=Math.sin(time*9+sx)*0.5+0.5;
+  ctx.fillStyle='#ffb44a';
+  ctx.beginPath();ctx.ellipse(0,-26,3+fl,5+fl*2,0,0,6.29);ctx.fill();
+  ctx.fillStyle='#ffe9a0';
+  ctx.beginPath();ctx.ellipse(0,-25,1.4,2.4,0,0,6.29);ctx.fill();
+  const g3=ctx.createRadialGradient(0,-24,0,0,-24,36);
+  g3.addColorStop(0,`rgba(255,160,70,${0.2+fl*0.08})`);g3.addColorStop(1,'rgba(255,160,70,0)');
+  ctx.fillStyle=g3;ctx.fillRect(-36,-60,72,72);
+  ctx.restore();
+}
+function drawCaveExit(sx,sy){
+  ctx.save();ctx.translate(sx,sy);
+  const p2=0.5+Math.sin(time*2)*0.3;
+  ctx.fillStyle=`rgba(140,200,255,${0.25+p2*0.2})`;
+  ctx.beginPath();ctx.ellipse(0,-14,10,18,0,0,6.29);ctx.fill();
+  ctx.fillStyle='#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('出口',0,8);
+  ctx.restore();
+}
 function drawNpc(sx,sy,n){
   const img=SPRITES[n.kind==='merchant'?'npc_obaba':'npc_okina'];
   if(img){
@@ -1857,6 +2025,9 @@ function render(){
       case 'tree':drawTree(sx,sy,it.o);break;
       case 'rock':drawRock(sx,sy,it.o);break;
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
+      case 'cave':drawCaveEntrance(sx,sy);break;
+      case 'torch':drawTorch(sx,sy);break;
+      case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
       case 'house':case 'shop':drawHouse(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
@@ -1865,7 +2036,7 @@ function render(){
       case 'corpse':drawCorpse(sx,sy,it.o);break;
       case 'goblin':case 'goblin_red':drawGoblin(sx,sy,it.o);break;
       case 'wolf':drawWolf(sx,sy,it.o);break;
-      case 'orc':drawOrc(sx,sy,it.o);break;
+      case 'orc':case 'oni_blue':drawOrc(sx,sy,it.o);break;
       case 'skeleton':drawSkeleton(sx,sy,it.o);break;
       case 'drake':drawDrake(sx,sy,it.o);break;
     }
@@ -1954,6 +2125,11 @@ function render(){
   const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.max(W,H)*0.75);
   vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(4,6,12,0.55)');
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+  if(zone==='cave'){  // 洞窟はさらに暗く
+    const cv=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.22,W/2,H/2,Math.max(W,H)*0.7);
+    cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,'rgba(2,3,8,0.5)');
+    ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
+  }
 }
 
 /* ================= HUD ================= */
@@ -1964,7 +2140,8 @@ const el={
   hpn:$('hpnum'),mpn:$('mpnum'),
   pot:$('potN'),bolt:$('btnBolt'),heal:$('btnHeal'),fire:$('btnFire'),
   lockHeal:$('lockHeal'),lockFire:$('lockFire'),
-  buffs:$('buffs'),pt:$('ptN')
+  buffs:$('buffs'),pt:$('ptN'),
+  goal:document.querySelector('#quest .goal')
 };
 function hud(){
   el.lv.textContent=player.lv;
@@ -1979,6 +2156,9 @@ function hud(){
   el.mpn.textContent=`${Math.floor(player.mp)} / ${player.maxMp}`;
   el.pot.textContent=player.potions;
   el.pt.textContent=player.statPts>0?player.statPts:'';
+  el.goal.textContent=player.quests.trial===0?'まずはオキナの話を聞こう'
+    :player.quests.trial===1?'東の岩山 試練の洞窟へ'
+    :'賽の森のゴウリュウを鎮めよ';
   let bf='';
   if(player.hasteT>0)bf+=`⚡韋駄天 ${Math.ceil(player.hasteT)}秒　`;
   if(player.critT>0)bf+=`🔥修羅 ${Math.ceil(player.critT)}秒`;
@@ -2087,6 +2267,7 @@ $('resetBtn').addEventListener('click',()=>{
 });
 $('reviveBtn').addEventListener('click',()=>{
   player.dead=false;
+  if(zone==='cave')switchZone('field',SPAWN.x,SPAWN.y);
   player.x=SPAWN.x;player.y=SPAWN.y;
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;
@@ -2097,6 +2278,9 @@ $('reviveBtn').addEventListener('click',()=>{
 });
 
 /* ================= 起動 ================= */
+FIELD={blocked,tileKind,props,npcs,mobs,ground};
+buildCave();
+switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
 if(hasSaveData){
   $('nameIn').value=player.name;
