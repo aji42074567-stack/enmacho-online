@@ -1200,6 +1200,10 @@ loadSprite('mob_goblin_attack','assets/mob_goblin_attack.png');
 loadSprite('mob_goblin_red_attack','assets/mob_goblin_red_attack.png');
 loadSprite('mob_wolf','assets/mob_wolf.png');
 loadSprite('mob_wolf_attack','assets/mob_wolf_attack.png');
+loadSprite('mob_orc','assets/mob_orc.png');
+loadSprite('mob_orc_attack','assets/mob_orc_attack.png');
+loadSprite('mob_skeleton','assets/mob_skeleton.png');
+loadSprite('mob_skeleton_attack','assets/mob_skeleton_attack.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1395,6 +1399,7 @@ function drawWolf(sx,sy,m){
   ctx.restore();
 }
 function drawOrc(sx,sy,m){
+  if(drawMobImg(sx,sy,m,'mob_orc'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*10+m.phase)*1.5:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,11*s);
@@ -1418,6 +1423,7 @@ function drawOrc(sx,sy,m){
   ctx.restore();
 }
 function drawSkeleton(sx,sy,m){
+  if(drawMobImg(sx,sy,m,'mob_skeleton'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*11+m.phase)*1.4:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,9*s);
