@@ -1365,6 +1365,8 @@ loadSprite('mob_drake_flap','assets/mob_drake_flap.png');
 loadSprite('mob_drake_attack','assets/mob_drake_attack.png');
 loadSprite('mob_drake_death','assets/mob_drake_death.png');
 loadSprite('fx_breath','assets/fx_breath.png');
+loadSprite('npc_obaba','assets/npc_obaba.png');
+loadSprite('npc_okina','assets/npc_okina.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1774,6 +1776,19 @@ function drawHouse(sx,sy,p){
   ctx.restore();
 }
 function drawNpc(sx,sy,n){
+  const img=SPRITES[n.kind==='merchant'?'npc_obaba':'npc_okina'];
+  if(img){
+    drawShadow(sx,sy+2,10);
+    const D=50,F=128;
+    ctx.drawImage(img,0,0,F,F,sx-D/2,sy-D+3+Math.sin(time*1.5+(n.kind==='merchant'?0:2))*1.2,D,D);
+    const puls=0.6+Math.sin(time*3)*0.4;
+    ctx.fillStyle=`rgba(255,225,120,${puls})`;
+    ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('!',sx,sy-D-4);
+    ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';
+    ctx.fillText(n.name,sx,sy+12);
+    return;
+  }
   drawShadow(sx,sy+2,9);
   ctx.save();ctx.translate(sx,sy);
   if(n.kind==='merchant'){
