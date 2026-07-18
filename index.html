@@ -120,6 +120,7 @@
   .itemrow{display:flex;align-items:center;gap:10px;padding:9px 2px;
     border-bottom:1px solid #33291a;font-family:var(--sans);font-size:13px;
     color:var(--parchment);text-align:left}
+  .itemrow .icn{width:26px;height:26px;flex:none}
   .itemrow .nm{flex:1}
   .itemrow .fx{color:var(--dim);font-size:11px}
   .itemrow .pr{color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -200,6 +201,8 @@
 
   <div class="overlay" id="intro">
     <div class="scroll">
+      <div style="width:88px;height:88px;margin:0 auto 6px;
+        background:url(assets/char_player.png) 0 0/400% 100% no-repeat"></div>
       <h1>閻魔庁ONLINE</h1>
       <div class="sub">死後に知る。生前こそが地獄だった。</div>
       <div class="rule"></div>
@@ -280,10 +283,10 @@ const rndi=(a,b)=>Math.floor(rnd(a,b+1));
 
 /* ================= アイテム定義 ================= */
 const ITEMS={
-  dagger:      {slot:'weapon',name:'小刀',        atk:2, price:0},
-  long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120},
-  bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400},
-  drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true},
+  dagger:      {slot:'weapon',name:'小刀',        atk:2, price:0,  icon:'icon_tanto.png'},
+  long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120,icon:'icon_katana.png'},
+  bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400,icon:'icon_greatsword.png'},
+  drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true,icon:'icon_greatsword.png'},
   cloth:       {slot:'armor', name:'経帷子',      def:1, price:0},
   leather:     {slot:'armor', name:'鬼革の胴着',  def:3, price:100},
   chain:       {slot:'armor', name:'鎖帷子',      def:6, price:350},
@@ -426,7 +429,7 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,atk:6,
   xp:0,gold:0,potions:3,
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
-  target:null,talkTarget:null,atkCd:0,repath:0,swing:0,dead:false,face:1,moving:false
+  target:null,talkTarget:null,atkCd:0,repath:0,swing:0,dead:false,face:1,dir:'down',moving:false
 };
 let kills=0,time=0,started=false,hasSaveData=false;
 const xpNext=lv=>Math.floor(55*Math.pow(lv,1.55));
@@ -666,10 +669,16 @@ function gainXp(n){
     sfx.lvup();
   }
 }
+function faceToward(e,t){
+  const dx=t.x-e.x,dy=t.y-e.y;
+  e.face=dx>=0?1:-1;
+  const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向(アイソメ変換)
+  e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
+}
 function playerAttack(){
   const m=player.target;if(!m||m.dead)return;
   player.atkCd=0.85;player.swing=0.25;
-  player.face=m.x-player.x>=0?1:-1;
+  faceToward(player,m);
   const crit=Math.random()<0.1;
   const dmg=Math.round((atkTotal()+rnd(0,4))*(crit?1.6:1));
   damageMob(m,dmg,crit);
@@ -687,7 +696,7 @@ function castBolt(){
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
   player.mp-=8;player.target=t;player.swing=0.25;
-  player.face=t.x-player.x>=0?1:-1;
+  faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
 }
@@ -710,7 +719,7 @@ function castFire(){
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
   player.mp-=20;player.target=t;player.swing=0.25;
-  player.face=t.x-player.x>=0?1:-1;
+  faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
 }
@@ -752,7 +761,8 @@ function renderShop(){
     const it=ITEMS[id];
     const fx=it.slot==='weapon'?`攻+${it.atk}`:`防+${it.def}`;
     const owned=player.items.includes(id);
-    html+=`<div class="itemrow"><span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
+    const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'';
+    html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
       <span class="pr">${it.price} 六文銭</span>
       <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
   }
@@ -786,7 +796,8 @@ function renderEquip(){
       const it=ITEMS[id];if(it.slot!==slot)continue;
       const on=(slot==='weapon'?player.weapon:player.armor)===id;
       const fx=slot==='weapon'?`攻+${it.atk}`:`防+${it.def}`;
-      html+=`<div class="itemrow"><span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
+      const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'';
+      html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
         <button class="buyb ${on?'on':''}" data-eq="${id}">${on?'装備中':'装備する'}</button></div>`;
     }
   }
@@ -824,6 +835,8 @@ function moveAlong(e,dt,speed){
   const step=Math.min(d,speed*dt);
   e.x+=dx/d*step;e.y+=dy/d*step;
   if(Math.abs(dx)>0.05)e.face=dx>=0?1:-1;
+  const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向
+  e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
   e.moving=true;
 }
 function update(dt){
@@ -1020,6 +1033,16 @@ const ground=document.createElement('canvas');
   }
 })();
 
+/* ================= 画像スプライト ================= */
+// 読み込みに失敗したら従来のコード描画にフォールバックする
+const SPRITES={};
+(function(){
+  const img=new Image();
+  img.onload=()=>{SPRITES.player=img;};
+  img.src='assets/char_player.png';
+})();
+const DIR_FRAME={down:0,up:1,left:2,right:3};
+
 /* ================= 描画 ================= */
 let camX=0,camY=0,camInit=false;
 const isoX=(x,y)=>(x-y)*TW/2;
@@ -1056,6 +1079,21 @@ function drawKnight(sx,sy,e){
   ctx.fillStyle='#79839a';
   ctx.beginPath();ctx.arc(0,-26,5.4,3.4,6.1);ctx.fill();
   ctx.fillRect(-5.4,-27,10.8,3);
+  ctx.restore();
+}
+function drawPlayer(sx,sy,e){
+  const img=SPRITES.player;
+  if(!img){drawKnight(sx,sy,e);return;}
+  const bob=e.moving?Math.sin(time*14)*1.6:0;
+  drawShadow(sx,sy+2,10);
+  const F=128,D=48;  // Fはシートの1コマ、Dは画面上の描画サイズ
+  const fi=DIR_FRAME[e.dir]||0;
+  ctx.save();ctx.translate(sx,sy+bob);
+  if(e.swing>0){
+    const t=(0.25-e.swing)/0.25;
+    ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t*Math.PI)*0.22);
+  }
+  ctx.drawImage(img,fi*F,0,F,F,-D/2,-D+3,D,D);
   ctx.restore();
 }
 function drawGoblin(sx,sy,m){
@@ -1299,7 +1337,7 @@ function render(){
       case 'stone':drawStone(sx,sy);break;
       case 'house':case 'shop':drawHouse(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
-      case 'player':drawKnight(sx,sy,it.o);break;
+      case 'player':drawPlayer(sx,sy,it.o);break;
       case 'goblin':drawGoblin(sx,sy,it.o);break;
       case 'wolf':drawWolf(sx,sy,it.o);break;
       case 'orc':drawOrc(sx,sy,it.o);break;
