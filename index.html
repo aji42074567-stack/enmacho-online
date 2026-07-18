@@ -474,6 +474,8 @@ let PIER=null;
     }
   }
   if(PIER)props=props.filter(pp=>!(pp.kind==='shoal'&&pp.x>PIER.x-2&&pp.x<PIER.x+7&&Math.abs(pp.y-PIER.y)<3.5));
+  // 桟橋の上を歩けるように、デッキ直下の海タイルの通行を開放
+  if(PIER){const px=Math.round(PIER.x+0.5);for(let dx=0;dx<6;dx++)blocked[44*MAP+px+dx]=0;}
 })();
 
 // 試練の洞窟の入口: 岩山の高台の上。西の坂からだけ登れる
@@ -1680,6 +1682,8 @@ loadSprite('beach_2','assets/beach_2.png');
 loadSprite('beach_3','assets/beach_3.png');
 loadSprite('beach_4','assets/beach_4.png');
 loadSprite('pier','assets/pier.png');
+loadSprite('map_cave_entrance','assets/map_cave_entrance.png');
+loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -2108,12 +2112,18 @@ function drawPier(sx,sy){
   if(!img)return;
   const w=252,h=w*img.height/img.width;
   const x0=sx-w*0.13,y0=sy-h*0.30;
+  // 画像の陸側が直線で切れているため、板のスロープを下に敷いて継ぎ目を隠す
+  ctx.save();
+  ctx.beginPath();ctx.moveTo(x0-26,y0+18);ctx.lineTo(x0+34,y0-4);ctx.lineTo(x0+62,y0+40);ctx.lineTo(x0+2,y0+62);ctx.closePath();
+  ctx.fillStyle='#5d4a30';ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle='rgba(30,22,12,0.55)';ctx.lineWidth=2;
+  for(let i=0;i<8;i++){ctx.beginPath();ctx.moveTo(x0-30+i*9,y0+66);ctx.lineTo(x0+30+i*9,y0-10);ctx.stroke();}
+  ctx.restore();
   ctx.drawImage(img,x0,y0,w,h);
-  // 画像の陸側が直線で切れているため、岩場で継ぎ目を隠す
-  const r1=SPRITES.shore_rock_1,r2=SPRITES.shore_rock_2,r3=SPRITES.shore_rock_3;
-  if(r3){const rw=56,rh=rw*r3.height/r3.width;ctx.drawImage(r3,x0-26,y0-10,rw,rh);}
-  if(r1){const rw=90,rh=rw*r1.height/r1.width;ctx.drawImage(r1,x0-18,y0+2,rw,rh);}
-  if(r2){const rw=64,rh=rw*r2.height/r2.width;ctx.drawImage(r2,x0+14,y0+40,rw,rh);}
+  const r2=SPRITES.shore_rock_2,r3=SPRITES.shore_rock_3;
+  if(r3){const rw=44,rh=rw*r3.height/r3.width;ctx.drawImage(r3,x0-30,y0-14,rw,rh);}
+  if(r2){const rw=46,rh=rw*r2.height/r2.width;ctx.drawImage(r2,x0-14,y0+52,rw,rh);}
 }
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
@@ -2123,6 +2133,18 @@ function drawShoal(sx,sy,p){
   ctx.drawImage(img,sx-w/2,sy-h+6,w,h);
 }
 function drawCaveEntrance(sx,sy){
+  const img=SPRITES.map_cave_entrance;
+  if(img){
+    const w=170,h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy-h+26,w,h);
+    const fl=0.5+Math.sin(time*7)*0.2;
+    const g3=ctx.createRadialGradient(sx-4,sy-28,0,sx-4,sy-28,30);
+    g3.addColorStop(0,`rgba(255,150,60,${0.18*fl})`);g3.addColorStop(1,'rgba(255,150,60,0)');
+    ctx.fillStyle=g3;ctx.fillRect(sx-34,sy-58,60,50);
+    ctx.fillStyle='#cfc2a0';ctx.font='9px sans-serif';ctx.textAlign='center';
+    ctx.fillText('試練の洞窟',sx,sy+34);
+    return;
+  }
   drawShadow(sx,sy+4,34);
   ctx.save();ctx.translate(sx,sy);
   ctx.fillStyle='#3a3d44';
@@ -2159,6 +2181,18 @@ function drawTorch(sx,sy){
 function drawCaveExit(sx,sy){
   ctx.save();ctx.translate(sx,sy);
   const p2=0.5+Math.sin(time*2)*0.3;
+  const img=SPRITES.map_cave_exit;
+  if(img){
+    const w=64,h=w*img.height/img.width;
+    const g3=ctx.createRadialGradient(0,-h*0.45,0,0,-h*0.45,w*0.9);
+    g3.addColorStop(0,`rgba(140,200,255,${0.16+p2*0.12})`);g3.addColorStop(1,'rgba(140,200,255,0)');
+    ctx.fillStyle=g3;ctx.fillRect(-w,-h-20,w*2,h+40);
+    ctx.drawImage(img,-w/2,-h+6,w,h);
+    ctx.fillStyle='#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
+    ctx.fillText('出口',0,16);
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle=`rgba(140,200,255,${0.25+p2*0.2})`;
   ctx.beginPath();ctx.ellipse(0,-14,10,18,0,0,6.29);ctx.fill();
   ctx.fillStyle='#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
