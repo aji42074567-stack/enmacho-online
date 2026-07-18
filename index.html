@@ -2158,7 +2158,7 @@ function drawPierBase(sx,sy){
   const b=pierDrawBox(sx,sy);
   if(!b)return;
   const {img,w,h,x:x0,y:y0}=b;
-  // 陸側へ同じ向きの板を延ばし、平行な継ぎ目と一本の敷居で砂浜へ接続する
+  // 桟橋画像の陸側を同じ画像から1区画ぶん反復し、切れた端を自然に延長する
   const landL={x:x0-26,y:y0+18},landR={x:x0+34,y:y0-4};
   const deckL={x:x0+2,y:y0+62},deckR={x:x0+62,y:y0+40};
   const approachPath=()=>{
@@ -2171,37 +2171,28 @@ function drawPierBase(sx,sy){
   shadow.addColorStop(0,'rgba(42,29,17,0.12)');shadow.addColorStop(1,'rgba(30,21,13,0.38)');
   ctx.fillStyle=shadow;ctx.fill();ctx.restore();
   ctx.save();
-  approachPath();
-  const wood=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
-  wood.addColorStop(0,'#6a5436');wood.addColorStop(0.55,'#5a462e');wood.addColorStop(1,'#463623');
-  ctx.fillStyle=wood;ctx.fill();
-  ctx.clip();
-  // すべての板の継ぎ目を同一の横断方向・等間隔にする
-  ctx.lineCap='butt';
-  for(let i=1;i<7;i++){
-    const t=i/7;
-    const lx=landL.x+(deckL.x-landL.x)*t,ly=landL.y+(deckL.y-landL.y)*t;
-    const rx=landR.x+(deckR.x-landR.x)*t,ry=landR.y+(deckR.y-landR.y)*t;
-    ctx.strokeStyle='rgba(27,20,13,0.62)';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(rx,ry);ctx.stroke();
-    ctx.strokeStyle='rgba(154,126,78,0.20)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(lx,ly-1);ctx.lineTo(rx,ry-1);ctx.stroke();
-  }
-  // 控えめな木目も桟橋の長手方向だけに通す
-  ctx.strokeStyle='rgba(190,157,98,0.13)';ctx.lineWidth=1;
-  for(let i=1;i<4;i++){
-    const t=i/4;
-    ctx.beginPath();
-    ctx.moveTo(landL.x+(landR.x-landL.x)*t,landL.y+(landR.y-landL.y)*t);
-    ctx.lineTo(deckL.x+(deckR.x-deckL.x)*t,deckL.y+(deckR.y-deckL.y)*t);
-    ctx.stroke();
-  }
+  approachPath();ctx.clip();
+  ctx.fillStyle='#51402b';
+  ctx.fillRect(x0-32,y0-8,108,82);
+  // 接合点から陸側へのベクトル(-28,-44px)だけ同じ桟橋をずらして再利用する。
+  // AI画像と別物の平板を重ねず、板幅・木目・色を元画像と完全に揃える。
+  ctx.drawImage(img,x0-28,y0-44,w,h);
+  // 砂側だけを薄く明るくし、板が岸へ沈み込む境界を作る
+  const fade=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
+  fade.addColorStop(0,'rgba(156,126,77,0.16)');
+  fade.addColorStop(0.45,'rgba(94,70,40,0.04)');
+  fade.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=fade;
+  ctx.fillRect(x0-30,y0-8,100,76);
   ctx.restore();
-  // 砂との境目は暗い影＋明るい上端の一本の敷居にして、切り口を意図的に見せる
-  ctx.save();ctx.lineCap='round';
-  ctx.strokeStyle='rgba(35,25,15,0.72)';ctx.lineWidth=6;
+  ctx.save();
+  approachPath();
+  ctx.clip();
+  // 岸の切り口は太い横棒ではなく、砂に埋もれた細い枕木だけにする
+  ctx.lineCap='round';
+  ctx.strokeStyle='rgba(35,25,15,0.48)';ctx.lineWidth=3;
   ctx.beginPath();ctx.moveTo(landL.x,landL.y);ctx.lineTo(landR.x,landR.y);ctx.stroke();
-  ctx.strokeStyle='rgba(176,145,89,0.52)';ctx.lineWidth=2;
+  ctx.strokeStyle='rgba(186,151,91,0.28)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(landL.x,landL.y-1);ctx.lineTo(landR.x,landR.y-1);ctx.stroke();
   ctx.restore();
   ctx.drawImage(img,x0,y0,w,h);
