@@ -447,6 +447,35 @@ const FOAM_PTS=[];
   }
 })();
 
+// ヤシの木・浜の小物・桟橋
+let PIER=null;
+(function beachDecor(){
+  const h=(x,y)=>{const n=Math.sin(x*53.1+y*97.7)*24634.6345;return n-Math.floor(n);};
+  for(let y=2;y<MAP-2;y++)for(let x=2;x<MAP-2;x++){
+    if(blocked[y*MAP+x])continue;
+    const k=tileKind[y*MAP+x];
+    if(k===1||k===2)continue;
+    if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<8)continue;
+    if(x>=43&&x<=56&&y>=17&&y<=27)continue;
+    const f=islandF(x,y);
+    if(f>-1.6&&f<1.6&&h(x,y)<0.055){          // ヤシの木(海岸沿い)
+      blocked[y*MAP+x]=1;
+      props.push({x:x+0.2,y:y+0.2,kind:'palm',v:h(x*3,y)>0.5?2:1,s:0.85+h(x,y*5)*0.4});
+    }else if(k===3&&f>0.2&&h(x*7,y*3)<0.07){  // 浜の小物
+      props.push({x:x+h(x,y)*0.6,y:y+h(y,x)*0.6,kind:'sundry',v:1+Math.floor(h(x*5,y*7)*3.99),s:0.8+h(x,y)*0.5});
+    }
+  }
+  // 桟橋: 東の浜、岸がf≈1になる場所へ
+  for(let x=40;x<MAP-4;x++){
+    if(islandF(x,44)>1.0){
+      PIER={x:x-0.5,y:44};
+      props.push({x:PIER.x,y:PIER.y,kind:'pier'});
+      break;
+    }
+  }
+  if(PIER)props=props.filter(pp=>!(pp.kind==='shoal'&&pp.x>PIER.x-2&&pp.x<PIER.x+7&&Math.abs(pp.y-PIER.y)<3.5));
+})();
+
 // 試練の洞窟の入口: 岩山の高台の上。西の坂からだけ登れる
 for(let x=MT.x0;x<=MT.x1;x++)for(let y=MT.y0;y<=MT.y1;y++){
   const border=(x===MT.x0||x===MT.x1||y===MT.y0||y===MT.y1);
@@ -1644,6 +1673,13 @@ loadSprite('mob_orc_blue_attack','assets/mob_orc_blue_attack.png');
 loadSprite('shore_rock_1','assets/shore_rock_1.png');
 loadSprite('shore_rock_2','assets/shore_rock_2.png');
 loadSprite('shore_rock_3','assets/shore_rock_3.png');
+loadSprite('palm_1','assets/palm_1.png');
+loadSprite('palm_2','assets/palm_2.png');
+loadSprite('beach_1','assets/beach_1.png');
+loadSprite('beach_2','assets/beach_2.png');
+loadSprite('beach_3','assets/beach_3.png');
+loadSprite('beach_4','assets/beach_4.png');
+loadSprite('pier','assets/pier.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -2052,6 +2088,27 @@ function drawHouse(sx,sy,p){
   }
   ctx.restore();
 }
+function drawPalm(sx,sy,p){
+  const img=SPRITES['palm_'+p.v];
+  if(!img){drawTree(sx,sy,{s:p.s});return;}
+  const h=118*p.s,w=h*img.width/img.height;
+  ctx.save();ctx.translate(sx,sy);
+  ctx.rotate(Math.sin(time*0.6+p.x)*0.014);   // 潮風のゆれ
+  ctx.drawImage(img,-w/2,-h+5,w,h);
+  ctx.restore();
+}
+function drawSundry(sx,sy,p){
+  const img=SPRITES['beach_'+p.v];
+  if(!img)return;
+  const w=20*p.s,h=w*img.height/img.width;
+  ctx.drawImage(img,sx-w/2,sy-h+2,w,h);
+}
+function drawPier(sx,sy){
+  const img=SPRITES.pier;
+  if(!img)return;
+  const w=252,h=w*img.height/img.width;
+  ctx.drawImage(img,sx-w*0.13,sy-h*0.30,w,h);
+}
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
   if(!img){drawRock(sx,sy,{s:p.s});return;}
@@ -2213,6 +2270,9 @@ function render(){
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
       case 'shoal':drawShoal(sx,sy,it.o);break;
+      case 'palm':drawPalm(sx,sy,it.o);break;
+      case 'sundry':drawSundry(sx,sy,it.o);break;
+      case 'pier':drawPier(sx,sy);break;
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
