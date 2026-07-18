@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>アデンの森 — リネ風ミニRPG</title>
+<title>閻魔庁ONLINE — 死後に知る。生前こそが地獄だった。</title>
 <style>
   :root{
     --ink:#0b0d12;
@@ -52,6 +52,7 @@
   #log div{color:#cfc2a0;opacity:.9}
   #log div.sys{color:#8fb2d9}
   #log div.gain{color:#d9c07a}
+  #log div.glitch{color:#7fd8a0;letter-spacing:.05em}
 
   /* ---- bottom bar ---- */
   #dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
@@ -150,16 +151,16 @@
   <canvas id="game"></canvas>
 
   <div id="plate">
-    <span class="name">冒険者アジ</span><span class="lv">Lv <span id="lv">1</span></span>
-    <div class="row"><span>EXP</span><div class="meter" id="xpbar"><i></i></div></div>
+    <span class="name">亡者アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
+    <div class="row"><span>徳</span><div class="meter" id="xpbar"><i></i></div></div>
     <div class="row"><span>攻撃 <span class="v" id="atkv">8</span></span>
       <span>防御 <span class="v" id="defv">1</span></span>
-      <span style="margin-left:auto" class="gold"><span id="gold">0</span> アデナ</span></div>
+      <span style="margin-left:auto" class="gold"><span id="gold">0</span> 六文銭</span></div>
   </div>
 
   <div id="quest">
-    <div class="goal">森の奥のドレイクを討て</div>
-    <div class="n">討伐数 <span id="kills">0</span></div>
+    <div class="goal">賽の森の業龍を鎮めよ</div>
+    <div class="n">成仏させた魂 <span id="kills">0</span></div>
   </div>
 
   <div id="log" aria-live="polite"></div>
@@ -170,18 +171,18 @@
       <div class="vital"><b>MP</b><div class="meter" id="mpbar"><i></i></div><span class="num" id="mpnum"></span></div>
     </div>
     <div id="skills">
-      <button class="skill" id="btnBolt" title="エナジーボルト (E) MP8">
-        <span class="key">E</span><span class="icon">✦</span><span>ボルト</span>
+      <button class="skill" id="btnBolt" title="破魔の印 (E) MP8">
+        <span class="key">E</span><span class="icon">✦</span><span>破魔</span>
       </button>
-      <button class="skill" id="btnHeal" title="ヒール (R) MP12 / Lv3で習得">
-        <span class="key">R</span><span class="icon">✚</span><span>ヒール</span>
-        <span class="lock hidden" id="lockHeal">Lv3</span>
+      <button class="skill" id="btnHeal" title="回向の印 (R) MP12 / 徳位3で習得">
+        <span class="key">R</span><span class="icon">✚</span><span>回向</span>
+        <span class="lock hidden" id="lockHeal">徳3</span>
       </button>
-      <button class="skill" id="btnFire" title="ファイアボール (F) MP20 / Lv6で習得">
-        <span class="key">F</span><span class="icon">🔥</span><span>火球</span>
-        <span class="lock hidden" id="lockFire">Lv6</span>
+      <button class="skill" id="btnFire" title="業火の印 (F) MP20 / 徳位6で習得">
+        <span class="key">F</span><span class="icon">🔥</span><span>業火</span>
+        <span class="lock hidden" id="lockFire">徳6</span>
       </button>
-      <button class="skill" id="btnPotion" title="ポーション (Q)">
+      <button class="skill" id="btnPotion" title="甘露水 (Q)">
         <span class="key">Q</span><span class="icon">⚗</span><span>回復</span>
         <span class="badge" id="potN">3</span>
       </button>
@@ -193,33 +194,37 @@
 
   <div class="overlay" id="intro">
     <div class="scroll">
-      <h1>アデンの森</h1>
-      <div class="sub">リネージュ風・ブラウザRPG v0.2</div>
+      <h1>閻魔庁ONLINE</h1>
+      <div class="sub">死後に知る。生前こそが地獄だった。</div>
       <div class="rule"></div>
+      <div class="say" style="margin-bottom:12px">あなたは死にました。<br>
+        ここは地獄庁 第七審査区「賽の森」。<br>
+        迷える魂を成仏させて徳を積み、転生許可の審査に進みなさい。</div>
       <ul>
         <li><b>地面をクリック / タップ</b> … 移動</li>
-        <li><b>モンスターをクリック</b> … 自動攻撃</li>
-        <li><b>村人をクリック</b> … 会話・買い物</li>
-        <li><b>E</b> ボルト / <b>R</b> ヒール / <b>F</b> 火球 / <b>Q</b> 回復薬</li>
+        <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
+        <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
+        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 甘露水</li>
       </ul>
-      <div class="goal">— 森の最深部に棲むドレイクを討伐せよ —</div>
-      <button class="btn" id="startBtn">冒険をはじめる</button>
-      <br><button class="linkbtn hidden" id="resetBtn">セーブを消して最初からやり直す</button>
+      <div class="goal">— 森の最深部に巣くう業龍を鎮めよ —</div>
+      <button class="btn" id="startBtn">入庁する</button>
+      <br><button class="linkbtn hidden" id="resetBtn">記録を消して転生し直す(最初から)</button>
     </div>
   </div>
 
   <div class="overlay hidden" id="death">
     <div class="scroll">
-      <h1>死亡</h1>
-      <div class="sub">あなたは倒れました</div>
-      <button class="btn" id="reviveBtn">村の祈りの石で復活する</button>
+      <h1>魂散</h1>
+      <div class="sub">魂がほどけてしまった</div>
+      <div class="say" id="judgeText" style="margin-top:4px"></div>
+      <button class="btn" id="reviveBtn">賽の石碑で目を覚ます</button>
     </div>
   </div>
 
   <div class="overlay hidden" id="shop">
     <div class="scroll">
-      <h2>雑貨屋モルフ</h2>
-      <div class="sub">「いらっしゃい。森へ行くなら備えな」</div>
+      <h2>奪衣婆の売店</h2>
+      <div class="sub">「六文銭は貯めるもんじゃない、使うもんだよ」</div>
       <div id="shopList"></div>
       <div class="goldrow">所持金 <span id="shopGold">0</span> アデナ</div>
       <button class="btn small" id="shopClose">店を出る</button>
@@ -228,8 +233,8 @@
 
   <div class="overlay hidden" id="talk">
     <div class="scroll">
-      <h2>長老ハーディン</h2>
-      <div class="sub">村の長老</div>
+      <h2>懸衣翁</h2>
+      <div class="sub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
       <button class="btn small" id="talkClose">別れる</button>
     </div>
@@ -269,14 +274,14 @@ const rndi=(a,b)=>Math.floor(rnd(a,b+1));
 
 /* ================= アイテム定義 ================= */
 const ITEMS={
-  dagger:      {slot:'weapon',name:'短剣',              atk:2, price:0},
-  long_sword:  {slot:'weapon',name:'ロングソード',      atk:6, price:120},
-  bastard:     {slot:'weapon',name:'バスタードソード',  atk:12,price:400},
-  drake_slayer:{slot:'weapon',name:'ドレイクスレイヤー',atk:20,price:0,rare:true},
-  cloth:       {slot:'armor', name:'布の服',            def:1, price:0},
-  leather:     {slot:'armor', name:'レザーアーマー',    def:3, price:100},
-  chain:       {slot:'armor', name:'チェーンメイル',    def:6, price:350},
-  plate:       {slot:'armor', name:'プレートメイル',    def:10,price:900},
+  dagger:      {slot:'weapon',name:'小刀',        atk:2, price:0},
+  long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120},
+  bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400},
+  drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true},
+  cloth:       {slot:'armor', name:'経帷子',      def:1, price:0},
+  leather:     {slot:'armor', name:'鬼革の胴着',  def:3, price:100},
+  chain:       {slot:'armor', name:'鎖帷子',      def:6, price:350},
+  plate:       {slot:'armor', name:'冥府の具足',  def:10,price:900},
 };
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate'];
 const POTION_PRICE=30;
@@ -324,15 +329,24 @@ blocked[50*MAP+32]=1;
 props.push({x:32,y:50,kind:'stone'});
 
 const npcs=[
-  {x:34,y:56,kind:'merchant',name:'モルフ'},
-  {x:30,y:51,kind:'elder',name:'ハーディン'},
+  {x:34,y:56,kind:'merchant',name:'奪衣婆'},
+  {x:30,y:51,kind:'elder',name:'懸衣翁'},
 ];
 const ELDER_LINES=[
-  '「北の森の奥に、ドレイクという竜が棲みついておる。腕を磨いてから挑むのじゃぞ」',
-  '「モルフの店で装備を整えるとよい。レザーアーマー1枚でも生存率は段違いじゃ」',
-  '「ヒールはLv3、ファイアボールはLv6で自然と使えるようになる。魔法を頼れ」',
-  '「オークは稀にバスタードソードを、スケルトンはチェーンメイルを落とすらしい」',
-  '「村の中は聖なる加護で回復が速い。危なくなったら戻ってくるのじゃ」',
+  '「森の最深部に業龍が巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
+  '「奪衣婆の店で装備を整えよ。六文銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
+  '「印は徳が積まれれば自然と授かる。回向は徳位3、業火は徳位6じゃ」',
+  '「悪鬼は大太刀を、がしゃどくろは鎖帷子を落とすことがある。執着の強い品ほど、よく落ちるものでな」',
+  '「詰所の中は庁の加護で回復が速い。疲れたら戻ってこい。休むことは、逃げることではないぞ」',
+  '「魂を斬るのは殺生ではない。迷いを断ち、成仏させてやる功徳じゃ。……生きておった頃、お前は誰かの迷いを断ってやれたかの?」',
+  '「ここだけの話じゃがな……この世界、時々"ほころび"のようなものが見える。まあ、わしの気のせいじゃろうて」',
+];
+const JUDGE_COMMENTS=[
+  '審査記録: 無謀は勇気ではない。だが、挑んだという事実は徳として記録した。',
+  '審査記録: 準備を怠った者から順に倒れる。生前も、死後も、それは同じである。',
+  '審査記録: 逃げてもよかった。それでも立ち向かったことを記録した。',
+  '審査記録: 失敗は罪ではない。同じ失敗から何も学ばぬことが罪である。',
+  '審査記録: 回復を後回しにする癖、生前の働き方と同じである。改善を求む。',
 ];
 let elderIdx=0;
 
@@ -440,11 +454,11 @@ window.addEventListener('beforeunload',save);
 
 /* ================= モンスター ================= */
 const MOBS={
-  goblin:  {name:'ゴブリン',  lv:1,hp:30, dmg:[3,6],  xp:14, gold:[3,8],   speed:2.2,aggro:0,  atkCd:1.3,size:.75},
-  wolf:    {name:'ウルフ',    lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:3.1,aggro:4.5,atkCd:1.1,size:.85},
-  orc:     {name:'オーク',    lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:2.4,aggro:4.2,atkCd:1.4,size:1},
-  skeleton:{name:'スケルトン',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:2.0,aggro:4.0,atkCd:1.3,size:1.05},
-  drake:   {name:'ドレイク',  lv:9,hp:420,dmg:[18,28],xp:420,gold:[150,250],speed:2.7,aggro:5, atkCd:1.5,size:1.5,boss:true}
+  goblin:  {name:'餓鬼',      lv:1,hp:30, dmg:[3,6],  xp:14, gold:[3,8],   speed:2.2,aggro:0,  atkCd:1.3,size:.75},
+  wolf:    {name:'犬神',      lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:3.1,aggro:4.5,atkCd:1.1,size:.85},
+  orc:     {name:'悪鬼',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:2.4,aggro:4.2,atkCd:1.4,size:1},
+  skeleton:{name:'がしゃどくろ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60],speed:2.0,aggro:4.0,atkCd:1.3,size:1.05},
+  drake:   {name:'業龍',      lv:9,hp:420,dmg:[18,28],xp:420,gold:[150,250],speed:2.7,aggro:5, atkCd:1.5,size:1.5,boss:true}
 };
 const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1]};
 const mobs=[];
@@ -564,15 +578,16 @@ function killMob(m){
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
   gainXp(m.def.xp);
-  log(`${m.name}を倒した (+${m.def.xp} EXP / +${gold}アデナ)`);
+  log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} 六文銭)`);
   const drop=DROPS[m.type];
   if(drop&&Math.random()<drop[1]&&!player.items.includes(drop[0])){
     gainItem(drop[0]);
   }else if(Math.random()<0.28){
-    player.potions++;addFloat(m.x,m.y-0.6,'ポーション獲得','#7fd0ff');log('ポーションを拾った','gain');
+    player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');
   }
+  if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
-  if(m.def.boss){banner={txt:'ドレイク討伐！',age:0};log('森に平和が戻った…(90秒後に再出現)','sys');}
+  if(m.def.boss){banner={txt:'業龍鎮魂！',age:0};log('賽の森が静まりかえった…(90秒後にまた迷い出る)','sys');}
   save();
 }
 function gainXp(n){
@@ -582,11 +597,12 @@ function gainXp(n){
     player.lv++;player.atk+=2;
     player.maxHp+=14;player.maxMp+=7;
     player.hp=player.maxHp;player.mp=player.maxMp;
-    addFloat(player.x,player.y-0.8,'LEVEL UP!','#ffe27a',true);
+    addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
-    log(`レベルアップ！ Lv${player.lv}`,'gain');
-    if(player.lv===3)log('スキル「ヒール」を習得した！','gain');
-    if(player.lv===6)log('スキル「ファイアボール」を習得した！','gain');
+    log(`徳が高まり、徳位${player.lv}になった`,'gain');
+    if(player.lv===3)log('印「回向」を授かった！','gain');
+    if(player.lv===6)log('印「業火」を授かった！','gain');
+    if(Math.random()<0.15)log('[系統] 人格学習スコア: 良好','glitch');
     sfx.lvup();
   }
 }
@@ -608,8 +624,8 @@ function pickSpellTarget(range){
 function castBolt(){
   if(player.dead||!started)return;
   const t=pickSpellTarget(7);
-  if(!t){log('射程内に敵がいない','sys');return;}
-  if(player.mp<8){log('MPが足りない','sys');return;}
+  if(!t){log('射程内に迷える魂がいない','sys');return;}
+  if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
   player.mp-=8;player.target=t;player.swing=0.25;
   player.face=t.x-player.x>=0?1:-1;
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
@@ -617,8 +633,8 @@ function castBolt(){
 }
 function castHeal(){
   if(player.dead||!started)return;
-  if(player.lv<3){log('ヒールはLv3で習得する','sys');return;}
-  if(player.mp<12){log('MPが足りない','sys');return;}
+  if(player.lv<3){log('印「回向」は徳位3で授かる','sys');return;}
+  if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
   player.mp-=12;
   const n=45+7*player.lv;
@@ -629,10 +645,10 @@ function castHeal(){
 }
 function castFire(){
   if(player.dead||!started)return;
-  if(player.lv<6){log('ファイアボールはLv6で習得する','sys');return;}
+  if(player.lv<6){log('印「業火」は徳位6で授かる','sys');return;}
   const t=pickSpellTarget(7);
-  if(!t){log('射程内に敵がいない','sys');return;}
-  if(player.mp<20){log('MPが足りない','sys');return;}
+  if(!t){log('射程内に迷える魂がいない','sys');return;}
+  if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
   player.mp-=20;player.target=t;player.swing=0.25;
   player.face=t.x-player.x>=0?1:-1;
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
@@ -640,7 +656,7 @@ function castFire(){
 }
 function drinkPotion(){
   if(player.dead||!started)return;
-  if(player.potions<=0){log('ポーションがない','sys');return;}
+  if(player.potions<=0){log('甘露水がない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
   player.potions--;
   player.hp=Math.min(player.maxHp,player.hp+65);
@@ -657,7 +673,8 @@ function mobAttack(m){
   sfx.hurt();
   if(player.hp<=0){
     player.hp=0;player.dead=true;player.path=[];player.target=null;
-    log('あなたは死亡した…','sys');
+    log('魂がほどけて散った…','sys');
+    document.getElementById('judgeText').textContent=JUDGE_COMMENTS[rndi(0,JUDGE_COMMENTS.length-1)];
     document.getElementById('death').classList.remove('hidden');
   }
 }
@@ -668,7 +685,7 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 function renderShop(){
   const list=$('shopList');
   let html='';
-  html+=`<div class="itemrow"><span class="nm">ポーション <span class="fx">HP+65</span></span>
+  html+=`<div class="itemrow"><span class="nm">甘露水 <span class="fx">HP+65</span></span>
     <span class="pr">${POTION_PRICE}アデナ</span>
     <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
   for(const id of SHOP_STOCK){
@@ -689,7 +706,7 @@ function buy(id){
   if(id==='potion'){
     if(player.gold<POTION_PRICE)return;
     player.gold-=POTION_PRICE;player.potions++;
-    log('ポーションを買った','gain');
+    log('甘露水を買った','gain');
   }else{
     const it=ITEMS[id];
     if(!it||player.items.includes(id)||player.gold<it.price)return;
@@ -1304,10 +1321,10 @@ $('startBtn').addEventListener('click',()=>{
   $('intro').classList.add('hidden');
   started=true;audio();
   if(hasSaveData){
-    log(`おかえりなさい (Lv${player.lv} / ${player.gold}アデナ)`,'sys');
+    log(`おかえり、亡者アジ (徳位${player.lv} / ${player.gold} 六文銭)`,'sys');
   }else{
-    log('アデンの森に足を踏み入れた','sys');
-    log('村人に話しかけてみよう','sys');
+    log('地獄庁 第七審査区「賽の森」に着任した','sys');
+    log('川辺の奪衣婆と懸衣翁に話しかけてみよう','sys');
   }
 });
 $('resetBtn').addEventListener('click',()=>{
@@ -1320,13 +1337,13 @@ $('reviveBtn').addEventListener('click',()=>{
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;
   $('death').classList.add('hidden');
-  log('祈りの石のもとで復活した','sys');
+  log('賽の石碑のもとで、魂が編み直された','sys');
 });
 
 /* ================= 起動 ================= */
 hasSaveData=load();
 if(hasSaveData){
-  $('startBtn').textContent=`つづきから (Lv${player.lv})`;
+  $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');
 }
 let last=0;
