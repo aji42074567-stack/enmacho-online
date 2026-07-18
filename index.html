@@ -135,6 +135,9 @@
     padding:9px 10px;outline:none;box-sizing:border-box}
   #nameIn:focus{border-color:var(--gold)}
   #nameIn::placeholder{color:#6b604a;font-size:12px;letter-spacing:.05em}
+  #buffs{position:absolute;left:50%;bottom:104px;transform:translateX(-50%);
+    font-family:var(--sans);font-size:11.5px;color:#ffd98a;pointer-events:none;
+    text-shadow:0 1px 3px #000,0 0 6px #000;letter-spacing:.04em}
   .itemrow .nm{flex:1}
   .itemrow .fx{color:var(--dim);font-size:11px}
   .itemrow .pr{color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -186,6 +189,8 @@
 
   <div id="log" aria-live="polite"></div>
 
+  <div id="buffs"></div>
+
   <div id="dock">
     <div id="vitals">
       <div class="vital"><b>HP</b><div class="meter" id="hpbar"><i></i></div><span class="num" id="hpnum"></span></div>
@@ -207,8 +212,9 @@
         <span class="key">Q</span><span class="icon">⚗</span><span>回復</span>
         <span class="badge" id="potN">3</span>
       </button>
-      <button class="skill" id="btnEquip" title="装備 (I)">
-        <span class="key">I</span><span class="icon">🛡</span><span>装備</span>
+      <button class="skill" id="btnEquip" title="道具 (I)">
+        <span class="key">I</span><span class="icon">🛡</span><span>道具</span>
+        <span class="badge" id="ptN"></span>
       </button>
     </div>
   </div>
@@ -231,7 +237,7 @@
         <li><b>地面をクリック / タップ</b> … 移動</li>
         <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
         <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 甘露水</li>
+        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 甘露水 / <b>I</b> 道具</li>
       </ul>
       <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
       <button class="btn" id="startBtn">入庁する</button>
@@ -269,8 +275,8 @@
 
   <div class="overlay hidden" id="equip">
     <div class="scroll">
-      <h2>装備</h2>
-      <div class="sub">タップで装備を切り替え</div>
+      <h2>持ち物</h2>
+      <div class="sub">魂の資質・薬・装備</div>
       <div id="equipList"></div>
       <button class="btn small" id="equipClose">閉じる</button>
     </div>
@@ -311,7 +317,7 @@ const ITEMS={
   plate:       {slot:'armor', name:'冥府の具足',  def:10,price:900,icon:'icon_armor_plate.png'},
 };
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate'];
-const POTION_PRICE=30;
+const POTION_PRICE=30,HASTE_PRICE=60,CRIT_PRICE=80;
 
 /* ================= マップ生成 ================= */
 const blocked=new Uint8Array(MAP*MAP);
@@ -448,7 +454,9 @@ function findPath(fx,fy,tx,ty){
 /* ================= プレイヤー ================= */
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
-  lv:1,hp:80,maxHp:80,mp:30,maxMp:30,atk:6,
+  lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
+  stats:{str:0,con:0,agi:0,int:0},statPts:5,
+  hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,
   name:'',
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
@@ -457,31 +465,50 @@ const player={
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
-const xpNext=lv=>Math.floor(55*Math.pow(lv,1.55));
-const atkTotal=()=>player.atk+ITEMS[player.weapon].atk;
-const defTotal=()=>ITEMS[player.armor].def+Math.floor(player.lv/3);
+const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
+const ST=()=>player.stats;
+const atkTotal=()=>6+2*ST().str+ITEMS[player.weapon].atk;
+const defTotal=()=>ITEMS[player.armor].def+Math.floor(ST().con/2);
+const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
+const spellMul=()=>1+0.06*ST().int;
+const speedNow=()=>player.speed*(1+0.02*ST().agi)*(player.hasteT>0?1.3:1);
+function recalcMax(){
+  player.maxHp=80+12*(player.lv-1)+16*ST().con;
+  player.maxMp=30+6*(player.lv-1)+12*ST().int;
+  player.hp=Math.min(player.hp,player.maxHp);
+  player.mp=Math.min(player.mp,player.maxMp);
+}
 
 function save(){
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:1,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:2,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       items:player.items,weapon:player.weapon,armor:player.armor,kills,
-      gender:player.gender,name:player.name
+      gender:player.gender,name:player.name,
+      stats:player.stats,statPts:player.statPts,
+      hastePots:player.hastePots,critPots:player.critPots
     }));
   }catch(e){}
 }
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||d.v!==1)return false;
+    if(!d||(d.v!==1&&d.v!==2))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
     player.items=d.items;player.weapon=d.weapon;player.armor=d.armor;
     player.gender=d.gender==='f'?'f':'m';
     player.name=(typeof d.name==='string'&&d.name.trim())?d.name.trim().slice(0,8):'アジ';
     kills=d.kills||0;
-    player.maxHp=80+14*(player.lv-1);
-    player.maxMp=30+7*(player.lv-1);
-    player.atk=6+2*(player.lv-1);
+    if(d.v===2&&d.stats){
+      player.stats={str:d.stats.str|0,con:d.stats.con|0,agi:d.stats.agi|0,int:d.stats.int|0};
+      player.statPts=d.statPts|0;
+      player.hastePots=d.hastePots|0;player.critPots=d.critPots|0;
+    }else{
+      // 旧セーブ: 初期5pt+10レベルごとの分をまとめて付与
+      player.stats={str:0,con:0,agi:0,int:0};
+      player.statPts=5+Math.floor(player.lv/10);
+    }
+    recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
   }catch(e){return false;}
@@ -727,9 +754,10 @@ function gainXp(n){
   player.xp+=n;
   while(player.xp>=xpNext(player.lv)){
     player.xp-=xpNext(player.lv);
-    player.lv++;player.atk+=2;
-    player.maxHp+=14;player.maxMp+=7;
+    player.lv++;
+    recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
+    if(player.lv%10===0){player.statPts++;log('魂の資質ポイント+1！ 道具(I)で割り振ろう','gain');}
     addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
     log(`徳が高まり、徳位${player.lv}になった`,'gain');
@@ -748,7 +776,7 @@ function faceToward(e,t){
 function playerAttack(){
   // 振りかぶり→0.3秒後にヒット判定(リネ風の「間」)
   const m=player.target;if(!m||m.dead)return;
-  player.atkCd=1.5;
+  player.atkCd=player.hasteT>0?1.1:1.5;
   player.attackT=0;player.attackDur=0.62;
   player.swingKind='melee';
   faceToward(player,m);
@@ -778,7 +806,7 @@ function castHeal(){
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
   player.mp-=12;
-  const n=45+7*player.lv;
+  const n=45+7*player.lv+8*ST().int;
   player.hp=Math.min(player.maxHp,player.hp+n);
   addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
   burst(player.x,player.y,'#7fe07f',12);
@@ -803,6 +831,24 @@ function drinkPotion(){
   player.hp=Math.min(player.maxHp,player.hp+65);
   addFloat(player.x,player.y-0.6,'+65','#7fe07f');
   burst(player.x,player.y,'#7fe07f',10);
+  sfx.potion();save();
+}
+function drinkHaste(){
+  if(player.dead||!started)return;
+  if(player.hastePots<=0){log('韋駄天の水がない','sys');return;}
+  if(player.hasteT>0){log('すでに韋駄天の加護がある','sys');return;}
+  player.hastePots--;player.hasteT=30;
+  addFloat(player.x,player.y-0.6,'韋駄天！','#9fe0ff');
+  burst(player.x,player.y,'#9fe0ff',12);
+  sfx.potion();save();
+}
+function drinkCrit(){
+  if(player.dead||!started)return;
+  if(player.critPots<=0){log('修羅の酒がない','sys');return;}
+  if(player.critT>0){log('すでに修羅の血が滾っている','sys');return;}
+  player.critPots--;player.critT=30;
+  addFloat(player.x,player.y-0.6,'修羅！','#ffb46a');
+  burst(player.x,player.y,'#ffb46a',12);
   sfx.potion();save();
 }
 function mobAttack(m){
@@ -837,6 +883,14 @@ function renderShop(){
     <span class="nm">甘露水 <span class="fx">HP+65</span></span>
     <span class="pr">${POTION_PRICE} 六文銭</span>
     <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
+  html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
+    <span class="nm">韋駄天の水 <span class="fx">30秒 移動と攻撃が速くなる</span></span>
+    <span class="pr">${HASTE_PRICE} 六文銭</span>
+    <button class="buyb" data-buy="haste" ${player.gold<HASTE_PRICE?'disabled':''}>買う</button></div>`;
+  html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
+    <span class="nm">修羅の酒 <span class="fx">30秒 会心率+25%</span></span>
+    <span class="pr">${CRIT_PRICE} 六文銭</span>
+    <button class="buyb" data-buy="crit" ${player.gold<CRIT_PRICE?'disabled':''}>買う</button></div>`;
   for(const id of SHOP_STOCK){
     const it=ITEMS[id];
     const fx=it.slot==='weapon'?`攻+${it.atk}`:`防+${it.def}`;
@@ -857,6 +911,14 @@ function buy(id){
     if(player.gold<POTION_PRICE)return;
     player.gold-=POTION_PRICE;player.potions++;
     log('甘露水を買った','gain');
+  }else if(id==='haste'){
+    if(player.gold<HASTE_PRICE)return;
+    player.gold-=HASTE_PRICE;player.hastePots++;
+    log('韋駄天の水を買った','gain');
+  }else if(id==='crit'){
+    if(player.gold<CRIT_PRICE)return;
+    player.gold-=CRIT_PRICE;player.critPots++;
+    log('修羅の酒を買った','gain');
   }else{
     const it=ITEMS[id];
     if(!it||player.items.includes(id)||player.gold<it.price)return;
@@ -868,7 +930,34 @@ function buy(id){
 }
 function renderEquip(){
   const list=$('equipList');
+  const st=player.stats;
   let html='';
+  // 魂の資質
+  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
+    <span class="fx">─ 魂の資質 ─${player.statPts>0?` 残り${player.statPts}ポイント`:''}</span></div>`;
+  const STATS=[
+    ['str','力','物理攻撃 +2'],
+    ['con','体','最大HP +16 / 2ごとに防御+1'],
+    ['agi','速','会心 +2% / 移動 +2%'],
+    ['int','知','最大MP +12 / 印の威力 +6%'],
+  ];
+  for(const [k,nm,fx] of STATS){
+    html+=`<div class="itemrow"><span class="nm">${nm} <b>${st[k]}</b> <span class="fx">${fx}</span></span>`+
+      (player.statPts>0?`<button class="buyb" data-st="${k}">+1</button>`:'')+`</div>`;
+  }
+  // 消耗品
+  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
+    <span class="fx">─ 薬 ─</span></div>`;
+  const CONS=[
+    ['potions','甘露水','HP+65','drink'],
+    ['hastePots','韋駄天の水','30秒 高速化','haste'],
+    ['critPots','修羅の酒','30秒 会心+25%','crit'],
+  ];
+  for(const [f,nm,fx,act] of CONS){
+    html+=`<div class="itemrow"><span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
+      <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
+  }
+  // 装備
   for(const slot of ['weapon','armor']){
     html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
       <span class="fx">${slot==='weapon'?'─ 武器 ─':'─ 防具 ─'}</span></div>`;
@@ -884,6 +973,22 @@ function renderEquip(){
   list.innerHTML=html;
   for(const b of list.querySelectorAll('[data-eq]')){
     b.addEventListener('click',()=>{equip(b.getAttribute('data-eq'));renderEquip();});
+  }
+  for(const b of list.querySelectorAll('[data-st]')){
+    b.addEventListener('click',()=>{
+      if(player.statPts<=0)return;
+      player.stats[b.getAttribute('data-st')]++;player.statPts--;
+      recalcMax();sfx.click();save();renderEquip();
+    });
+  }
+  for(const b of list.querySelectorAll('[data-use]')){
+    b.addEventListener('click',()=>{
+      const a=b.getAttribute('data-use');
+      if(a==='drink')drinkPotion();
+      else if(a==='haste')drinkHaste();
+      else drinkCrit();
+      renderEquip();
+    });
   }
 }
 function openNpc(npc){
@@ -972,6 +1077,8 @@ function update(dt){
   if(!player.dead){
     player.atkCd-=dt;player.swing-=dt;
     if(player.hitT>0)player.hitT-=dt;
+    if(player.hasteT>0)player.hasteT-=dt;
+    if(player.critT>0)player.critT-=dt;
     if(player.attackDur>0){
       player.attackT+=dt;
       if(player.pendingHit&&player.attackT>=0.3){   // 振り下ろした瞬間にヒット
@@ -979,7 +1086,7 @@ function update(dt){
         if(!m.dead&&dist(player,m)<=RANGE+0.7){
           if(Math.random()<0.08){addFloat(m.x,m.y,'Miss','#b8b8b8');sfx.miss();}
           else{
-            const crit=Math.random()<0.1;
+            const crit=Math.random()<critRate();
             damageMob(m,Math.round((atkTotal()+rnd(0,4))*(crit?1.6:1)),crit);
             hitstop=0.07;
           }
@@ -1008,7 +1115,7 @@ function update(dt){
         }
       }
     }
-    if(player.attackDur<=0)moveAlong(player,dt,player.speed);  // 攻撃中は足を止める
+    if(player.attackDur<=0)moveAlong(player,dt,speedNow());  // 攻撃中は足を止める
     const inVillage=dist(player,SPAWN)<6.5;
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2));
     if(inVillage||!player.moving)
@@ -1066,10 +1173,10 @@ function update(dt){
         for(const m of mobs){
           if(m.dead)continue;
           if(Math.hypot(m.x-tx,m.y-(ty+0.4))<2.2)
-            damageMob(m,Math.round(atkTotal()*1.3+rnd(0,8)),false);
+            damageMob(m,Math.round(atkTotal()*1.3*spellMul()+rnd(0,8)),false);
         }
       }else{
-        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5+rnd(0,6)),false);
+        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5*spellMul()+rnd(0,6)),false);
         burst(tx,ty,'#7fb0ff',10);
       }
     }else{
@@ -1839,7 +1946,8 @@ const el={
   hp:document.querySelector('#hpbar i'),mp:document.querySelector('#mpbar i'),
   hpn:$('hpnum'),mpn:$('mpnum'),
   pot:$('potN'),bolt:$('btnBolt'),heal:$('btnHeal'),fire:$('btnFire'),
-  lockHeal:$('lockHeal'),lockFire:$('lockFire')
+  lockHeal:$('lockHeal'),lockFire:$('lockFire'),
+  buffs:$('buffs'),pt:$('ptN')
 };
 function hud(){
   el.lv.textContent=player.lv;
@@ -1853,6 +1961,11 @@ function hud(){
   el.hpn.textContent=`${Math.ceil(player.hp)} / ${player.maxHp}`;
   el.mpn.textContent=`${Math.floor(player.mp)} / ${player.maxMp}`;
   el.pot.textContent=player.potions;
+  el.pt.textContent=player.statPts>0?player.statPts:'';
+  let bf='';
+  if(player.hasteT>0)bf+=`⚡韋駄天 ${Math.ceil(player.hasteT)}秒　`;
+  if(player.critT>0)bf+=`🔥修羅 ${Math.ceil(player.critT)}秒`;
+  el.buffs.textContent=bf;
   el.bolt.classList.toggle('disabled',player.mp<8);
   el.heal.classList.toggle('disabled',player.lv<3||player.mp<12);
   el.fire.classList.toggle('disabled',player.lv<6||player.mp<20);
@@ -1909,6 +2022,8 @@ window.addEventListener('keydown',ev=>{
   if(k==='r')castHeal();
   if(k==='f')castFire();
   if(k==='q')drinkPotion();
+  if(k==='w')drinkHaste();
+  if(k==='c')drinkCrit();
   if(k==='i')toggleEquip();
 });
 $('btnBolt').addEventListener('click',castBolt);
@@ -1945,6 +2060,7 @@ $('startBtn').addEventListener('click',()=>{
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
     log('川辺のダツエバとケンエオウに話しかけてみよう','sys');
+    log('道具(I)で魂の資質5ポイントを割り振ろう','gain');
   }
 });
 $('resetBtn').addEventListener('click',()=>{
@@ -1957,6 +2073,7 @@ $('reviveBtn').addEventListener('click',()=>{
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;
   player.hitT=0;player.attackDur=0;player.attackT=0;player.pendingHit=null;
+  player.hasteT=0;player.critT=0;
   $('death').classList.add('hidden');
   log('賽の石碑のもとで、魂が編み直された','sys');
 });
