@@ -177,7 +177,7 @@
     <div class="row"><span>徳</span><div class="meter" id="xpbar"><i></i></div></div>
     <div class="row"><span>攻撃 <span class="v" id="atkv">8</span></span>
       <span>防御 <span class="v" id="defv">1</span></span>
-      <span style="margin-left:auto" class="gold"><span id="gold">0</span> 六文銭</span></div>
+      <span style="margin-left:auto" class="gold"><span id="gold">0</span> モン</span></div>
   </div>
 
   <div id="quest">
@@ -256,17 +256,17 @@
 
   <div class="overlay hidden" id="shop">
     <div class="scroll">
-      <h2>ダツエバの売店</h2>
-      <div class="sub">「六文銭は貯めるもんじゃない、使うもんだよ」</div>
+      <h2>オババの売店</h2>
+      <div class="sub">「銭は貯めるもんじゃない、使うもんだよ」</div>
       <div id="shopList"></div>
-      <div class="goldrow">所持金 <span id="shopGold">0</span> 六文銭</div>
+      <div class="goldrow">所持金 <span id="shopGold">0</span> モン</div>
       <button class="btn small" id="shopClose">店を出る</button>
     </div>
   </div>
 
   <div class="overlay hidden" id="talk">
     <div class="scroll">
-      <h2>ケンエオウ</h2>
+      <h2>オキナ</h2>
       <div class="sub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
       <button class="btn small" id="talkClose">別れる</button>
@@ -366,12 +366,12 @@ props.push({x:29,y:54,kind:'lamp'});
 props.push({x:37,y:52,kind:'lamp'});
 
 const npcs=[
-  {x:34,y:56,kind:'merchant',name:'ダツエバ'},
-  {x:30,y:51,kind:'elder',name:'ケンエオウ'},
+  {x:34,y:56,kind:'merchant',name:'オババ'},
+  {x:30,y:51,kind:'elder',name:'オキナ'},
 ];
 const ELDER_LINES=[
   '「森の最深部にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
-  '「ダツエバの店で装備を整えよ。六文銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
+  '「オババの店で装備を整えよ。銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
   '「印は徳が積まれれば自然と授かる。回向は徳位3、業火は徳位6じゃ」',
   '「アッキは大太刀を、ガシャドクロは鎖帷子を落とすことがある。執着の強い品ほど、よく落ちるものでな」',
   '「詰所の中は庁の加護で回復が速い。疲れたら戻ってこい。休むことは、逃げることではないぞ」',
@@ -740,7 +740,7 @@ function killMob(m){
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
   gainXp(m.def.xp);
-  log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} 六文銭)`);
+  log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
   const drop=DROPS[m.type];
   if(drop&&Math.random()<drop[1]&&!player.items.includes(drop[0])){
     gainItem(drop[0]);
@@ -883,15 +883,15 @@ function renderShop(){
   let html='';
   html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
     <span class="nm">甘露水 <span class="fx">HP+65</span></span>
-    <span class="pr">${POTION_PRICE} 六文銭</span>
+    <span class="pr">${POTION_PRICE} モン</span>
     <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
   html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
     <span class="nm">韋駄天の水 <span class="fx">30秒 移動と攻撃が速くなる</span></span>
-    <span class="pr">${HASTE_PRICE} 六文銭</span>
+    <span class="pr">${HASTE_PRICE} モン</span>
     <button class="buyb" data-buy="haste" ${player.gold<HASTE_PRICE?'disabled':''}>買う</button></div>`;
   html+=`<div class="itemrow"><img class="icn" src="assets/icon_potion.png" alt="">
     <span class="nm">修羅の酒 <span class="fx">30秒 会心率+25%</span></span>
-    <span class="pr">${CRIT_PRICE} 六文銭</span>
+    <span class="pr">${CRIT_PRICE} モン</span>
     <button class="buyb" data-buy="crit" ${player.gold<CRIT_PRICE?'disabled':''}>買う</button></div>`;
   for(const id of SHOP_STOCK){
     const it=ITEMS[id];
@@ -899,7 +899,7 @@ function renderShop(){
     const owned=player.items.includes(id);
     const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'';
     html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
-      <span class="pr">${it.price} 六文銭</span>
+      <span class="pr">${it.price} モン</span>
       <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
   }
   list.innerHTML=html;
@@ -2058,10 +2058,10 @@ $('startBtn').addEventListener('click',()=>{
   $('intro').classList.add('hidden');
   started=true;audio();startBgm();
   if(hasSaveData){
-    log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} 六文銭)`,'sys');
+    log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
-    log('川辺のダツエバとケンエオウに話しかけてみよう','sys');
+    log('川辺のオババとオキナに話しかけてみよう','sys');
     log('道具(I)で魂の資質5ポイントを割り振ろう','gain');
   }
 });
