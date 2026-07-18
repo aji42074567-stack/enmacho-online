@@ -2107,7 +2107,13 @@ function drawPier(sx,sy){
   const img=SPRITES.pier;
   if(!img)return;
   const w=252,h=w*img.height/img.width;
-  ctx.drawImage(img,sx-w*0.13,sy-h*0.30,w,h);
+  const x0=sx-w*0.13,y0=sy-h*0.30;
+  ctx.drawImage(img,x0,y0,w,h);
+  // 画像の陸側が直線で切れているため、岩場で継ぎ目を隠す
+  const r1=SPRITES.shore_rock_1,r2=SPRITES.shore_rock_2,r3=SPRITES.shore_rock_3;
+  if(r3){const rw=56,rh=rw*r3.height/r3.width;ctx.drawImage(r3,x0-26,y0-10,rw,rh);}
+  if(r1){const rw=90,rh=rw*r1.height/r1.width;ctx.drawImage(r1,x0-18,y0+2,rw,rh);}
+  if(r2){const rw=64,rh=rw*r2.height/r2.width;ctx.drawImage(r2,x0+14,y0+40,rw,rh);}
 }
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
