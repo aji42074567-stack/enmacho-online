@@ -620,6 +620,43 @@ function startBgm(){
     setTimeout(pluck,1200+Math.random()*3200);
   }
   pluck();
+  loadMusic();  // フィールド曲の読み込み(完了したら生成BGMと交代)
+}
+
+/* ---- フィールド曲: 2曲をクロスフェードで連結して無限ループ ---- */
+const BGM_TRACKS=['assets/bgm_field_1.m4a','assets/bgm_field_2.m4a'];
+const MUSIC_VOL=0.55,XFADE=1.6;
+let musicBuf=null,musicReady=false,musicGain=null;
+function loadMusic(){
+  const ac=audio();if(!ac||musicBuf)return;
+  musicBuf=[];
+  Promise.all(BGM_TRACKS.map(u=>fetch(u)
+    .then(r=>{if(!r.ok)throw new Error(u);return r.arrayBuffer()})
+    .then(b=>new Promise((ok,ng)=>ac.decodeAudioData(b,ok,ng)))))
+  .then(bufs=>{
+    musicBuf=bufs;musicReady=true;
+    musicGain=ac.createGain();
+    musicGain.gain.value=0.0001;
+    musicGain.connect(ac.destination);
+    musicGain.gain.linearRampToValueAtTime(soundOn?MUSIC_VOL:0.0001,ac.currentTime+3);
+    if(bgmGain)bgmGain.gain.linearRampToValueAtTime(0.0001,ac.currentTime+4);  // 琴の生成BGMは静かに退場
+    scheduleTrack(0,ac.currentTime+0.2);
+  })
+  .catch(()=>{musicBuf=null;});  // 曲ファイルが無い環境では生成BGMのまま
+}
+function scheduleTrack(i,when){
+  const ac=AC;if(!ac||!musicReady)return;
+  const buf=musicBuf[i%musicBuf.length];
+  const src=ac.createBufferSource();src.buffer=buf;
+  const g=ac.createGain();
+  g.gain.setValueAtTime(0.0001,when);
+  g.gain.linearRampToValueAtTime(1,when+XFADE);
+  g.gain.setValueAtTime(1,when+buf.duration-XFADE);
+  g.gain.linearRampToValueAtTime(0.0001,when+buf.duration);
+  src.connect(g);g.connect(musicGain);
+  src.start(when);
+  const nextWhen=when+buf.duration-XFADE;  // 曲尻に次の曲頭を重ねる
+  setTimeout(()=>scheduleTrack(i+1,nextWhen),Math.max(0,(nextWhen-ac.currentTime-1)*1000));
 }
 
 /* ================= アイテム入手・装備 ================= */
@@ -1872,7 +1909,8 @@ $('btnPotion').addEventListener('click',drinkPotion);
 $('btnEquip').addEventListener('click',toggleEquip);
 $('sndBtn').addEventListener('click',()=>{
   soundOn=!soundOn;
-  if(bgmGain)bgmGain.gain.value=soundOn?0.5:0;
+  if(bgmGain)bgmGain.gain.value=soundOn?(musicReady?0:0.5):0;
+  if(musicGain)musicGain.gain.value=soundOn?MUSIC_VOL:0;
   $('sndBtn').textContent=soundOn?'🔊':'🔇';
 });
 function setGender(g){
