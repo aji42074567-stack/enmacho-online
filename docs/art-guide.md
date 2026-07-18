@@ -89,9 +89,21 @@ enmacho-online/
 - 防具・薬アイコン: `assets/icon_armor_{cloth,leather,chain,plate}.png` / `icon_potion.png` =
   Claudeがコードで描いた16×16ドット絵の4倍拡大(仮アイコン)。
   同じ画風のAI生成画像をもらえたら差し替え推奨
-- 元画像の加工手順(ニセ透過の除去→分割→シート化)は
-  会話でChatGPT生成画像を渡せばClaudeが再現できる(scratchpadのprocess_sprites.py方式)
+- 元画像の加工手順(緑背景クロマキー or ニセ透過の除去→分割→シート化)は
+  会話でChatGPT生成画像を渡せばClaudeが再現できる
 - 今後同様に `mob_*.png` を渡されたら drawGoblin 等を同方式で差し替える
+
+### 実装済み(v0.5.2) — アニメーションシート
+
+- `char_player_m_walk.png` = 512×512。4行(下/上/左/右)×4コマ(踏み出し→揃う→逆足→揃う)。
+  右向きは左向きの反転を焼き込み済み。コマ送りは `e.walkT`(移動距離)に同期
+- `char_player_m_attack.png` = 480×640。**セル160px**(頭上の刀が128に収まらないため)。
+  4行(下/上=左流用/左/右反転)×3コマ。ヒット判定はアニメ開始0.3秒後(update内)
+- `char_player_m_hit.png` / `char_player_m_death.png` = 128×128 各1コマ
+- 元画像は緑背景(クロマキー)で受領→greenness判定で透過化。
+  スケールは既存立ち絵のコマ内身長(117px)・接地位置(124px)に合わせる
+- 女性キャラは未対応(立ち絵のみ)。同じ7枚セットをもらえたら同手順で追加
+- 旧 `char_player_walk_*.png`(8コマ白背景方式)は廃止済み
 
 ### マップ画像素材(v0.5〜)
 
