@@ -129,6 +129,12 @@
   .pick:hover{opacity:.8}
   .pick.on{opacity:1;border-color:var(--gold);box-shadow:0 0 10px rgba(201,162,74,.35)}
   .pick:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  #nameIn{display:block;margin:0 auto 12px;width:min(220px,70%);text-align:center;
+    font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--parchment);
+    background:#12100b;border:1px solid var(--panel-edge);border-radius:4px;
+    padding:9px 10px;outline:none;box-sizing:border-box}
+  #nameIn:focus{border-color:var(--gold)}
+  #nameIn::placeholder{color:#6b604a;font-size:12px;letter-spacing:.05em}
   .itemrow .nm{flex:1}
   .itemrow .fx{color:var(--dim);font-size:11px}
   .itemrow .pr{color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -164,7 +170,7 @@
   <canvas id="game"></canvas>
 
   <div id="plate">
-    <span class="name">亡者アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
+    <span class="name" id="pname">亡者アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
     <div class="row"><span>徳</span><div class="meter" id="xpbar"><i></i></div></div>
     <div class="row"><span>攻撃 <span class="v" id="atkv">8</span></span>
       <span>防御 <span class="v" id="defv">1</span></span>
@@ -214,6 +220,7 @@
         <div class="pick" id="pickF" role="button" tabindex="0" aria-label="女の子を選ぶ"></div>
       </div>
       <div style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
+      <input id="nameIn" maxlength="8" placeholder="なまえを入力 (8文字まで)" autocomplete="off">
       <h1>閻魔庁ONLINE</h1>
       <div class="sub">死後に知る。生前こそが地獄だった。</div>
       <div class="rule"></div>
@@ -443,6 +450,7 @@ const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,atk:6,
   xp:0,gold:0,potions:3,
+  name:'',
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
   target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
@@ -458,7 +466,7 @@ function save(){
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       v:1,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       items:player.items,weapon:player.weapon,armor:player.armor,kills,
-      gender:player.gender
+      gender:player.gender,name:player.name
     }));
   }catch(e){}
 }
@@ -469,6 +477,7 @@ function load(){
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
     player.items=d.items;player.weapon=d.weapon;player.armor=d.armor;
     player.gender=d.gender==='f'?'f':'m';
+    player.name=(typeof d.name==='string'&&d.name.trim())?d.name.trim().slice(0,8):'アジ';
     kills=d.kills||0;
     player.maxHp=80+14*(player.lv-1);
     player.maxMp=30+7*(player.lv-1);
@@ -1925,10 +1934,14 @@ for(const [id,g] of [['pickM','m'],['pickF','f']]){
   $(id).addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' ')setGender(g);});
 }
 $('startBtn').addEventListener('click',()=>{
+  const nm=$('nameIn').value.trim().slice(0,8);
+  player.name=nm||player.name||'ナナシ';
+  $('pname').textContent='亡者'+player.name;
+  save();
   $('intro').classList.add('hidden');
   started=true;audio();startBgm();
   if(hasSaveData){
-    log(`おかえり、亡者アジ (徳位${player.lv} / ${player.gold} 六文銭)`,'sys');
+    log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} 六文銭)`,'sys');
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
     log('川辺のダツエバとケンエオウに話しかけてみよう','sys');
@@ -1950,6 +1963,10 @@ $('reviveBtn').addEventListener('click',()=>{
 
 /* ================= 起動 ================= */
 hasSaveData=load();
+if(hasSaveData){
+  $('nameIn').value=player.name;
+  $('pname').textContent='亡者'+player.name;
+}
 $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
