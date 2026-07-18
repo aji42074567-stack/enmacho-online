@@ -436,14 +436,15 @@ function findPath(fx,fy,tx,ty){
 
 /* ================= プレイヤー ================= */
 const player={
-  x:SPAWN.x,y:SPAWN.y,path:[],speed:3.6,
+  x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,atk:6,
   xp:0,gold:0,potions:3,
   items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
   target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
+  walkDist:0,hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
-let kills=0,time=0,started=false,hasSaveData=false;
+let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
 const xpNext=lv=>Math.floor(55*Math.pow(lv,1.55));
 const atkTotal=()=>player.atk+ITEMS[player.weapon].atk;
 const defTotal=()=>ITEMS[player.armor].def+Math.floor(player.lv/3);
@@ -477,11 +478,11 @@ window.addEventListener('beforeunload',save);
 
 /* ================= モンスター ================= */
 const MOBS={
-  goblin:  {name:'ガキ',        lv:1,hp:30, dmg:[3,6],  xp:14, gold:[3,8],   speed:2.2,aggro:0,  atkCd:1.3,size:.75},
-  wolf:    {name:'イヌガミ',    lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:3.1,aggro:4.5,atkCd:1.1,size:.85},
-  orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:2.4,aggro:4.2,atkCd:1.4,size:1},
-  skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:2.0,aggro:4.0,atkCd:1.3,size:1.05},
-  drake:   {name:'ゴウリュウ',  lv:9,hp:420,dmg:[18,28],xp:420,gold:[150,250],speed:2.7,aggro:5, atkCd:1.5,size:1.5,boss:true}
+  goblin:  {name:'ガキ',        lv:1,hp:30, dmg:[3,6],  xp:14, gold:[3,8],   speed:1.7,aggro:0,  atkCd:1.7,size:.75},
+  wolf:    {name:'イヌガミ',    lv:3,hp:55, dmg:[6,10], xp:30, gold:[6,14],  speed:2.4,aggro:4.5,atkCd:1.5,size:.85},
+  orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:1.9,aggro:4.2,atkCd:1.9,size:1},
+  skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:1.6,aggro:4.0,atkCd:1.8,size:1.05},
+  drake:   {name:'ゴウリュウ',  lv:9,hp:420,dmg:[18,28],xp:420,gold:[150,250],speed:2.1,aggro:5, atkCd:2.1,size:1.5,boss:true}
 };
 const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1]};
 const mobs=[];
@@ -509,7 +510,7 @@ function spawnMob(type,x,y){
 })();
 
 /* ================= 演出・ログ ================= */
-const floats=[],sparks=[],bolts=[];
+const floats=[],sparks=[],bolts=[],corpses=[];
 const wisps=[];   // 人魂(雰囲気演出)
 for(let i=0;i<7;i++)wisps.push({x:0,y:0,dir:rnd(0,6.28),sp:rnd(0.25,0.6),ph:rnd(0,6.28),init:false});
 let clickMark=null,banner=null;
@@ -559,7 +560,9 @@ const sfx={
   potion:()=>beep(400,800,.15,'sine',.05),
   coin:()=>{beep(900,900,.06,'triangle',.05);setTimeout(()=>beep(1200,1200,.08,'triangle',.05),60);},
   lvup:()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,f,.16,'triangle',.06),i*90));},
-  click:()=>beep(900,700,.04,'sine',.02)
+  click:()=>beep(900,700,.04,'sine',.02),
+  swing:()=>beep(220,60,.16,'sawtooth',.035),
+  miss:()=>beep(500,300,.08,'sine',.03)
 };
 
 /* ---- BGM(コード生成の和風アンビエント) ---- */
@@ -642,7 +645,7 @@ function gainItem(id){
 /* ================= 戦闘 ================= */
 function damageMob(m,dmg,crit){
   if(m.dead)return;
-  m.hp-=dmg;
+  m.hp-=dmg;m.flash=0.14;
   addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
   burst(m.x,m.y,'#e8d090',crit?12:6);
   if(m.state==='idle'){m.state='chase';m.repath=0;}
@@ -650,6 +653,7 @@ function damageMob(m,dmg,crit){
 }
 function killMob(m){
   m.dead=true;m.hp=0;m.respawn=m.def.boss?90:12;
+  corpses.push({x:m.x,y:m.y,type:m.type,face:m.face,age:0});  // 死体をその場に残す
   if(player.target===m)player.target=null;
   kills++;
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
@@ -690,12 +694,14 @@ function faceToward(e,t){
   e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
 }
 function playerAttack(){
+  // 振りかぶり→0.3秒後にヒット判定(リネ風の「間」)
   const m=player.target;if(!m||m.dead)return;
-  player.atkCd=0.85;player.swing=0.25;player.swingKind='melee';
+  player.atkCd=1.5;
+  player.attackT=0;player.attackDur=0.62;
+  player.swingKind='melee';
   faceToward(player,m);
-  const crit=Math.random()<0.1;
-  const dmg=Math.round((atkTotal()+rnd(0,4))*(crit?1.6:1));
-  damageMob(m,dmg,crit);
+  player.pendingHit=m;
+  sfx.swing();
 }
 function pickSpellTarget(range){
   let t=player.target;
@@ -748,17 +754,24 @@ function drinkPotion(){
   sfx.potion();save();
 }
 function mobAttack(m){
-  m.atkCd=m.def.atkCd;m.swing=0.25;
+  // 予備動作0.22秒 → mobStrikeで実ダメージ
+  m.atkCd=m.def.atkCd;m.swing=0.35;
   m.face=player.x-m.x>=0?1:-1;
+  m.windup=0.22;
+}
+function mobStrike(m){
+  if(Math.random()<0.06){addFloat(player.x,player.y,'Miss','#b8b8b8');return;}
   const dmg=Math.max(1,rndi(m.def.dmg[0],m.def.dmg[1])-defTotal());
-  player.hp-=dmg;
+  player.hp-=dmg;player.hitT=0.3;
   addFloat(player.x,player.y,String(dmg),'#ff7a6a');
   sfx.hurt();
   if(player.hp<=0){
     player.hp=0;player.dead=true;player.path=[];player.target=null;
+    player.attackDur=0;player.pendingHit=null;
     log('魂がほどけて散った…','sys');
     document.getElementById('judgeText').textContent=JUDGE_COMMENTS[rndi(0,JUDGE_COMMENTS.length-1)];
-    document.getElementById('death').classList.remove('hidden');
+    // 倒れる姿を見せてからオーバーレイ表示
+    setTimeout(()=>{if(player.dead)document.getElementById('death').classList.remove('hidden');},1500);
   }
 }
 
@@ -849,6 +862,7 @@ function moveAlong(e,dt,speed){
   if(d<0.08){e.x=n.x;e.y=n.y;e.path.shift();return;}
   const step=Math.min(d,speed*dt);
   e.x+=dx/d*step;e.y+=dy/d*step;
+  if(e.walkDist!==undefined)e.walkDist+=step;  // 歩行アニメを移動距離に同期
   if(Math.abs(dx)>0.05)e.face=dx>=0?1:-1;
   const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向
   e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
@@ -858,6 +872,22 @@ function update(dt){
   time+=dt;
   if(!player.dead){
     player.atkCd-=dt;player.swing-=dt;
+    if(player.hitT>0)player.hitT-=dt;
+    if(player.attackDur>0){
+      player.attackT+=dt;
+      if(player.pendingHit&&player.attackT>=0.3){   // 振り下ろした瞬間にヒット
+        const m=player.pendingHit;player.pendingHit=null;
+        if(!m.dead&&dist(player,m)<=RANGE+0.7){
+          if(Math.random()<0.08){addFloat(m.x,m.y,'Miss','#b8b8b8');sfx.miss();}
+          else{
+            const crit=Math.random()<0.1;
+            damageMob(m,Math.round((atkTotal()+rnd(0,4))*(crit?1.6:1)),crit);
+            hitstop=0.07;
+          }
+        }
+      }
+      if(player.attackT>=player.attackDur){player.attackDur=0;player.attackT=0;}
+    }
     if(player.talkTarget){
       if(dist(player,player.talkTarget)<2.6){
         const n=player.talkTarget;player.talkTarget=null;player.path=[];
@@ -879,7 +909,7 @@ function update(dt){
         }
       }
     }
-    moveAlong(player,dt,player.speed);
+    if(player.attackDur<=0)moveAlong(player,dt,player.speed);  // 攻撃中は足を止める
     const inVillage=dist(player,SPAWN)<6.5;
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2));
     if(inVillage||!player.moving)
@@ -895,6 +925,11 @@ function update(dt){
       continue;
     }
     m.atkCd-=dt;m.swing-=dt;
+    if(m.flash)m.flash-=dt;
+    if(m.windup!==undefined&&m.windup>0){
+      m.windup-=dt;
+      if(m.windup<=0&&!player.dead&&dist(m,player)<=RANGE+0.8)mobStrike(m);
+    }
     const dp=dist(m,player);
     const dh=dist(m,m.home);
     if(m.state==='idle'){
@@ -950,6 +985,8 @@ function update(dt){
   for(let i=floats.length-1;i>=0;i--)if(floats[i].age>1)floats.splice(i,1);
   for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=3*dt;}
   for(let i=sparks.length-1;i>=0;i--)if(sparks[i].age>0.7)sparks.splice(i,1);
+  for(const c of corpses)c.age+=dt;
+  for(let i=corpses.length-1;i>=0;i--)if(corpses[i].age>6)corpses.splice(i,1);
   for(const w of wisps){
     if(!w.init||dist(w,player)>17){
       const a=rnd(0,6.28),d=rnd(5,13);
@@ -1058,6 +1095,10 @@ function loadSprite(key,src){
 }
 loadSprite('player_m','assets/char_player_m.png');
 loadSprite('player_f','assets/char_player_f.png');
+loadSprite('player_m_walk','assets/char_player_m_walk.png');
+loadSprite('player_m_attack','assets/char_player_m_attack.png');
+loadSprite('player_m_hit','assets/char_player_m_hit.png');
+loadSprite('player_m_death','assets/char_player_m_death.png');
 (function(){  // 武器振りエフェクト用にアイコン画像も読む
   const seen=new Set();
   for(const id in ITEMS){
@@ -1106,36 +1147,72 @@ function drawKnight(sx,sy,e){
   ctx.restore();
 }
 function drawPlayer(sx,sy,e){
-  const img=SPRITES['player_'+(e.gender||'m')]||SPRITES.player_m;
-  if(!img){drawKnight(sx,sy,e);return;}
-  const bob=e.moving?Math.sin(time*14)*1.6:0;
+  const g=e.gender||'m';
+  const base=SPRITES['player_'+g]||SPRITES.player_m;
+  const walkS=SPRITES['player_'+g+'_walk']||SPRITES.player_m_walk;
+  const atkS=SPRITES['player_'+g+'_attack']||SPRITES.player_m_attack;
+  const hitS=SPRITES['player_'+g+'_hit']||SPRITES.player_m_hit;
+  if(!base&&!walkS){drawKnight(sx,sy,e);return;}
   drawShadow(sx,sy+2,10);
-  const F=128,D=48;  // Fはシートの1コマ、Dは画面上の描画サイズ
-  const fi=DIR_FRAME[e.dir]||0;
-  const t=e.swing>0?(0.25-e.swing)/0.25:-1;
-  ctx.save();ctx.translate(sx,sy+bob);
-  if(t>=0)ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t*Math.PI)*0.12);
-  ctx.drawImage(img,fi*F,0,F,F,-D/2,-D+3,D,D);
-  ctx.restore();
-  if(t>=0&&e.swingKind==='melee'){
-    // 装備中の武器を振り下ろす+斬撃の軌跡
-    const side=e.dir==='left'?-1:1;
-    const wimg=SPRITES[ITEMS[e.weapon].icon];
-    ctx.save();ctx.translate(sx,sy+bob-20);ctx.scale(side,1);
-    ctx.save();ctx.translate(9,2);ctx.rotate(-1.9+t*2.7);
-    if(wimg)ctx.drawImage(wimg,-7,-25,28,28);
-    ctx.restore();
-    const a=0.55*(1-t);
-    if(a>0.03){
+  const F=128,D=48,k=D/F;
+  const row=DIR_FRAME[e.dir]||0;
+  ctx.save();ctx.translate(sx,sy);
+  if(e.attackDur>0&&atkS){
+    // 攻撃: 振りかぶり→振り下ろし→戻し(刀は絵に含まれる)
+    const t=e.attackT/e.attackDur;
+    const fr=t<0.35?0:(t<0.72?1:2);
+    const FA=160,DA=FA*k;
+    ctx.drawImage(atkS,fr*FA,row*FA,FA,FA,-DA/2,(3-4*k)-150*k,DA,DA);
+    if(t>0.32&&t<0.85){  // 斬撃の軌跡
+      const side=(e.dir==='left')?-1:1;
+      const p=(t-0.32)/0.53;
+      const a=0.6*(1-p);
+      ctx.save();ctx.scale(side,1);
       ctx.strokeStyle=`rgba(240,242,255,${a})`;
       ctx.lineWidth=3;ctx.lineCap='round';
-      ctx.beginPath();ctx.arc(2,2,17,-1.5,-1.5+2.6*Math.min(1,t*1.4));ctx.stroke();
-      ctx.strokeStyle=`rgba(190,220,255,${a*0.5})`;
-      ctx.lineWidth=6;
-      ctx.beginPath();ctx.arc(2,2,14,-1.3,-1.3+2.2*Math.min(1,t*1.4));ctx.stroke();
+      ctx.beginPath();ctx.arc(4,-18,19,-1.5,-1.5+2.6*Math.min(1,p*1.3));ctx.stroke();
+      ctx.strokeStyle=`rgba(190,220,255,${a*0.5})`;ctx.lineWidth=6;
+      ctx.beginPath();ctx.arc(4,-18,15,-1.3,-1.3+2.2*Math.min(1,p*1.3));ctx.stroke();
+      ctx.restore();
     }
-    ctx.restore();
+  }else if(e.hitT>0&&hitS){
+    // 被弾: のけぞり+赤フラッシュ
+    ctx.drawImage(hitS,0,0,F,F,-D/2,-D+3,D,D);
+    ctx.globalCompositeOperation='screen';
+    ctx.fillStyle=`rgba(255,80,60,${0.4*(e.hitT/0.3)})`;
+    ctx.beginPath();ctx.arc(0,-16,16,0,6.29);ctx.fill();
+    ctx.globalCompositeOperation='source-over';
+  }else if(e.moving&&walkS){
+    // 歩行: 移動距離に同期してコマ送り(足滑り防止)
+    const fr=Math.floor(e.walkDist*2.6)%4;
+    ctx.drawImage(walkS,fr*F,row*F,F,F,-D/2,-D+3,D,D);
+  }else{
+    const t2=e.swing>0?(0.25-e.swing)/0.25:-1;   // 印を結ぶ身振り(詠唱)
+    if(t2>=0&&e.swingKind==='cast')ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t2*Math.PI)*0.12);
+    if(base)ctx.drawImage(base,row*F,0,F,F,-D/2,-D+3,D,D);
+    else ctx.drawImage(walkS,F,row*F,F,F,-D/2,-D+3,D,D);
   }
+  ctx.restore();
+}
+function drawPlayerCorpse(sx,sy,e){
+  const img=SPRITES['player_'+(e.gender||'m')+'_death']||SPRITES.player_m_death;
+  drawShadow(sx,sy+2,12);
+  if(img)ctx.drawImage(img,0,0,128,128,-24,-45,48,48);
+}
+function drawCorpse(sx,sy,c){
+  const fade=c.age>4.5?Math.max(0,1-(c.age-4.5)/1.5):1;
+  ctx.save();
+  ctx.globalAlpha=0.85*fade;
+  ctx.translate(sx,sy);ctx.rotate(1.25*(c.face>=0?1:-1));ctx.scale(0.92,0.92);
+  const fake={def:MOBS[c.type],moving:false,face:c.face,phase:0,swing:0};
+  switch(c.type){
+    case 'goblin':drawGoblin(0,0,fake);break;
+    case 'wolf':drawWolf(0,0,fake);break;
+    case 'orc':drawOrc(0,0,fake);break;
+    case 'skeleton':drawSkeleton(0,0,fake);break;
+    case 'drake':drawDrake(0,0,fake);break;
+  }
+  ctx.restore();
 }
 function drawGoblin(sx,sy,m){
   const s=m.def.size,bob=m.moving?Math.sin(time*12+m.phase)*1.5:0;
@@ -1366,8 +1443,9 @@ function render(){
   const items=[];
   for(const p of props)items.push({d:p.x+p.y,k:p.kind,o:p});
   for(const n of npcs)items.push({d:n.x+n.y,k:'npc',o:n});
+  for(const c of corpses)items.push({d:c.x+c.y-0.01,k:'corpse',o:c});
   for(const m of mobs)if(!m.dead)items.push({d:m.x+m.y,k:m.type,o:m});
-  if(!player.dead)items.push({d:player.x+player.y,k:'player',o:player});
+  items.push({d:player.x+player.y,k:player.dead?'pcorpse':'player',o:player});
   items.sort((a,b)=>a.d-b.d);
   for(const it of items){
     const sx=SX(it.o.x,it.o.y),sy=SY(it.o.x,it.o.y);
@@ -1379,11 +1457,23 @@ function render(){
       case 'house':case 'shop':drawHouse(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
       case 'player':drawPlayer(sx,sy,it.o);break;
+      case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
+      case 'corpse':drawCorpse(sx,sy,it.o);break;
       case 'goblin':drawGoblin(sx,sy,it.o);break;
       case 'wolf':drawWolf(sx,sy,it.o);break;
       case 'orc':drawOrc(sx,sy,it.o);break;
       case 'skeleton':drawSkeleton(sx,sy,it.o);break;
       case 'drake':drawDrake(sx,sy,it.o);break;
+    }
+    if(it.o.def&&it.o.flash>0&&it.k!=='corpse'){  // 被弾の白フラッシュ
+      const fa=it.o.flash/0.14,r2=20*it.o.def.size;
+      ctx.globalCompositeOperation='screen';
+      const fg2=ctx.createRadialGradient(sx,sy-12*it.o.def.size,0,sx,sy-12*it.o.def.size,r2);
+      fg2.addColorStop(0,`rgba(255,240,220,${0.8*fa})`);
+      fg2.addColorStop(1,'rgba(255,240,220,0)');
+      ctx.fillStyle=fg2;
+      ctx.beginPath();ctx.arc(sx,sy-12*it.o.def.size,r2,0,6.29);ctx.fill();
+      ctx.globalCompositeOperation='source-over';
     }
     if(it.o.def&&(it.o===player.target||it.o.hp<it.o.maxHp||it.o.def.boss)){
       const m=it.o,top=sy-34-m.def.size*14;
@@ -1581,6 +1671,7 @@ $('reviveBtn').addEventListener('click',()=>{
   player.x=SPAWN.x;player.y=SPAWN.y;
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;
+  player.hitT=0;player.attackDur=0;player.attackT=0;player.pendingHit=null;
   $('death').classList.add('hidden');
   log('賽の石碑のもとで、魂が編み直された','sys');
 });
@@ -1594,8 +1685,9 @@ if(hasSaveData){
 }
 let last=0;
 function frame(t){
-  const dt=Math.min(0.05,(t-last)/1000||0.016);
+  let dt=Math.min(0.05,(t-last)/1000||0.016);
   last=t;
+  if(hitstop>0){hitstop-=dt;dt*=0.15;}  // ヒットの瞬間だけ時間が止まる
   if(started)update(dt);
   render();
   hud();
