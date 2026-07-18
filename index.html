@@ -1196,6 +1196,8 @@ loadSprite('player_f_walk','assets/char_player_f_walk.png');
 loadSprite('player_f_attack','assets/char_player_f_attack.png');
 loadSprite('mob_goblin','assets/mob_goblin.png');
 loadSprite('mob_goblin_red','assets/mob_goblin_red.png');
+loadSprite('mob_goblin_attack','assets/mob_goblin_attack.png');
+loadSprite('mob_goblin_red_attack','assets/mob_goblin_red_attack.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1328,16 +1330,24 @@ function drawMobImg(sx,sy,m,key){
   drawShadow(sx,sy+2,10*sz);
   const D=Math.round(64*sz);
   const t=m.swing>0?(0.35-m.swing)/0.35:-1;
+  const atk=SPRITES[key+'_attack'];
   ctx.save();
   ctx.translate(sx,sy-(m.moving?Math.abs(Math.sin((m.walkT||0)*7))*2:0));
   if(m.face>=0)ctx.scale(-1,1);   // 元画像は左向き
-  if(t>=0){
-    ctx.translate(-Math.sin(Math.min(1,t)*Math.PI)*7,0);
-    ctx.rotate(-Math.sin(t*Math.PI)*0.2);
-  }else if(m.moving){
-    ctx.rotate(Math.sin((m.walkT||0)*7)*0.05);
+  if(t>=0&&atk){
+    // 攻撃コマ絵(160pxセル×3: 振りかぶり→振り下ろし→戻し)
+    const FA=160,DA=Math.round(80*sz),k=DA/FA;
+    const fr=t<0.4?0:(t<0.75?1:2);
+    ctx.drawImage(atk,fr*FA,0,FA,FA,-DA/2,(3-2*sz)-150*k,DA,DA);
+  }else{
+    if(t>=0){
+      ctx.translate(-Math.sin(Math.min(1,t)*Math.PI)*7,0);
+      ctx.rotate(-Math.sin(t*Math.PI)*0.2);
+    }else if(m.moving){
+      ctx.rotate(Math.sin((m.walkT||0)*7)*0.05);
+    }
+    ctx.drawImage(img,0,0,128,128,-D/2,-D+3,D,D);
   }
-  ctx.drawImage(img,0,0,128,128,-D/2,-D+3,D,D);
   ctx.restore();
   return true;
 }
