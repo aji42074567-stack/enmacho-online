@@ -286,7 +286,7 @@
 <script>
 'use strict';
 /* ================= 基本設定 ================= */
-const TW=64, TH=32, MAP=64;
+const TW=64, TH=32, MAP=72;   // 島の周囲に海の余白を確保
 const RANGE=1.4;
 const SAVE_KEY='aden_save_v1';
 const canvas=document.getElementById('game');
@@ -422,6 +422,22 @@ let elderIdx=0;
     if(blocked[y*MAP+x]||tileKind[y*MAP+x]!==0||clear(x,y))continue;
     blocked[y*MAP+x]=1;
     props.push({x,y,kind:'rock',s:rnd(0.7,1.1)});n++;
+  }
+})();
+
+// 磯岩: 海岸線の輪郭に沿って自動配置。白波の位置も一緒に拾う
+const FOAM_PTS=[];
+(function shoreDecor(){
+  const h=(x,y)=>{const n=Math.sin(x*91.7+y*137.3)*43758.5453;return n-Math.floor(n);};
+  for(let y=1;y<MAP-1;y++)for(let x=1;x<MAP-1;x++){
+    const f=islandF(x,y);
+    if(f>1.9&&f<3.3&&h(x,y)<0.26){
+      const v=1+Math.floor(h(x*3,y*7)*3);
+      props.push({x:x+h(x,y*2)*0.8,y:y+h(x*2,y)*0.8,kind:'shoal',v,s:0.7+h(x*5,y*3)*0.5});
+    }
+    if(Math.abs(f-2.3)<0.5&&h(x*7,y*5)<0.5){
+      FOAM_PTS.push({x:x+h(x,y)*0.6,y:y+h(y,x)*0.6,ph:h(x*11,y*13)});
+    }
   }
 })();
 
@@ -1358,6 +1374,10 @@ function renderGround(){
       g.fillStyle='rgba(150,200,210,0.05)';
       g.beginPath();g.ellipse(GX(fx,fy),GY(fx,fy),15,7,0,0,6.29);g.fill();
     }
+    if(f>1.4&&f<2.2){   // 濡れた砂の帯
+      g.fillStyle='rgba(38,30,18,0.09)';
+      g.beginPath();g.ellipse(GX(fx,fy),GY(fx,fy),14,6,0,0,6.29);g.fill();
+    }
     if(Math.abs(f-2.2)<0.3&&vnoise(fx*1.9,fy*1.9)>0.4){
       g.fillStyle=`rgba(205,230,234,${0.10+vnoise(fx*3.1,fy*2.7)*0.12})`;
       g.beginPath();
@@ -1607,6 +1627,9 @@ loadSprite('npc_obaba','assets/npc_obaba.png');
 loadSprite('npc_okina','assets/npc_okina.png');
 loadSprite('mob_orc_blue','assets/mob_orc_blue.png');
 loadSprite('mob_orc_blue_attack','assets/mob_orc_blue_attack.png');
+loadSprite('shore_rock_1','assets/shore_rock_1.png');
+loadSprite('shore_rock_2','assets/shore_rock_2.png');
+loadSprite('shore_rock_3','assets/shore_rock_3.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -2015,6 +2038,13 @@ function drawHouse(sx,sy,p){
   }
   ctx.restore();
 }
+function drawShoal(sx,sy,p){
+  const img=SPRITES['shore_rock_'+p.v];
+  if(!img){drawRock(sx,sy,{s:p.s});return;}
+  const w=(p.v===1?92:p.v===2?78:88)*p.s;
+  const h=w*img.height/img.width;
+  ctx.drawImage(img,sx-w/2,sy-h+6,w,h);
+}
 function drawCaveEntrance(sx,sy){
   drawShadow(sx,sy+4,34);
   ctx.save();ctx.translate(sx,sy);
@@ -2119,6 +2149,17 @@ function render(){
     ctx.lineTo(cx,cy+TH/2*a);ctx.lineTo(cx-TW/2*a,cy);
     ctx.closePath();ctx.stroke();
   }
+  if(zone==='field'){   // 動く白波
+    for(const fp of FOAM_PTS){
+      const fsx=SX(fp.x,fp.y),fsy=SY(fp.x,fp.y);
+      if(fsx<-40||fsx>W+40||fsy<-40||fsy>H+40)continue;
+      const ph=Math.sin(time*1.15+fp.ph*6.28);
+      const a2=0.09+0.11*ph;
+      if(a2<=0.02)continue;
+      ctx.fillStyle=`rgba(210,232,236,${a2})`;
+      ctx.beginPath();ctx.ellipse(fsx+ph*4,fsy,12+ph*3,3.2,0,0,6.29);ctx.fill();
+    }
+  }
   if(player.target&&!player.target.dead){
     const m=player.target;
     ctx.strokeStyle='rgba(220,60,40,0.9)';ctx.lineWidth=2;
@@ -2142,6 +2183,7 @@ function render(){
       case 'rock':drawRock(sx,sy,it.o);break;
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
+      case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
