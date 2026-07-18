@@ -1198,6 +1198,8 @@ loadSprite('mob_goblin','assets/mob_goblin.png');
 loadSprite('mob_goblin_red','assets/mob_goblin_red.png');
 loadSprite('mob_goblin_attack','assets/mob_goblin_attack.png');
 loadSprite('mob_goblin_red_attack','assets/mob_goblin_red_attack.png');
+loadSprite('mob_wolf','assets/mob_wolf.png');
+loadSprite('mob_wolf_attack','assets/mob_wolf_attack.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -1374,6 +1376,7 @@ function drawGoblin(sx,sy,m){
   ctx.restore();
 }
 function drawWolf(sx,sy,m){
+  if(drawMobImg(sx,sy,m,'mob_wolf'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*16+m.phase)*1.2:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,10*s);
