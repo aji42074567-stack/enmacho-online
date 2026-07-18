@@ -92,3 +92,13 @@ enmacho-online/
 - 元画像の加工手順(ニセ透過の除去→分割→シート化)は
   会話でChatGPT生成画像を渡せばClaudeが再現できる(scratchpadのprocess_sprites.py方式)
 - 今後同様に `mob_*.png` を渡されたら drawGoblin 等を同方式で差し替える
+
+### マップ画像素材(v0.5〜)
+
+- `map_forest_ground.png` — 森床の反復テクスチャ
+- `map_tile_path.png` / `map_tile_stone.png` — 土道・村の石畳
+- `map_house_*.png` / `map_shop_green.png` — 村の家と商店
+- `map_pine_*.png` / `map_rock_*.png` — 森の樹木と岩
+- `map_lamp_post.png` / `map_stone_well.png` — 灯籠と井戸
+- 画像の読み込み前または失敗時は、従来のコード描画へフォールバックする
+- 移動経路・当たり判定・深度ソートは従来のマップ座標をそのまま使用する
