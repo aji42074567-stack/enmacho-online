@@ -479,7 +479,9 @@ function recalcMax(){
   player.mp=Math.min(player.mp,player.maxMp);
 }
 
+let resetting=false;  // 転生リセット中は自動セーブを止める
 function save(){
+  if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       v:2,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
@@ -2064,6 +2066,7 @@ $('startBtn').addEventListener('click',()=>{
   }
 });
 $('resetBtn').addEventListener('click',()=>{
+  resetting=true;  // beforeunloadの自動セーブに書き戻させない
   try{localStorage.removeItem(SAVE_KEY);}catch(e){}
   location.reload();
 });
