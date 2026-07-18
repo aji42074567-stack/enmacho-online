@@ -940,31 +940,82 @@ const ground=document.createElement('canvas');
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
   ground.width=gW;ground.height=gH;
   const g=ground.getContext('2d');
+  const GX=(x,y)=>(x-y)*TW/2+gW/2;
+  const GY=(x,y)=>(x+y)*TH/2+TH/2;
+  // なめらかノイズ: 隣のマスと色が近くなる→格子に見えない
+  function hash2(x,y){const n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
+  function vnoise(x,y){
+    const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+    const sm=t=>t*t*(3-2*t);
+    const a=hash2(xi,yi),b=hash2(xi+1,yi),c=hash2(xi,yi+1),d=hash2(xi+1,yi+1);
+    const u=sm(xf),v=sm(yf);
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+  }
+  const lerp=(a,b,t)=>a+(b-a)*t;
   g.fillStyle='#0b0d12';g.fillRect(0,0,gW,gH);
-  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    const cx=(x-y)*TW/2+gW/2, cy=(x+y)*TH/2+TH/2;
-    const v=((x*7349+y*9151)%97)/97;
-    const k=tileKind[y*MAP+x];
-    let col;
-    if(k===1)col=`rgb(${86+v*14|0},${66+v*12|0},${44+v*10|0})`;
-    else if(k===2)col=`rgb(${92+v*12|0},${90+v*12|0},${88+v*10|0})`;
-    else col=`rgb(${40+v*13|0},${67+v*16|0},${47+v*14|0})`;
-    g.fillStyle=col;
+  function diamond(x,y){
+    const cx=GX(x,y),cy=GY(x,y);
     g.beginPath();
     g.moveTo(cx,cy-TH/2-1);g.lineTo(cx+TW/2+1.5,cy);
     g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1.5,cy);
-    g.closePath();g.fill();
-    if(k===2){g.strokeStyle='rgba(0,0,0,0.18)';g.lineWidth=1;g.stroke();}
-    if(k===0){
-      if(v<0.22){
-        g.fillStyle='rgba(18,36,26,0.28)';
-        g.beginPath();g.ellipse(cx,cy,16+v*30,7+v*10,0,0,6.29);g.fill();
-      }
-      if(v>0.72){
-        g.fillStyle='rgba(110,150,95,0.45)';
-        g.fillRect(cx-6+v*10,cy-2,2,2);g.fillRect(cx+2,cy+2-v*4,2,2);
-        g.fillRect(cx-2,cy-5+v*6,2,2);
-      }
+    g.closePath();
+  }
+  // 1) 草地: なめらかなグラデーションで塗る
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    const n=vnoise(x/5,y/5)*0.65+vnoise(x/13+7,y/13+3)*0.35;
+    g.fillStyle=`rgb(${lerp(34,56,n)|0},${lerp(58,86,n)|0},${lerp(42,60,n)|0})`;
+    diamond(x,y);g.fill();
+  }
+  // 2) 土の道: マス形ではなく柔らかい楕円を重ねて不定形の道に
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    if(tileKind[y*MAP+x]!==1)continue;
+    const n=vnoise(x/4+3,y/4+9);
+    const cx=GX(x,y)+(hash2(x,y)-0.5)*14, cy=GY(x,y)+(hash2(y,x)-0.5)*7;
+    g.fillStyle=`rgba(${lerp(78,100,n)|0},${lerp(60,76,n)|0},${lerp(40,52,n)|0},0.9)`;
+    g.beginPath();g.ellipse(cx,cy,TW*0.62,TH*0.62,0,0,6.29);g.fill();
+  }
+  // 3) 村の石畳: ダイヤ模様をやめ、丸石を敷き詰める
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    if(tileKind[y*MAP+x]!==2)continue;
+    const cx=GX(x,y),cy=GY(x,y);
+    g.fillStyle='rgba(56,57,60,0.95)';
+    g.beginPath();g.ellipse(cx,cy,TW*0.6,TH*0.6,0,0,6.29);g.fill();
+  }
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    if(tileKind[y*MAP+x]!==2)continue;
+    const cx=GX(x,y),cy=GY(x,y);
+    for(let i=0;i<3;i++){
+      const h1=hash2(x*3+i,y*7),h2=hash2(x*7,y*3+i),h3=hash2(x+i*13,y+i*5);
+      const sxp=cx+(h1-0.5)*TW*0.8, syp=cy+(h2-0.5)*TH*0.8;
+      const rw=7+h3*8;
+      g.fillStyle=`rgb(${88+h3*26|0},${86+h3*26|0},${86+h3*24|0})`;
+      g.beginPath();g.ellipse(sxp,syp,rw,rw*0.55,(h1-0.5)*0.6,0,6.29);g.fill();
+    }
+  }
+  // 4) まだら模様: 複数マスをまたぐ影と光で自然な地面に
+  for(let i=0;i<420;i++){
+    const x=rnd(0,MAP-0.01),y=rnd(0,MAP-0.01);
+    if(tileKind[Math.floor(y)*MAP+Math.floor(x)]!==0)continue;
+    const cx=GX(x,y),cy=GY(x,y);
+    const r=rnd(30,110);
+    const dark=Math.random()<0.6;
+    g.fillStyle=dark?'rgba(10,22,16,0.07)':'rgba(140,180,120,0.05)';
+    g.beginPath();g.ellipse(cx,cy,r,r*0.5,0,0,6.29);g.fill();
+  }
+  // 5) 草むら・小石: マスの境界を無視して散らす
+  for(let i=0;i<1600;i++){
+    const x=rnd(1,MAP-1.01),y=rnd(1,MAP-1.01);
+    if(tileKind[Math.round(y)*MAP+Math.round(x)]!==0)continue;
+    const cx=GX(x,y),cy=GY(x,y);
+    const h=hash2(x*17,y*23);
+    if(h<0.75){
+      g.strokeStyle=`rgba(${90+h*60|0},${130+h*60|0},${80+h*40|0},0.55)`;
+      g.lineWidth=1;
+      g.beginPath();g.moveTo(cx,cy);g.lineTo(cx-2+h*4,cy-4-h*4);g.stroke();
+      g.beginPath();g.moveTo(cx+2,cy);g.lineTo(cx+3-h*3,cy-3-h*5);g.stroke();
+    }else{
+      g.fillStyle='rgba(120,120,125,0.5)';
+      g.beginPath();g.ellipse(cx,cy,2.2,1.3,0,0,6.29);g.fill();
     }
   }
 })();
