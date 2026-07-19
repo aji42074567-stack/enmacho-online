@@ -115,7 +115,50 @@
   .linkbtn{display:inline-block;margin-top:14px;background:none;border:none;cursor:pointer;
     font-family:var(--sans);font-size:11px;color:var(--dim);text-decoration:underline}
   .linkbtn:hover{color:var(--parchment)}
+  .linkbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   #death h1{color:#c96a5a}
+
+  /* ---- 転生記録の確認紙 ---- */
+  .reset-dialog{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;
+    border:0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right))
+    max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+    box-sizing:border-box;background:transparent;align-items:center;justify-content:center}
+  .reset-dialog[open]{display:flex}
+  .reset-dialog::backdrop{background:rgba(5,2,2,.88)}
+  .reset-paper{position:relative;width:min(430px,100%);max-height:calc(100dvh - 32px);
+    overflow:auto;box-sizing:border-box;padding:30px 28px;color:#2b1910;text-align:center;
+    background:
+      radial-gradient(circle at 18% 12%,rgba(255,246,199,.28),transparent 32%),
+      linear-gradient(135deg,rgba(96,44,20,.08),rgba(39,18,9,.12)),#d7c18d;
+    border:3px double #51271b;border-radius:2px;
+    box-shadow:0 20px 64px rgba(0,0,0,.86),inset 0 0 34px rgba(76,35,17,.22)}
+  .reset-paper::before{content:"";position:absolute;inset:8px;border:1px solid rgba(74,35,24,.3);
+    pointer-events:none}
+  .reset-kicker{font-family:var(--sans);font-size:10px;letter-spacing:.24em;color:#73523a}
+  .reset-paper h2{font-family:var(--serif);font-size:22px;letter-spacing:.15em;
+    color:#32150f;margin:8px 0 0}
+  .reset-paper .rule{height:1px;margin:16px 0;
+    background:linear-gradient(90deg,transparent,#784332,transparent)}
+  .reset-question{font-family:var(--serif);font-size:18px;font-weight:700;
+    letter-spacing:.08em;margin:0 0 8px}
+  .reset-warning{display:block;font-family:var(--serif);font-size:17px;
+    color:#8c211b;letter-spacing:.04em;margin-bottom:14px}
+  .reset-losses{font-family:var(--sans);font-size:12px;line-height:1.9;color:#4a3022;margin:0}
+  .reset-error{font-family:var(--sans);font-size:12px;line-height:1.7;color:#941f18;
+    background:rgba(255,238,210,.52);border:1px solid rgba(148,31,24,.4);
+    padding:8px;margin:14px 0 0}
+  .reset-seal{position:absolute;right:18px;top:15px;width:38px;height:38px;
+    display:grid;place-items:center;border:2px solid #9b2a22;color:#9b2a22;
+    font-family:var(--serif);font-size:20px;font-weight:700;transform:rotate(7deg);
+    opacity:.82}
+  .reset-actions{display:flex;gap:10px;justify-content:center;margin-top:20px}
+  .reset-actions .btn{flex:1;margin-top:0;min-height:46px;padding:10px 12px;
+    font-size:13px;letter-spacing:.08em}
+  .reset-actions .danger{background:linear-gradient(180deg,#702b24,#38120f);
+    border-color:#9f4a40;color:#ffe4da}
+  .reset-actions .danger:hover{border-color:#d07a6d}
+  .reset-actions .danger:disabled{opacity:.55;cursor:wait}
+  #resetBtn{min-height:44px;padding:9px 8px;touch-action:manipulation}
 
   .itemrow{display:flex;align-items:center;gap:10px;padding:9px 2px;
     border-bottom:1px solid #33291a;font-family:var(--sans);font-size:13px;
@@ -203,6 +246,10 @@
     #dock{gap:8px;padding:8px 10px}
     .scroll{padding:22px 20px}
     .scroll h1{font-size:24px}
+    .reset-paper{padding:26px 18px}
+    .reset-paper h2{font-size:19px}
+    .reset-actions{flex-direction:column}
+    .reset-actions .btn{width:100%;min-height:48px}
   }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
@@ -282,9 +329,29 @@
       </ul>
       <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
       <button class="btn" id="startBtn">入庁する</button>
-      <br><button class="linkbtn hidden" id="resetBtn">記録を消して転生し直す(最初から)</button>
+      <br><button class="linkbtn hidden" id="resetBtn">記録を消して転生し直す（最初から）</button>
     </div>
   </div>
+
+  <dialog class="reset-dialog" id="resetConfirm" role="alertdialog"
+    aria-labelledby="resetTitle" aria-describedby="resetWarning">
+    <div class="reset-paper">
+      <div class="reset-seal" aria-hidden="true">閻</div>
+      <div class="reset-kicker">地獄庁・転生申立書</div>
+      <h2 id="resetTitle">転生記録 抹消の確認</h2>
+      <div class="rule"></div>
+      <div id="resetWarning">
+        <p class="reset-question">本当にいいのか？</p>
+        <strong class="reset-warning">今は転生し直しても、なんのメリットもないよ。</strong>
+        <p class="reset-losses">徳位・名前・装備・道具・モン・魂の資質・竜の血・試練の進行など、保存された記録はすべて失われる。<br>この操作は取り消せない。</p>
+      </div>
+      <p class="reset-error hidden" id="resetError" role="alert">記録を消せなかった。ブラウザの保存設定を確認してくれ。</p>
+      <div class="reset-actions">
+        <button class="btn small" type="button" id="resetCancel" autofocus>消さずに戻る</button>
+        <button class="btn small danger" type="button" id="resetConfirmBtn">記録を消して最初から</button>
+      </div>
+    </div>
+  </dialog>
 
   <div class="overlay hidden" id="death">
     <div class="scroll">
@@ -2699,6 +2766,11 @@ canvas.addEventListener('pointerdown',ev=>{
   clickMark={x:t.x,y:t.y,age:0};
 });
 window.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'&&$('resetConfirm').open){
+    ev.preventDefault();
+    closeResetConfirm();
+    return;
+  }
   if(!started)return;
   const k=ev.key.toLowerCase();
   if(k==='e')castBolt();
@@ -2746,9 +2818,62 @@ $('startBtn').addEventListener('click',()=>{
     log('メニュー(I)のステータスで魂の資質5ポイントを割り振ろう','gain');
   }
 });
-$('resetBtn').addEventListener('click',()=>{
-  resetting=true;  // beforeunloadの自動セーブに書き戻させない
-  try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+const resetDialog=$('resetConfirm');
+let resetOpener=null;
+function openResetConfirm(){
+  resetOpener=document.activeElement;
+  $('resetError').textContent='記録を消せなかった。ブラウザの保存設定を確認してくれ。';
+  $('resetError').classList.add('hidden');
+  $('resetConfirmBtn').disabled=false;
+  if(!resetDialog.open)resetDialog.showModal();
+  $('resetCancel').focus();
+}
+function closeResetConfirm(){
+  if(resetDialog.open)resetDialog.close();
+}
+$('resetBtn').addEventListener('click',openResetConfirm);
+$('resetCancel').addEventListener('click',closeResetConfirm);
+resetDialog.addEventListener('cancel',ev=>{
+  ev.preventDefault();
+  closeResetConfirm();
+});
+resetDialog.addEventListener('click',ev=>{
+  if(ev.target===resetDialog)closeResetConfirm();
+});
+resetDialog.addEventListener('close',()=>{
+  if(resetOpener&&resetOpener.isConnected)resetOpener.focus();
+});
+$('resetConfirmBtn').addEventListener('click',()=>{
+  if(resetting)return;
+  const btn=$('resetConfirmBtn');
+  btn.disabled=true;
+  let backup;
+  try{
+    backup=localStorage.getItem(SAVE_KEY);
+  }catch(e){
+    btn.disabled=false;
+    $('resetError').textContent='記録の保存状態を確認できなかった。記録は消していない。';
+    $('resetError').classList.remove('hidden');
+    return;
+  }
+  resetting=true;  // 確定した瞬間からbeforeunloadの自動セーブを止める
+  try{
+    localStorage.removeItem(SAVE_KEY);
+    if(localStorage.getItem(SAVE_KEY)!==null)throw new Error('reset failed');
+  }catch(e){
+    let restored=false;
+    try{
+      if(backup!==null)localStorage.setItem(SAVE_KEY,backup);
+      restored=localStorage.getItem(SAVE_KEY)===backup;
+    }catch(restoreError){}
+    resetting=false;
+    btn.disabled=false;
+    $('resetError').textContent=restored
+      ?'記録を消せなかった。元の記録は守られている。'
+      :'記録の削除中に異常が起きた。ページを閉じず、ブラウザの保存設定を確認してくれ。';
+    $('resetError').classList.remove('hidden');
+    return;
+  }
   location.reload();
 });
 $('reviveBtn').addEventListener('click',()=>{
