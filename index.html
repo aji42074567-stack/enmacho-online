@@ -374,10 +374,29 @@
 
   <div class="overlay hidden" id="talk">
     <div class="scroll">
-      <h2>オキナ</h2>
-      <div class="sub">三途の川の番人</div>
+      <h2 id="talkTitle">オキナ</h2>
+      <div class="sub" id="talkSub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
       <button class="btn small" id="talkClose">別れる</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="tavern">
+    <div class="scroll">
+      <h2>酒場 彼岸亭</h2>
+      <div class="sub">「死んでからも、飯と噂話は残るのさ」</div>
+      <div id="tavernList"></div>
+      <div class="goldrow">所持金 <span id="tavernGold">0</span> モン</div>
+      <button class="btn small" id="tavernClose">店を出る</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="board">
+    <div class="scroll">
+      <h2>高札</h2>
+      <div class="sub">町の亡者からの頼み事</div>
+      <div id="boardList"></div>
+      <button class="btn small" id="boardClose">立ち去る</button>
     </div>
   </div>
 
@@ -493,7 +512,8 @@ const BOSS_HOME={x:10,y:7};
   }
   // 村の石畳
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<6.2)tileKind[y*MAP+x]=2;
+    if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<7.4)tileKind[y*MAP+x]=2;   // 宿場町の広場
+    if(y>=56&&y<=60&&x>=33&&x<=40&&Math.abs(y-(57.5+(x-33)*0.35))<1.6)tileKind[y*MAP+x]=2;   // 酒場へ続く通り
   }
   // 離小島(歪な菱形): 当たり判定は islandF で決定(見た目も同じ関数で滑らかに描く)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
@@ -514,16 +534,23 @@ placeBuilding(27,50,'house','#6e3a2e','#5a2f26');
 placeBuilding(36,49,'house','#3e5a4a','#33493d');
 placeBuilding(26,55,'house','#6e3a2e','#5a2f26');
 placeBuilding(35,54,'shop','#7a5a2a','#645022');
+placeBuilding(38,57,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」
+placeBuilding(23,52,'house','#3e5a4a','#33493d');
 blocked[50*MAP+32]=1;
 props.push({x:32,y:50,kind:'stone'});
 blocked[56*MAP+31]=1;
 props.push({x:31,y:56,kind:'well'});
 props.push({x:29,y:54,kind:'lamp'});
 props.push({x:37,y:52,kind:'lamp'});
+props.push({x:36,y:58.4,kind:'lamp'});   // 酒場前の通り
+props.push({x:40.6,y:59.2,kind:'lamp'});
 
 let npcs=[
   {x:34,y:56,kind:'merchant',name:'オババ'},
   {x:30,y:51,kind:'elder',name:'オキナ'},
+  {x:38.2,y:59.6,kind:'okami',name:'オカミ'},     // 酒場の女将
+  {x:36.4,y:60.2,kind:'guest',name:'トックリ'},   // 酔客の亡者
+  {x:33.6,y:58.6,kind:'board',name:'高札'},       // クエスト掲示板
 ];
 const ELDER_LINES=[
   '「森の最深部にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
@@ -534,6 +561,27 @@ const ELDER_LINES=[
   '「魂を斬るのは殺生ではない。迷いを断ち、成仏させてやる功徳じゃ。……生きておった頃、お前は誰かの迷いを断ってやれたかの?」',
   '「ここだけの話じゃがな……この世界、時々"ほころび"のようなものが見える。まあ、わしの気のせいじゃろうて」',
 ];
+const OKAMI_LINES=[
+  '「いらっしゃい。ここは彼岸亭。転生待ちの亡者が、束の間の憂さを晴らす店さ」',
+  '「まかない飯は体にいいよ。……体なんて、もうないはずなんだけどねえ。おかしな話さ」',
+  '「高札の頼み事、受けてやっておくれよ。この町の亡者は気が弱いのばかりでね」',
+  '「オキナの旦那は長生きだよ。あたしがこの店を開いた時にはもう、あの姿だった」',
+  '「たまにね、お客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどさ」',
+];
+const GUEST_LINES=[
+  '「ひっく……なあ、兄さんも飲むかい。死んでから酒の味が薄いんだ。誰かが手を抜いてやがる」',
+  '「雨の音、聞いたことあるか。……全部同じ間隔なんだよ。数えてみな。おれは三晩数えた」',
+  '「海の向こうに行こうとしたやつがいてな。桟橋の先でぷっつり、いなくなった。……転生ってやつかね」',
+  '「この町の夜空、星の数がいっつも同じなんだ。ひっく……増えも減りもしねえ。きっちり同じ」',
+];
+/* ================= クエスト(高札) ================= */
+const QUESTS=[
+  {id:'q_gaki',   name:'ガキ退治',        desc:'村の周りのガキを5体成仏させる',    type:'kill', mob:['goblin','goblin_red'], n:5, rw:{gold:80, xp:40}},
+  {id:'q_tokkuri',name:'酔客の戯言',      desc:'彼岸亭のトックリの話を聞いてやる',  type:'talk', n:1, rw:{gold:50, xp:30}},
+  {id:'q_inugami',name:'イヌガミの群れ',  desc:'森のイヌガミを5体成仏させる',      type:'kill', mob:['wolf'], n:5, rw:{gold:150,xp:90}},
+  {id:'q_akki',   name:'アッキ討伐',      desc:'森の奥のアッキを3体成仏させる',    type:'kill', mob:['orc'], n:3, rw:{gold:220,xp:160}},
+];
+const questById=id=>QUESTS.find(q=>q.id===id);
 const JUDGE_COMMENTS=[
   '審査記録: 無謀は勇気ではない。だが、挑んだという事実は徳として記録した。',
   '審査記録: 準備を怠った者から順に倒れる。生前も、死後も、それは同じである。',
@@ -544,7 +592,7 @@ const JUDGE_COMMENTS=[
 let elderIdx=0;
 
 (function genProps(){
-  const clear=(x,y)=>Math.hypot(x-SPAWN.x,y-SPAWN.y)<9||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||(x>=43&&x<=56&&y>=17&&y<=27);
+  const clear=(x,y)=>Math.hypot(x-SPAWN.x,y-SPAWN.y)<10.5||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||(x>=43&&x<=56&&y>=17&&y<=27);
   let n=0,tries=0;
   while(n<240&&tries++<8000){
     const x=rndi(2,MAP-3),y=rndi(2,MAP-3);
@@ -710,6 +758,8 @@ const player={
   hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,dragonBlood:0,
   name:'',quests:{trial:0},
+  qb:{active:null,prog:0,done:{}},          // 高札クエスト
+  foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
   target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
@@ -720,8 +770,8 @@ let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
-const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk;
-const defTotal=()=>eqSum('def')+Math.floor(ST().con/2);
+const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk+(player.foodAtkT>0?4:0);
+const defTotal=()=>eqSum('def')+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
 const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
 const spellMul=()=>1+0.06*ST().int;
 const speedNow=()=>player.speed*(1+0.02*ST().agi)*(player.hasteT>0?1.3:1);
@@ -743,7 +793,7 @@ function save(){
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
-      quests:player.quests
+      quests:player.quests,qb:player.qb
     }));
   }catch(e){}
 }
@@ -778,6 +828,10 @@ function load(){
       player.statPts=5+Math.floor(player.lv/10);
     }
     player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
+    player.qb=(d.qb&&typeof d.qb==='object')
+      ?{active:(d.qb.active&&questById(d.qb.active))?d.qb.active:null,
+        prog:d.qb.prog|0,done:d.qb.done&&typeof d.qb.done==='object'?d.qb.done:{}}
+      :{active:null,prog:0,done:{}};
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -999,6 +1053,26 @@ function gainItem(id){
   save();
 }
 
+/* ================= 高札クエスト進行 ================= */
+function questProgress(type,tag){
+  if(!player.qb.active)return;
+  const q=questById(player.qb.active);
+  if(!q||q.type!==type)return;
+  if(type==='kill'&&!q.mob.includes(tag))return;
+  player.qb.prog++;
+  if(player.qb.prog>=q.n){
+    player.qb.done[q.id]=true;
+    player.qb.active=null;player.qb.prog=0;
+    player.gold+=q.rw.gold;gainXp(q.rw.xp);
+    banner={txt:`頼み事「${q.name}」達成！`,age:0};
+    log(`高札の頼み事「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
+    sfx.coin();
+  }else{
+    addFloat(player.x,player.y-1.0,`${q.name} ${player.qb.prog}/${q.n}`,'#ffe27a');
+  }
+  save();
+}
+
 /* ================= 戦闘 ================= */
 function damageMob(m,dmg,crit){
   if(m.dead)return;
@@ -1031,6 +1105,7 @@ function killMob(m){
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
   if(m.def.boss){banner={txt:'ゴウリュウ鎮魂！',age:0};log('賽の森が静まりかえった…(90秒後にまた迷い出る)','sys');}
+  questProgress('kill',m.type);
   if(m.type==='oni_blue'&&player.quests.trial<2){
     player.quests.trial=2;
     player.statPts+=2;player.gold+=300;
@@ -1219,6 +1294,74 @@ function buy(id){
   }
   sfx.coin();save();renderShop();
 }
+
+/* ---- 酒場 彼岸亭 ---- */
+const FOODS=[
+  {id:'onigiri',name:'鬼焼き握り',fx:'60秒 攻撃+4',price:40,t:'foodAtkT'},
+  {id:'gusokuni',name:'具足煮',   fx:'60秒 防御+4',price:40,t:'foodDefT'},
+  {id:'higanjiru',name:'彼岸汁',  fx:'60秒 HPがじわじわ回復',price:60,t:'foodRegenT'},
+];
+function renderTavern(){
+  let html='';
+  for(const f of FOODS){
+    const eating=player[f.t]>0;
+    html+=`<div class="itemrow"><span class="nm">${f.name} <span class="fx">${f.fx}</span></span>
+      <span class="pr">${f.price} モン</span>
+      <button class="buyb" data-food="${f.id}" ${player.gold<f.price?'disabled':''}>${eating?'おかわり':'食べる'}</button></div>`;
+  }
+  html+=`<div class="itemrow"><span class="nm">女将の噂話 <span class="fx">タダで聞ける</span></span>
+    <button class="buyb" data-rumor="1">聞く</button></div>`;
+  $('tavernList').innerHTML=html;
+  $('tavernGold').textContent=player.gold;
+  for(const b of $('tavernList').querySelectorAll('[data-food]')){
+    b.addEventListener('click',()=>{
+      const f=FOODS.find(x=>x.id===b.getAttribute('data-food'));
+      if(!f||player.gold<f.price)return;
+      player.gold-=f.price;player[f.t]=60;
+      log(`${f.name}を食べた (${f.fx})`,'gain');
+      sfx.coin();save();renderTavern();
+    });
+  }
+  const r=$('tavernList').querySelector('[data-rumor]');
+  if(r)r.addEventListener('click',()=>{
+    $('tavern').classList.add('hidden');
+    $('talkTitle').textContent='オカミ';$('talkSub').textContent='彼岸亭の女将';
+    $('talkText').textContent=OKAMI_LINES[okamiIdx++%OKAMI_LINES.length];
+    $('talk').classList.remove('hidden');
+    sfx.click();
+  });
+}
+
+/* ---- 高札(クエスト掲示板) ---- */
+function renderBoard(){
+  let html='';
+  for(const q of QUESTS){
+    const done=!!player.qb.done[q.id];
+    const active=player.qb.active===q.id;
+    const rw=`${q.rw.gold}モン+${q.rw.xp}徳`;
+    let btn;
+    if(done)btn=`<button class="buyb" disabled>済</button>`;
+    else if(active)btn=`<button class="buyb on" data-qcancel="${q.id}">やめる</button>`;
+    else btn=`<button class="buyb" data-qtake="${q.id}" ${player.qb.active?'disabled':''}>受ける</button>`;
+    const prog=active&&q.type==='kill'?` <b>${player.qb.prog}/${q.n}</b>`:'';
+    html+=`<div class="itemrow"><span class="nm">${q.name}${prog} <span class="fx">${q.desc} — 礼: ${rw}</span></span>${btn}</div>`;
+  }
+  $('boardList').innerHTML=html;
+  for(const b of $('boardList').querySelectorAll('[data-qtake]')){
+    b.addEventListener('click',()=>{
+      player.qb.active=b.getAttribute('data-qtake');player.qb.prog=0;
+      const q=questById(player.qb.active);
+      log(`高札の頼み事「${q.name}」を受けた`,'sys');
+      sfx.click();save();renderBoard();
+    });
+  }
+  for(const b of $('boardList').querySelectorAll('[data-qcancel]')){
+    b.addEventListener('click',()=>{
+      player.qb.active=null;player.qb.prog=0;
+      sfx.click();save();renderBoard();
+    });
+  }
+}
 let menuTab='eq',selSlot='weapon';
 // 人型の周りの6ボックス位置(272x252の#doll内)
 const SLOT_POS={
@@ -1332,9 +1475,19 @@ function renderStatTab(){
 for(const b of document.querySelectorAll('.mtab')){
   b.addEventListener('click',()=>{menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();});
 }
+let okamiIdx=0,guestIdx=0;
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
+  else if(npc.kind==='okami'){renderTavern();$('tavern').classList.remove('hidden');}
+  else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
+  else if(npc.kind==='guest'){
+    $('talkTitle').textContent='トックリ';$('talkSub').textContent='彼岸亭の酔客';
+    $('talkText').textContent=GUEST_LINES[guestIdx++%GUEST_LINES.length];
+    $('talk').classList.remove('hidden');
+    questProgress('talk','guest');
+  }
   else{
+    $('talkTitle').textContent='オキナ';$('talkSub').textContent='三途の川の番人';
     let line;
     if(player.quests.trial===0){
       line='「よう来たな、亡者よ。業龍に挑むにはまだ早い。東の岩山に試練の洞窟がある。骨の武者どもを越え、主のアオオニを鎮めて力を示すのじゃ」';
@@ -1350,6 +1503,8 @@ function openNpc(npc){
   sfx.click();
 }
 $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
+$('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
+$('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>$('talk').classList.add('hidden'));
 $('equipClose').addEventListener('click',()=>$('equip').classList.add('hidden'));
 function toggleEquip(){
@@ -1429,6 +1584,9 @@ function update(dt){
     if(player.hitT>0)player.hitT-=dt;
     if(player.hasteT>0)player.hasteT-=dt;
     if(player.critT>0)player.critT-=dt;
+    if(player.foodAtkT>0)player.foodAtkT-=dt;
+    if(player.foodDefT>0)player.foodDefT-=dt;
+    if(player.foodRegenT>0){player.foodRegenT-=dt;player.hp=Math.min(player.maxHp,player.hp+2*dt);}
     if(player.attackDur>0){
       player.attackT+=dt;
       if(player.pendingHit&&player.attackT>=0.3){   // 振り下ろした瞬間にヒット
@@ -1940,6 +2098,11 @@ loadSprite('map_rock_spire','assets/map_rock_spire.png');
 loadSprite('map_rock_cluster','assets/map_rock_cluster.png');
 loadSprite('map_lamp_post','assets/map_lamp_post.png');
 loadSprite('map_stone_well','assets/map_stone_well.png');
+// 酒場まわり(画像が来たら自動で差し替わる仮キー)
+loadSprite('map_tavern','assets/map_tavern.png');
+loadSprite('map_kosatsu','assets/map_kosatsu.png');
+loadSprite('npc_okami','assets/npc_okami.png');
+loadSprite('npc_tokkuri','assets/npc_tokkuri.png');
 (function(){  // 武器振りエフェクト用にアイコン画像も読む
   const seen=new Set();
   for(const id in ITEMS){
@@ -2308,14 +2471,36 @@ function drawStone(sx,sy){
   ctx.restore();
 }
 function drawHouse(sx,sy,p){
-  const key=p.kind==='shop'
-    ?'map_shop_green'
+  const key=p.kind==='shop'?'map_shop_green'
+    :p.kind==='tavern'?'map_tavern'
     :((Math.floor(p.x)&1)?'map_house_red':'map_house_blue');
-  const img=SPRITES[key];
+  const img=SPRITES[key]||(p.kind==='tavern'?SPRITES.map_house_red:null);   // 酒場画像が来るまで赤屋根の家で代用
   if(img){
-    const w=p.kind==='shop'?202:180;
+    const w=p.kind==='shop'?202:p.kind==='tavern'?210:180;
     const h=w*img.height/img.width;
     ctx.drawImage(img,sx-w/2,sy+34-h,w,h);
+    if(p.kind==='tavern'&&!SPRITES.map_tavern){
+      // 代用中は赤提灯と看板で酒場らしく
+      for(const lx of [-58,60]){
+        const sw=Math.sin(time*2.2+lx)*2;
+        const fl=0.6+Math.sin(time*6+lx)*0.25;
+        const ly=34-h*0.52;
+        ctx.strokeStyle='#3a2f22';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(sx+lx,ly+sy-34+34);ctx.lineTo(sx+lx+sw,sy+ly-34+42);ctx.stroke();
+        const cy=sy+ly-34+48;
+        ctx.fillStyle='#c43a2a';
+        ctx.beginPath();ctx.ellipse(sx+lx+sw,cy,7,9,0,0,6.29);ctx.fill();
+        ctx.fillStyle=`rgba(255,190,120,${0.55*fl})`;
+        ctx.beginPath();ctx.ellipse(sx+lx+sw,cy,3.5,5.5,0,0,6.29);ctx.fill();
+        ctx.fillStyle='#e8dcc4';ctx.font='8px sans-serif';ctx.textAlign='center';
+        ctx.fillText('酒',sx+lx+sw,cy+3);
+        const gl=ctx.createRadialGradient(sx+lx+sw,cy,0,sx+lx+sw,cy,30);
+        gl.addColorStop(0,`rgba(255,140,80,${0.18*fl})`);gl.addColorStop(1,'rgba(255,140,80,0)');
+        ctx.fillStyle=gl;ctx.fillRect(sx+lx+sw-30,cy-30,60,60);
+      }
+      ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('彼岸亭',sx,sy+30);
+    }
     return;
   }
   const h=34;
@@ -2339,7 +2524,58 @@ function drawHouse(sx,sy,p){
     ctx.fillStyle='#e8dcc4';ctx.font='10px sans-serif';ctx.textAlign='center';
     ctx.fillText('店',48,-50);
   }
+  if(p.kind==='tavern'){
+    // のれん(入口の垂れ幕)
+    ctx.fillStyle='#7a2020';
+    for(let i=0;i<3;i++)ctx.fillRect(16+i*7,-2,5,14);
+    // 赤提灯2つ(軒先でゆれる)
+    for(const [lx,ph] of [[-30,-h-6],[52,-h+2]]){
+      const sw=Math.sin(time*2.2+lx)*2;
+      const fl=0.6+Math.sin(time*6+lx)*0.25;
+      ctx.strokeStyle='#3a2f22';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(lx,ph);ctx.lineTo(lx+sw,ph+8);ctx.stroke();
+      ctx.fillStyle='#c43a2a';
+      ctx.beginPath();ctx.ellipse(lx+sw,ph+14,6,8,0,0,6.29);ctx.fill();
+      ctx.fillStyle=`rgba(255,190,120,${0.5*fl})`;
+      ctx.beginPath();ctx.ellipse(lx+sw,ph+14,3,5,0,0,6.29);ctx.fill();
+      const gl=ctx.createRadialGradient(lx+sw,ph+14,0,lx+sw,ph+14,26);
+      gl.addColorStop(0,`rgba(255,140,80,${0.16*fl})`);gl.addColorStop(1,'rgba(255,140,80,0)');
+      ctx.fillStyle=gl;ctx.fillRect(lx+sw-26,ph-12,52,52);
+    }
+    ctx.fillStyle='#e8dcc4';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('酒',52,-h+18);
+  }
   ctx.restore();
+}
+function drawKosatsu(sx,sy){
+  const img=SPRITES.map_kosatsu;
+  if(img){
+    const w=84,h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy-h+10,w,h);
+  }else{
+    drawShadow(sx,sy+3,20);
+    ctx.save();ctx.translate(sx,sy);
+    // 柱2本+屋根+札3枚の高札場
+    ctx.fillStyle='#4a3a26';
+    ctx.fillRect(-24,-40,4,42);ctx.fillRect(20,-40,4,42);
+    ctx.fillStyle='#5d4a30';
+    ctx.beginPath();ctx.moveTo(-32,-40);ctx.lineTo(0,-52);ctx.lineTo(32,-40);ctx.lineTo(28,-36);ctx.lineTo(0,-47);ctx.lineTo(-28,-36);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#8a7448';
+    ctx.fillRect(-20,-36,40,26);
+    ctx.fillStyle='#6d5a38';
+    ctx.fillRect(-16,-32,10,18);ctx.fillRect(-4,-34,10,20);ctx.fillRect(8,-32,10,18);
+    ctx.restore();
+  }
+  // 未受注の頼み事があれば「!」
+  const avail=QUESTS.some(q=>!player.qb.done[q.id]&&player.qb.active!==q.id);
+  if(avail){
+    const puls=0.6+Math.sin(time*3)*0.4;
+    ctx.fillStyle=`rgba(255,225,120,${puls})`;
+    ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('!',sx,sy-58);
+  }
+  ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('高札',sx,sy+14);
 }
 function drawPalm(sx,sy,p){
   const img=SPRITES['palm_'+p.v];
@@ -2444,8 +2680,10 @@ function drawCaveExit(sx,sy){
   ctx.fillText('出口',0,8);
   ctx.restore();
 }
+const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',okami:'npc_okami',guest:'npc_tokkuri'};
 function drawNpc(sx,sy,n){
-  const img=SPRITES[n.kind==='merchant'?'npc_obaba':'npc_okina'];
+  if(n.kind==='board'){drawKosatsu(sx,sy);return;}
+  const img=SPRITES[NPC_SPRITE[n.kind]];
   if(img){
     drawShadow(sx,sy+2,10);
     const D=50,F=128;
@@ -2466,6 +2704,31 @@ function drawNpc(sx,sy,n){
     ctx.fillStyle='#e0b89a';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
     ctx.fillStyle='#a8342a';
     ctx.beginPath();ctx.moveTo(-8,-24);ctx.lineTo(0,-33);ctx.lineTo(8,-24);ctx.closePath();ctx.fill();
+  }else if(n.kind==='okami'){
+    // 女将: 茜色の着物+白い前掛け+お盆
+    ctx.fillStyle='#9a3a4a';
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#e8e2d2';
+    ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(-3,-10);ctx.lineTo(3,-10);ctx.lineTo(4,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#e0b89a';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
+    ctx.fillStyle='#2a2320';
+    ctx.beginPath();ctx.arc(0,-24,4.5,Math.PI,0);ctx.fill();
+    ctx.beginPath();ctx.arc(0,-27,2.4,0,6.29);ctx.fill();   // 団子髪
+    ctx.strokeStyle='#8a6d3a';ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(7,-14);ctx.lineTo(12,-16);ctx.stroke();
+    ctx.fillStyle='#6d5a38';ctx.beginPath();ctx.ellipse(13,-17,4,1.6,-0.3,0,6.29);ctx.fill();   // お盆
+  }else if(n.kind==='guest'){
+    // 酔客: 青白い亡者+徳利、ゆらゆら
+    const sway=Math.sin(time*1.8)*2;
+    ctx.save();ctx.translate(sway,0);ctx.rotate(sway*0.02);
+    ctx.fillStyle='rgba(150,170,200,0.75)';
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-15);ctx.lineTo(5,-15);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(214,206,186,0.9)';ctx.beginPath();ctx.arc(0,-20,5,0,6.29);ctx.fill();
+    ctx.fillStyle='#7a4a3a';
+    ctx.beginPath();ctx.ellipse(9,-12,2.6,3.6,0.2,0,6.29);ctx.fill();   // 徳利
+    ctx.fillStyle='rgba(255,150,150,0.5)';
+    ctx.beginPath();ctx.arc(-2,-19,1.2,0,6.29);ctx.fill();ctx.beginPath();ctx.arc(2,-19,1.2,0,6.29);ctx.fill();   // ほろ酔いの頬
+    ctx.restore();
   }else{
     ctx.fillStyle='#7d8290';
     ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
@@ -2568,7 +2831,7 @@ function render(){
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
-      case 'house':case 'shop':drawHouse(sx,sy,it.o);break;
+      case 'house':case 'shop':case 'tavern':drawHouse(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
       case 'player':drawPlayer(sx,sy,it.o);break;
       case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
@@ -2700,12 +2963,20 @@ function hud(){
   el.mpn.textContent=`${Math.floor(player.mp)} / ${player.maxMp}`;
   el.pot.textContent=player.potions;
   el.pt.textContent=player.statPts>0?player.statPts:'';
-  el.goal.textContent=player.quests.trial===0?'まずはオキナの話を聞こう'
-    :player.quests.trial===1?'東の岩山 試練の洞窟へ'
-    :'賽の森のゴウリュウを鎮めよ';
+  if(player.qb.active){
+    const q=questById(player.qb.active);
+    el.goal.textContent=q.type==='kill'?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
+  }else{
+    el.goal.textContent=player.quests.trial===0?'まずはオキナの話を聞こう'
+      :player.quests.trial===1?'東の岩山 試練の洞窟へ'
+      :'賽の森のゴウリュウを鎮めよ';
+  }
   let bf='';
   if(player.hasteT>0)bf+=`⚡韋駄天 ${Math.ceil(player.hasteT)}秒　`;
-  if(player.critT>0)bf+=`🔥修羅 ${Math.ceil(player.critT)}秒`;
+  if(player.critT>0)bf+=`🔥修羅 ${Math.ceil(player.critT)}秒　`;
+  if(player.foodAtkT>0)bf+=`🍙攻+4 ${Math.ceil(player.foodAtkT)}秒　`;
+  if(player.foodDefT>0)bf+=`🍲防+4 ${Math.ceil(player.foodDefT)}秒　`;
+  if(player.foodRegenT>0)bf+=`🍵回復 ${Math.ceil(player.foodRegenT)}秒`;
   el.buffs.textContent=bf;
   el.bolt.classList.toggle('disabled',player.mp<8);
   el.heal.classList.toggle('disabled',player.lv<3||player.mp<12);
