@@ -149,6 +149,35 @@
   .buyb.on{border-color:var(--gold);color:var(--gold)}
   .goldrow{font-family:var(--sans);font-size:12px;color:var(--dim);margin-top:12px;
     font-variant-numeric:tabular-nums}
+
+  /* ---- 行嚢メニュー(装備/道具/ステータス) ---- */
+  #menuTabs{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
+  .mtab{flex:1;max-width:110px;font-family:var(--serif);font-size:13px;letter-spacing:.14em;
+    color:var(--dim);background:linear-gradient(180deg,#2b2314,#1c160d);
+    border:1px solid var(--panel-edge);border-radius:4px;padding:8px 0;cursor:pointer}
+  .mtab:hover{color:var(--parchment)}
+  .mtab.on{color:var(--gold);border-color:var(--gold);
+    background:linear-gradient(180deg,#3d3220,#241c11)}
+  #doll{position:relative;width:272px;height:252px;margin:0 auto 12px}
+  #dollImg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:120px;height:120px;background:url(assets/char_player_m.png) 0 0/400% 100% no-repeat;
+    image-rendering:pixelated;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
+  .slotbox{position:absolute;width:62px;height:62px;box-sizing:border-box;
+    border:1px solid var(--panel-edge);border-radius:6px;background:#141009;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:1px;padding:2px}
+  .slotbox:hover{border-color:#8a6f3d}
+  .slotbox.sel{border-color:var(--gold);box-shadow:0 0 10px rgba(201,162,74,.35)}
+  .slotbox .sl{font-family:var(--sans);font-size:9px;color:var(--dim);letter-spacing:.1em}
+  .slotbox img{width:28px;height:28px;image-rendering:pixelated}
+  .slotbox .eqn{font-family:var(--sans);font-size:9px;color:var(--parchment);
+    max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .slotbox.empty .eqn{color:#5d5340}
+  .slotmark{display:inline-block}
+  #slotItems{min-height:40px}
+  .statline{display:flex;justify-content:space-between;font-family:var(--sans);
+    font-size:12.5px;color:#cfc2a0;padding:5px 2px;border-bottom:1px solid #2a2115}
+  .statline b{color:var(--parchment);font-variant-numeric:tabular-nums}
   .goldrow span{color:var(--gold)}
   .say{font-family:var(--sans);font-size:13.5px;color:#cfc2a0;line-height:2;text-align:left}
   .hidden{display:none !important}
@@ -212,8 +241,8 @@
         <span class="key">Q</span><span class="icon">⚗</span><span>回復</span>
         <span class="badge" id="potN">3</span>
       </button>
-      <button class="skill" id="btnEquip" title="道具 (I)">
-        <span class="key">I</span><span class="icon">🛡</span><span>道具</span>
+      <button class="skill" id="btnEquip" title="メニュー (I)">
+        <span class="key">I</span><span class="icon">🛡</span><span>メニュー</span>
         <span class="badge" id="ptN"></span>
       </button>
     </div>
@@ -275,10 +304,22 @@
 
   <div class="overlay hidden" id="equip">
     <div class="scroll">
-      <h2>持ち物</h2>
-      <div class="sub">魂の資質・薬・装備</div>
-      <div id="equipList"></div>
-      <button class="btn small" id="equipClose">閉じる</button>
+      <h2>メニュー</h2>
+      <div class="sub">装備・道具・ステータス</div>
+      <div id="menuTabs">
+        <button class="mtab on" data-tab="eq">装備</button>
+        <button class="mtab" data-tab="item">道具</button>
+        <button class="mtab" data-tab="stat">ステータス</button>
+      </div>
+      <div id="tabEq">
+        <div id="doll">
+          <div id="dollImg"></div>
+        </div>
+        <div id="slotItems"></div>
+      </div>
+      <div id="tabItem" class="hidden"><div id="itemList"></div></div>
+      <div id="tabStat" class="hidden"><div id="statList"></div></div>
+      <button class="btn small" id="equipClose">閉じる (I)</button>
     </div>
   </div>
 </div>
@@ -311,12 +352,28 @@ const ITEMS={
   long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120,icon:'icon_katana.png'},
   bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400,icon:'icon_greatsword.png'},
   drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true,icon:'icon_greatsword.png'},
-  cloth:       {slot:'armor', name:'経帷子',      def:1, price:0,  icon:'icon_armor_cloth.png'},
-  leather:     {slot:'armor', name:'鬼革の胴着',  def:3, price:100,icon:'icon_armor_leather.png'},
-  chain:       {slot:'armor', name:'鎖帷子',      def:6, price:350,icon:'icon_armor_chain.png'},
-  plate:       {slot:'armor', name:'冥府の具足',  def:10,price:900,icon:'icon_armor_plate.png'},
+  cloth:       {slot:'body',  name:'経帷子',      def:1, price:0,  icon:'icon_armor_cloth.png'},
+  leather:     {slot:'body',  name:'鬼革の胴着',  def:3, price:100,icon:'icon_armor_leather.png'},
+  chain:       {slot:'body',  name:'鎖帷子',      def:6, price:350,icon:'icon_armor_chain.png'},
+  plate:       {slot:'body',  name:'冥府の具足',  def:10,price:900,icon:'icon_armor_plate.png'},
+  kasa:        {slot:'head',  name:'網代笠',      def:1, price:60},
+  oni_helm:    {slot:'head',  name:'鬼面の兜',    def:4, price:320},
+  kote:        {slot:'arms',  name:'革の籠手',    def:1, price:80},
+  oni_kote:    {slot:'arms',  name:'鬼鉄の籠手',  def:3, price:280},
+  waraji:      {slot:'feet',  name:'白緒の草鞋',  def:1, price:70},
+  suneate:     {slot:'feet',  name:'冥鉄の脛当て',def:3, price:300},
+  juzu:        {slot:'acc',   name:'六道の数珠',  hpb:30,price:200},
+  magatama:    {slot:'acc',   name:'蒼の勾玉',    mpb:20,price:200},
 };
-const SHOP_STOCK=['long_sword','bastard','leather','chain','plate'];
+const SLOTS=[['weapon','武器'],['head','頭'],['body','胴'],['arms','腕'],['feet','足'],['acc','飾り']];
+const SLOT_NAME=Object.fromEntries(SLOTS);
+function itemFx(it){
+  const p=[];
+  if(it.atk)p.push(`攻+${it.atk}`);if(it.def)p.push(`防+${it.def}`);
+  if(it.hpb)p.push(`HP+${it.hpb}`);if(it.mpb)p.push(`MP+${it.mpb}`);
+  return p.join(' ');
+}
+const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
 const POTION_PRICE=30,HASTE_PRICE=60,CRIT_PRICE=80;
 
 /* ================= マップ生成 ================= */
@@ -574,7 +631,8 @@ const player={
   hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,
   name:'',quests:{trial:0},
-  items:['dagger','cloth'],weapon:'dagger',armor:'cloth',
+  items:['dagger','cloth'],
+  eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
   target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
@@ -582,14 +640,15 @@ const player={
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
-const atkTotal=()=>6+2*ST().str+ITEMS[player.weapon].atk;
-const defTotal=()=>ITEMS[player.armor].def+Math.floor(ST().con/2);
+const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
+const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk;
+const defTotal=()=>eqSum('def')+Math.floor(ST().con/2);
 const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
 const spellMul=()=>1+0.06*ST().int;
 const speedNow=()=>player.speed*(1+0.02*ST().agi)*(player.hasteT>0?1.3:1);
 function recalcMax(){
-  player.maxHp=80+12*(player.lv-1)+16*ST().con;
-  player.maxMp=30+6*(player.lv-1)+12*ST().int;
+  player.maxHp=80+12*(player.lv-1)+16*ST().con+eqSum('hpb');
+  player.maxMp=30+6*(player.lv-1)+12*ST().int+eqSum('mpb');
   player.hp=Math.min(player.hp,player.maxHp);
   player.mp=Math.min(player.mp,player.maxMp);
 }
@@ -599,8 +658,8 @@ function save(){
   if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:2,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
-      items:player.items,weapon:player.weapon,armor:player.armor,kills,
+      v:3,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      items:player.items,eq:player.eq,kills,
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
@@ -611,9 +670,20 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2))return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
-    player.items=d.items;player.weapon=d.weapon;player.armor=d.armor;
+    player.items=d.items;
+    if(d.v===3&&d.eq){
+      // 各部位のidが正しいものだけ採用
+      for(const [k] of SLOTS){
+        const id=d.eq[k];
+        player.eq[k]=(id&&ITEMS[id]&&ITEMS[id].slot===k)?id:(k==='weapon'?'dagger':'');
+      }
+    }else{
+      // 旧セーブ: weapon/armor(胴)のみ → 新しい部位は空でスタート
+      player.eq={weapon:(d.weapon&&ITEMS[d.weapon])?d.weapon:'dagger',
+        head:'',body:(d.armor&&ITEMS[d.armor])?d.armor:'cloth',arms:'',feet:'',acc:''};
+    }
     player.gender=d.gender==='f'?'f':'m';
     player.name=(typeof d.name==='string'&&d.name.trim())?d.name.trim().slice(0,8):'アジ';
     kills=d.kills||0;
@@ -819,16 +889,22 @@ function scheduleTrack(i,when){
 function equip(id){
   const it=ITEMS[id];
   if(!it||!player.items.includes(id))return;
-  if(it.slot==='weapon')player.weapon=id;else player.armor=id;
-  log(`${it.name}を装備した`,'gain');
-  save();
+  if(player.eq[it.slot]===id&&it.slot!=='weapon'){
+    player.eq[it.slot]='';           // もう一度押すと外す(武器以外)
+    log(`${it.name}を外した`);
+  }else{
+    player.eq[it.slot]=id;
+    log(`${it.name}を装備した`,'gain');
+  }
+  recalcMax();save();
 }
+const itemScore=it=>(it.atk||0)+(it.def||0)+(it.hpb||0)/10+(it.mpb||0)/10;
 function autoEquipIfBetter(id){
   const it=ITEMS[id];
-  if(it.slot==='weapon'){
-    if(it.atk>ITEMS[player.weapon].atk){player.weapon=id;log(`${it.name}を装備した`,'gain');}
-  }else{
-    if(it.def>ITEMS[player.armor].def){player.armor=id;log(`${it.name}を装備した`,'gain');}
+  const cur=ITEMS[player.eq[it.slot]];
+  if(!cur||itemScore(it)>itemScore(cur)){
+    player.eq[it.slot]=id;recalcMax();
+    log(`${it.name}を装備した`,'gain');
   }
 }
 function gainItem(id){
@@ -885,7 +961,7 @@ function gainXp(n){
     player.lv++;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
-    if(player.lv%10===0){player.statPts++;log('魂の資質ポイント+1！ 道具(I)で割り振ろう','gain');}
+    if(player.lv%10===0){player.statPts++;log('魂の資質ポイント+1！ メニュー(I)のステータスで割り振ろう','gain');}
     addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
     log(`徳が高まり、徳位${player.lv}になった`,'gain');
@@ -1021,9 +1097,9 @@ function renderShop(){
     <button class="buyb" data-buy="crit" ${player.gold<CRIT_PRICE?'disabled':''}>買う</button></div>`;
   for(const id of SHOP_STOCK){
     const it=ITEMS[id];
-    const fx=it.slot==='weapon'?`攻+${it.atk}`:`防+${it.def}`;
+    const fx=`[${SLOT_NAME[it.slot]}] ${itemFx(it)}`;
     const owned=player.items.includes(id);
-    const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'';
+    const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn slotmark"></span>';
     html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
       <span class="pr">${it.price} モン</span>
       <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
@@ -1056,12 +1132,83 @@ function buy(id){
   }
   sfx.coin();save();renderShop();
 }
+let menuTab='eq',selSlot='weapon';
+// 人型の周りの6ボックス位置(272x252の#doll内)
+const SLOT_POS={
+  head:'left:50%;top:0;transform:translateX(-50%)',
+  weapon:'left:6px;top:58px',
+  body:'right:6px;top:58px',
+  arms:'left:6px;top:134px',
+  acc:'right:6px;top:134px',
+  feet:'left:50%;bottom:0;transform:translateX(-50%)',
+};
 function renderEquip(){
-  const list=$('equipList');
-  const st=player.stats;
+  for(const b of document.querySelectorAll('.mtab'))
+    b.classList.toggle('on',b.getAttribute('data-tab')===menuTab);
+  $('tabEq').classList.toggle('hidden',menuTab!=='eq');
+  $('tabItem').classList.toggle('hidden',menuTab!=='item');
+  $('tabStat').classList.toggle('hidden',menuTab!=='stat');
+  if(menuTab==='eq')renderEquipTab();
+  else if(menuTab==='item')renderItemTab();
+  else renderStatTab();
+}
+function renderEquipTab(){
+  const doll=$('doll');
+  // 人型は性別に合わせる(正面向きの1コマ目)
+  let html=`<div id="dollImg" style="background-image:url(assets/char_player_${player.gender}.png)"></div>`;
+  for(const [slot,nm] of SLOTS){
+    const id=player.eq[slot],it=ITEMS[id];
+    const icn=it&&it.icon?`<img src="assets/${it.icon}" alt="">`:'';
+    html+=`<div class="slotbox ${selSlot===slot?'sel':''} ${it?'':'empty'}" data-slot="${slot}" style="${SLOT_POS[slot]}">
+      <span class="sl">${nm}</span>${icn}
+      <span class="eqn">${it?esc(it.name):'なし'}</span></div>`;
+  }
+  doll.innerHTML=html;
+  for(const b of doll.querySelectorAll('[data-slot]')){
+    b.addEventListener('click',()=>{selSlot=b.getAttribute('data-slot');sfx.click();renderEquipTab();});
+  }
+  // 選択部位の所持品リスト
+  let list=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
+    <span class="fx">─ ${SLOT_NAME[selSlot]} ─</span></div>`;
+  let cnt=0;
+  for(const id of player.items){
+    const it=ITEMS[id];if(!it||it.slot!==selSlot)continue;cnt++;
+    const on=player.eq[selSlot]===id;
+    const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn"></span>';
+    list+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${itemFx(it)}</span></span>
+      <button class="buyb ${on?'on':''}" data-eq="${id}">${on?(selSlot==='weapon'?'装備中':'外す'):'装備する'}</button></div>`;
+  }
+  if(!cnt)list+=`<div class="itemrow"><span class="fx">この部位の装備を持っていない。オババの店を覗いてみよう</span></div>`;
+  $('slotItems').innerHTML=list;
+  for(const b of $('slotItems').querySelectorAll('[data-eq]')){
+    b.addEventListener('click',()=>{equip(b.getAttribute('data-eq'));sfx.click();renderEquipTab();});
+  }
+}
+function renderItemTab(){
   let html='';
-  // 魂の資質
-  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
+  const CONS=[
+    ['potions','甘露水','HP+65','drink'],
+    ['hastePots','韋駄天の水','30秒 高速化','haste'],
+    ['critPots','修羅の酒','30秒 会心+25%','crit'],
+  ];
+  for(const [f,nm,fx,act] of CONS){
+    html+=`<div class="itemrow"><span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
+      <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
+  }
+  $('itemList').innerHTML=html;
+  for(const b of $('itemList').querySelectorAll('[data-use]')){
+    b.addEventListener('click',()=>{
+      const a=b.getAttribute('data-use');
+      if(a==='drink')drinkPotion();
+      else if(a==='haste')drinkHaste();
+      else drinkCrit();
+      renderItemTab();
+    });
+  }
+}
+function renderStatTab(){
+  const st=player.stats;
+  let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
     <span class="fx">─ 魂の資質 ─${player.statPts>0?` 残り${player.statPts}ポイント`:''}</span></div>`;
   const STATS=[
     ['str','力','物理攻撃 +2'],
@@ -1073,51 +1220,25 @@ function renderEquip(){
     html+=`<div class="itemrow"><span class="nm">${nm} <b>${st[k]}</b> <span class="fx">${fx}</span></span>`+
       (player.statPts>0?`<button class="buyb" data-st="${k}">+1</button>`:'')+`</div>`;
   }
-  // 消耗品
-  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
-    <span class="fx">─ 薬 ─</span></div>`;
-  const CONS=[
-    ['potions','甘露水','HP+65','drink'],
-    ['hastePots','韋駄天の水','30秒 高速化','haste'],
-    ['critPots','修羅の酒','30秒 会心+25%','crit'],
-  ];
-  for(const [f,nm,fx,act] of CONS){
-    html+=`<div class="itemrow"><span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
-      <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
-  }
-  // 装備
-  for(const slot of ['weapon','armor']){
-    html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
-      <span class="fx">${slot==='weapon'?'─ 武器 ─':'─ 防具 ─'}</span></div>`;
-    for(const id of player.items){
-      const it=ITEMS[id];if(it.slot!==slot)continue;
-      const on=(slot==='weapon'?player.weapon:player.armor)===id;
-      const fx=slot==='weapon'?`攻+${it.atk}`:`防+${it.def}`;
-      const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'';
-      html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
-        <button class="buyb ${on?'on':''}" data-eq="${id}">${on?'装備中':'装備する'}</button></div>`;
-    }
-  }
-  list.innerHTML=html;
-  for(const b of list.querySelectorAll('[data-eq]')){
-    b.addEventListener('click',()=>{equip(b.getAttribute('data-eq'));renderEquip();});
-  }
-  for(const b of list.querySelectorAll('[data-st]')){
+  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px;margin-top:8px">
+    <span class="fx">─ 亡者 ${esc(player.name||'ナナシ')} の現在 ─</span></div>`;
+  html+=`<div class="statline"><span>攻撃</span><b>${atkTotal()}</b></div>`;
+  html+=`<div class="statline"><span>防御</span><b>${defTotal()}</b></div>`;
+  html+=`<div class="statline"><span>会心率</span><b>${Math.round(critRate()*100)}%</b></div>`;
+  html+=`<div class="statline"><span>最大HP</span><b>${player.maxHp}</b></div>`;
+  html+=`<div class="statline"><span>最大MP</span><b>${player.maxMp}</b></div>`;
+  html+=`<div class="statline"><span>印の威力</span><b>×${spellMul().toFixed(2)}</b></div>`;
+  $('statList').innerHTML=html;
+  for(const b of $('statList').querySelectorAll('[data-st]')){
     b.addEventListener('click',()=>{
       if(player.statPts<=0)return;
       player.stats[b.getAttribute('data-st')]++;player.statPts--;
-      recalcMax();sfx.click();save();renderEquip();
+      recalcMax();sfx.click();save();renderStatTab();
     });
   }
-  for(const b of list.querySelectorAll('[data-use]')){
-    b.addEventListener('click',()=>{
-      const a=b.getAttribute('data-use');
-      if(a==='drink')drinkPotion();
-      else if(a==='haste')drinkHaste();
-      else drinkCrit();
-      renderEquip();
-    });
-  }
+}
+for(const b of document.querySelectorAll('.mtab')){
+  b.addEventListener('click',()=>{menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();});
 }
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
@@ -2575,7 +2696,7 @@ $('startBtn').addEventListener('click',()=>{
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
     log('川辺のオババとオキナに話しかけてみよう','sys');
-    log('道具(I)で魂の資質5ポイントを割り振ろう','gain');
+    log('メニュー(I)のステータスで魂の資質5ポイントを割り振ろう','gain');
   }
 });
 $('resetBtn').addEventListener('click',()=>{
