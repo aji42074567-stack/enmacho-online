@@ -121,6 +121,12 @@
     border-bottom:1px solid #33291a;font-family:var(--sans);font-size:13px;
     color:var(--parchment);text-align:left}
   .itemrow .icn{width:34px;height:34px;flex:none;object-fit:contain;image-rendering:pixelated}
+  .itemrow .dragon-blood-icon{display:flex;align-items:center;justify-content:center;
+    image-rendering:auto;filter:drop-shadow(0 0 6px rgba(220,35,70,.75))}
+  .itemrow .dragon-blood-icon::before{content:"";width:18px;height:18px;
+    border-radius:70% 16% 70% 70%;transform:rotate(45deg);
+    background:radial-gradient(circle at 35% 30%,#ff9a9a 0 9%,#b81736 28%,#560414 76%);
+    border:1px solid #e45468;box-shadow:inset -3px -3px 5px rgba(20,0,5,.65)}
   .itemrow img.icn[src*="assets/items/"],
   .slotbox img[src*="assets/items/"]{image-rendering:auto;object-fit:contain;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
@@ -635,7 +641,7 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
   stats:{str:0,con:0,agi:0,int:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
-  xp:0,gold:0,potions:3,
+  xp:0,gold:0,potions:3,dragonBlood:0,
   name:'',quests:{trial:0},
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
@@ -665,6 +671,7 @@ function save(){
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       v:3,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      dragonBlood:player.dragonBlood,
       items:player.items,eq:player.eq,kills,
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
@@ -678,6 +685,7 @@ function load(){
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
     if(!d||(d.v!==1&&d.v!==2&&d.v!==3))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
+    player.dragonBlood=Math.max(0,d.dragonBlood|0);
     player.items=d.items;
     if(d.v===3&&d.eq){
       // 各部位のidが正しいものだけ採用
@@ -719,9 +727,10 @@ const MOBS={
   orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:1.9,aggro:4.2,atkCd:1.9,size:1},
   skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:1.6,aggro:4.0,atkCd:1.8,size:1.05},
   oni_blue:{name:'アオオニ',    lv:8,hp:380,dmg:[16,26],xp:300,gold:[80,140], speed:2.0,aggro:5.5,atkCd:1.7,size:1.15,bar:72},
-  drake:   {name:'ゴウリュウ',  lv:9,hp:680,dmg:[24,36],xp:700,gold:[200,320],speed:2.1,aggro:5, atkCd:2.1,size:1.5,bar:124,boss:true}
+  drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[480,720],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
 const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1]};
+const DRAGON_BLOOD_DROP_RATE=0.07;
 let mobs=[];
 function spawnMob(type,x,y){
   const d=MOBS[type];
@@ -946,6 +955,11 @@ function killMob(m){
     gainItem(drop[0]);
   }else if(Math.random()<0.28){
     player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');
+  }
+  if(m.type==='drake'&&Math.random()<DRAGON_BLOOD_DROP_RATE){
+    player.dragonBlood++;
+    addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
+    log('希少素材「竜の血」を手に入れた！','gain');
   }
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
@@ -1201,6 +1215,10 @@ function renderItemTab(){
     html+=`<div class="itemrow"><img class="icn" src="assets/items/${icon}" alt="">
       <span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
       <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
+  }
+  if(player.dragonBlood>0){
+    html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
+      <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
   }
   $('itemList').innerHTML=html;
   for(const b of $('itemList').querySelectorAll('[data-use]')){
@@ -1958,8 +1976,10 @@ function drawPlayerCorpse(sx,sy,e){
 function drawCorpse(sx,sy,c){
   const fade=c.age>4.5?Math.max(0,1-(c.age-4.5)/1.5):1;
   if(c.type==='drake'&&SPRITES.mob_drake_death){
+    const vs=MOBS.drake.renderScale||1,D=Math.round(112*vs),k=D/192;
     ctx.save();ctx.globalAlpha=0.92*fade;
-    ctx.drawImage(SPRITES.mob_drake_death,0,0,192,192,sx-56,sy-104,112,112);
+    drawShadow(sx,sy+2,26*vs);
+    ctx.drawImage(SPRITES.mob_drake_death,0,0,192,192,sx-D/2,sy+4-186*k,D,D);
     ctx.restore();
     return;
   }
@@ -2097,8 +2117,8 @@ function drawDrake(sx,sy,m){
   const stand=SPRITES.mob_drake;
   if(stand){
     // ボス専用: 羽ばたき待機・4方向歩行・ブレス攻撃(炎はコード合成)
-    const C=192,D=112,k=D/C;
-    drawShadow(sx,sy+2,26);
+    const C=192,vs=m.def.renderScale||1,D=Math.round(112*vs),k=D/C;
+    drawShadow(sx,sy+2,26*vs);
     const walk=SPRITES.mob_drake_walk,flap=SPRITES.mob_drake_flap,
           atk=SPRITES.mob_drake_attack,fire=SPRITES.fx_breath;
     const dur=0.8;
@@ -2113,7 +2133,7 @@ function drawDrake(sx,sy,m){
         const ff=Math.floor(time*12)%2;
         ctx.save();ctx.translate(-D*0.46,-D*0.52);ctx.scale(-1,1);
         ctx.globalAlpha=Math.min(1,(0.95-t)*5);
-        ctx.drawImage(fire,ff*256,0,256,128,0,-32,175,70);
+        ctx.drawImage(fire,ff*256,0,256,128,0,-32*vs,175*vs,70*vs);
         ctx.restore();
       }
     }else if(m.moving&&walk){
@@ -2133,7 +2153,7 @@ function drawDrake(sx,sy,m){
     return;
   }
   // ---- フォールバック: 従来のコード描画 ----
-  const sF=m.def.size,bob=Math.sin(time*4+m.phase)*2.5;
+  const sF=m.def.size*(m.def.renderScale||1),bob=Math.sin(time*4+m.phase)*2.5;
   const y=sy+bob-4;
   drawShadow(sx,sy+2,14*sF);
   ctx.save();ctx.translate(sx,y);ctx.scale(m.face*sF,sF);
@@ -2448,9 +2468,10 @@ function render(){
   if(zone==='field'&&PIER)drawPierBase(SX(PIER.x,PIER.y),SY(PIER.x,PIER.y));
   if(player.target&&!player.target.dead){
     const m=player.target;
+    const visualSize=m.def.size*(m.def.renderScale||1);
     ctx.strokeStyle='rgba(220,60,40,0.9)';ctx.lineWidth=2;
     ctx.beginPath();
-    ctx.ellipse(SX(m.x,m.y),SY(m.x,m.y)+2,14*m.def.size,7*m.def.size,0,0,6.29);
+    ctx.ellipse(SX(m.x,m.y),SY(m.x,m.y)+2,14*visualSize,7*visualSize,0,0,6.29);
     ctx.stroke();
   }
   const items=[];
@@ -2463,7 +2484,12 @@ function render(){
   for(const it of items){
     const sx=SX(it.o.x,it.o.y);
     const sy=SY(it.o.x,it.o.y)-(zone==='field'?ELEV_PX*elevF(it.o.x,it.o.y):0);
-    if(sx<-140||sx>W+140||sy<-160||sy>H+120)continue;
+    const giantDrake=it.k==='drake'||(it.k==='corpse'&&it.o.type==='drake');
+    const vs=giantDrake?(MOBS.drake.renderScale||1):1;
+    const sidePad=giantDrake?Math.max(140,(112*0.46+175)*vs):140;
+    const abovePad=giantDrake?Math.max(160,25*vs):160;
+    const belowPad=giantDrake?Math.max(120,110*vs):120;
+    if(sx<-sidePad||sx>W+sidePad||sy<-abovePad||sy>H+belowPad)continue;
     switch(it.k){
       case 'tree':drawTree(sx,sy,it.o);break;
       case 'rock':drawRock(sx,sy,it.o);break;
@@ -2487,22 +2513,27 @@ function render(){
       case 'drake':drawDrake(sx,sy,it.o);break;
     }
     if(it.o.def&&it.o.flash>0&&it.k!=='corpse'){  // 被弾の白フラッシュ
-      const fa=it.o.flash/0.14,r2=20*it.o.def.size;
+      const fa=it.o.flash/0.14,drake=it.k==='drake';
+      const r2=drake?112*(it.o.def.renderScale||1)*0.42:20*it.o.def.size;
+      const flashY=drake?sy-112*(it.o.def.renderScale||1)*0.45:sy-12*it.o.def.size;
       ctx.globalCompositeOperation='screen';
-      const fg2=ctx.createRadialGradient(sx,sy-12*it.o.def.size,0,sx,sy-12*it.o.def.size,r2);
+      const fg2=ctx.createRadialGradient(sx,flashY,0,sx,flashY,r2);
       fg2.addColorStop(0,`rgba(255,240,220,${0.8*fa})`);
       fg2.addColorStop(1,'rgba(255,240,220,0)');
       ctx.fillStyle=fg2;
-      ctx.beginPath();ctx.arc(sx,sy-12*it.o.def.size,r2,0,6.29);ctx.fill();
+      ctx.beginPath();ctx.arc(sx,flashY,r2,0,6.29);ctx.fill();
       ctx.globalCompositeOperation='source-over';
     }
     if(it.o.def&&(it.o===player.target||it.o.hp<it.o.maxHp||it.o.def.boss)){
-      const m=it.o,top=sy-(m.def.bar||(34+m.def.size*14));
+      const m=it.o;
+      let top=sy-(m.def.bar||(34+m.def.size*14));
+      if(m.def.boss)top=Math.max(72,top);
+      const bw=m.def.boss?180:38,bh=m.def.boss?7:5;
       ctx.font='10px sans-serif';ctx.textAlign='center';
       ctx.fillStyle='rgba(0,0,0,0.6)';
-      ctx.fillRect(sx-19,top,38,5);
+      ctx.fillRect(sx-bw/2,top,bw,bh);
       ctx.fillStyle=m.def.boss?'#d05a2a':'#b5372b';
-      ctx.fillRect(sx-18,top+1,36*Math.max(0,m.hp/m.maxHp),3);
+      ctx.fillRect(sx-bw/2+1,top+1,(bw-2)*Math.max(0,m.hp/m.maxHp),bh-2);
       ctx.fillStyle='#e8dcc4';
       ctx.fillText(`${m.name} Lv${m.def.lv}`,sx,top-3);
     }
@@ -2640,9 +2671,18 @@ canvas.addEventListener('pointerdown',ev=>{
   for(const m of mobs){
     if(m.dead)continue;
     const mx=isoX(m.x,m.y)-camX+W/2;
-    const my=isoY(m.x,m.y)-camY+H/2-10*m.def.size;
-    const d=Math.hypot(mx-sx,my-sy);
-    if(d<28+m.def.size*10&&d<best){best=d;hit=m;}
+    const baseY=isoY(m.x,m.y)-camY+H/2;
+    if(m.type==='drake'){
+      const D=112*(m.def.renderScale||1);
+      const my=baseY-D*0.45;
+      const nx=(sx-mx)/(D*0.43),ny=(sy-my)/(D*0.45);
+      const d=Math.hypot(mx-sx,my-sy);
+      if(nx*nx+ny*ny<1&&d<best){best=d;hit=m;}
+    }else{
+      const my=baseY-10*m.def.size;
+      const d=Math.hypot(mx-sx,my-sy);
+      if(d<28+m.def.size*10&&d<best){best=d;hit=m;}
+    }
   }
   if(hit){
     player.target=hit;player.talkTarget=null;player.repath=0;
