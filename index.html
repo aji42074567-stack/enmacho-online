@@ -512,8 +512,9 @@ const BOSS_HOME={x:10,y:7};
   }
   // 村の石畳
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
-    if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<7.4)tileKind[y*MAP+x]=2;   // 宿場町の広場
+    if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<9.2)tileKind[y*MAP+x]=2;   // 宿場町の広場(拡張)
     if(y>=56&&y<=60&&x>=33&&x<=40&&Math.abs(y-(57.5+(x-33)*0.35))<1.6)tileKind[y*MAP+x]=2;   // 酒場へ続く通り
+    if(x>=28&&x<=31&&y>=43&&y<=47)tileKind[y*MAP+x]=2;   // 北門へ続く通り
   }
   // 離小島(歪な菱形): 当たり判定は islandF で決定(見た目も同じ関数で滑らかに描く)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
@@ -536,6 +537,9 @@ placeBuilding(26,55,'house','#6e3a2e','#5a2f26');
 placeBuilding(35,54,'shop','#7a5a2a','#645022');
 placeBuilding(38,57,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」
 placeBuilding(23,52,'house','#3e5a4a','#33493d');
+placeBuilding(25,45,'house','#6e3a2e','#5a2f26');    // 北の拡張区画
+placeBuilding(37,45,'house','#3e5a4a','#33493d');
+placeBuilding(40,53,'house','#6e3a2e','#5a2f26');
 blocked[50*MAP+32]=1;
 props.push({x:32,y:50,kind:'stone'});
 blocked[56*MAP+31]=1;
@@ -544,14 +548,53 @@ props.push({x:29,y:54,kind:'lamp'});
 props.push({x:37,y:52,kind:'lamp'});
 props.push({x:36,y:58.4,kind:'lamp'});   // 酒場前の通り
 props.push({x:40.6,y:59.2,kind:'lamp'});
+props.push({x:29,y:46,kind:'lamp'});     // 北の通り
+props.push({x:31,y:44,kind:'lamp'});
 
 let npcs=[
   {x:34,y:56,kind:'merchant',name:'オババ'},
   {x:30,y:51,kind:'elder',name:'オキナ'},
   {x:38.2,y:59.6,kind:'okami',name:'オカミ'},     // 酒場の女将
-  {x:36.4,y:60.2,kind:'guest',name:'トックリ'},   // 酔客の亡者
-  {x:33.6,y:58.6,kind:'board',name:'高札'},       // クエスト掲示板
+  {x:35.6,y:59.2,kind:'guest',name:'トックリ'},   // 酔客の亡者
+  {x:34.8,y:56.6,kind:'board',name:'高札'},       // クエスト掲示板(通り沿い)
 ];
+
+/* ---- 町を囲う柵と門 ---- */
+const TOWN={x0:21,y0:42,x1:42,y1:60};
+const GATES=[
+  {tiles:[[29,42],[30,42]],open:false,name:'北門'},   // 賽の森への街道
+  {tiles:[[42,49],[42,50]],open:false,name:'東門'},   // 試練の洞窟方面
+  {tiles:[[39,60],[40,60]],open:false,name:'南門'},   // 浜辺と桟橋へ
+];
+function gateAt(x,y){return GATES.find(g=>g.tiles.some(t=>t[0]===x&&t[1]===y));}
+(function buildFence(){
+  const onPerim=(x,y)=>(x===TOWN.x0||x===TOWN.x1||y===TOWN.y0||y===TOWN.y1)
+    &&x>=TOWN.x0&&x<=TOWN.x1&&y>=TOWN.y0&&y<=TOWN.y1
+    &&tileKind[y*MAP+x]!==4&&!blocked[y*MAP+x];
+  for(let y=TOWN.y0;y<=TOWN.y1;y++)for(let x=TOWN.x0;x<=TOWN.x1;x++){
+    if(!(x===TOWN.x0||x===TOWN.x1||y===TOWN.y0||y===TOWN.y1))continue;
+    if(tileKind[y*MAP+x]===4)continue;          // 海には建てない
+    if(blocked[y*MAP+x])continue;               // 建物と重なる所は避ける
+    const g=gateAt(x,y);
+    blocked[y*MAP+x]=1;                          // 門も初期状態は閉なのでふさぐ
+    if(g)continue;                               // 門プロップは後で1個だけ置く
+    props.push({x,y,kind:'fence',
+      rx:onPerim(x+1,y)||!!gateAt(x+1,y),        // +x隣へ横木を伸ばすか
+      ry:onPerim(x,y+1)||!!gateAt(x,y+1)});      // +y隣へ横木を伸ばすか
+  }
+  for(const g of GATES){
+    const [a,b]=g.tiles;
+    props.push({x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,kind:'gate',g,
+      vert:a[0]===b[0]});                        // 東門は縦向き
+  }
+})();
+const FIELD_BLOCKED=blocked;   // 門の開閉はフィールドの当たり判定にだけ効く
+function toggleGate(g){
+  g.open=!g.open;
+  for(const [gx,gy] of g.tiles)FIELD_BLOCKED[gy*MAP+gx]=g.open?0:1;
+  log(`${g.name}を${g.open?'開けた':'閉めた'}`,'sys');
+  sfx.click();
+}
 const ELDER_LINES=[
   '「森の最深部にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
   '「オババの店で装備を整えよ。銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
@@ -592,7 +635,7 @@ const JUDGE_COMMENTS=[
 let elderIdx=0;
 
 (function genProps(){
-  const clear=(x,y)=>Math.hypot(x-SPAWN.x,y-SPAWN.y)<10.5||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||(x>=43&&x<=56&&y>=17&&y<=27);
+  const clear=(x,y)=>(x>=TOWN.x0-1&&x<=TOWN.x1+1&&y>=TOWN.y0-1&&y<=TOWN.y1+1)||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||(x>=43&&x<=56&&y>=17&&y<=27);
   let n=0,tries=0;
   while(n<240&&tries++<8000){
     const x=rndi(2,MAP-3),y=rndi(2,MAP-3);
@@ -762,7 +805,7 @@ const player={
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
-  target:null,talkTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
+  target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
@@ -869,7 +912,7 @@ function spawnMob(type,x,y){
       spawnMob(type,Math.round(cx+Math.cos(a)*d),Math.round(cy+Math.sin(a)*d));
     }
   };
-  ring(32,41,5,8,'goblin');
+  ring(31,36,5,8,'goblin');   // 町の柵(y42)の外側
   ring(38,35,4,3,'goblin_red');
   ring(41,30,5,5,'wolf');  ring(22,34,5,5,'wolf');
   ring(42,16,4,4,'orc');   ring(16,24,4,4,'orc');
@@ -1608,6 +1651,14 @@ function update(dt){
         openNpc(n);
       }
     }
+    if(player.gateTarget){
+      const g=player.gateTarget;
+      const gx=(g.tiles[0][0]+g.tiles[1][0])/2,gy=(g.tiles[0][1]+g.tiles[1][1])/2;
+      if(dist(player,{x:gx,y:gy})<2.4){
+        player.gateTarget=null;player.path=[];
+        toggleGate(g);
+      }
+    }
     if(player.target){
       const m=player.target;
       if(m.dead){player.target=null;}
@@ -2103,6 +2154,8 @@ loadSprite('map_tavern','assets/map_tavern.png');
 loadSprite('map_kosatsu','assets/map_kosatsu.png');
 loadSprite('npc_okami','assets/npc_okami.png');
 loadSprite('npc_tokkuri','assets/npc_tokkuri.png');
+loadSprite('map_fence','assets/map_fence.png');
+loadSprite('map_gate','assets/map_gate.png');
 (function(){  // 武器振りエフェクト用にアイコン画像も読む
   const seen=new Set();
   for(const id in ITEMS){
@@ -2680,6 +2733,72 @@ function drawCaveExit(sx,sy){
   ctx.fillText('出口',0,8);
   ctx.restore();
 }
+function fencePost(px,py,s){
+  ctx.fillStyle='#4a3a26';
+  ctx.fillRect(px-2.5*s,py-24*s,5*s,24*s);
+  ctx.fillStyle='#5d4a30';
+  ctx.beginPath();ctx.moveTo(px-2.5*s,py-24*s);ctx.lineTo(px,py-30*s);ctx.lineTo(px+2.5*s,py-24*s);ctx.closePath();ctx.fill();
+}
+function fenceRail(x1,y1,x2,y2){
+  ctx.strokeStyle='#5d4a30';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(x1,y1-18);ctx.lineTo(x2,y2-18);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x1,y1-8);ctx.lineTo(x2,y2-8);ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x1,y1-16.5);ctx.lineTo(x2,y2-16.5);ctx.stroke();
+}
+function drawFence(sx,sy,p){
+  const img=SPRITES.map_fence;
+  drawShadow(sx,sy+2,14);
+  if(img){
+    const w=64,h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy-h+8,w,h);
+  }else{
+    // +x隣は画面右下(+32,+16)、+y隣は画面左下(-32,+16)
+    if(p.rx)fenceRail(sx,sy,sx+32,sy+16);
+    if(p.ry)fenceRail(sx,sy,sx-32,sy+16);
+    fencePost(sx,sy,1);
+  }
+}
+function drawGate(sx,sy,p){
+  const g=p.g;
+  // 2タイル分の門: 両端の太い柱+閉なら扉、開なら脇に寄せた扉
+  const ex=p.vert?-48:48,ey=24;   // 両端柱の画面オフセット(縦門は左右反転)
+  const x1=sx-ex,y1=sy-ey,x2=sx+ex,y2=sy+ey;
+  drawShadow(sx,sy+3,26);
+  fencePost(x1,y1,1.4);fencePost(x2,y2,1.4);
+  // 上の貫(ぬき)
+  ctx.strokeStyle='#5d4a30';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(x1,y1-30);ctx.lineTo(x2,y2-30);ctx.stroke();
+  if(!g.open){
+    // 閉: 板戸で塞ぐ(奥行きに沿った平行四辺形)
+    ctx.fillStyle='#7a6543';
+    ctx.beginPath();
+    ctx.moveTo(x1,y1-28);ctx.lineTo(x2,y2-28);
+    ctx.lineTo(x2,y2-2);ctx.lineTo(x1,y1-2);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#4a3a26';ctx.lineWidth=1.5;
+    for(const t of [0.2,0.4,0.6,0.8]){   // 縦板の継ぎ目
+      const bx=x1+(x2-x1)*t,by=y1+(y2-y1)*t;
+      ctx.beginPath();ctx.moveTo(bx,by-28);ctx.lineTo(bx,by-2);ctx.stroke();
+    }
+    ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(x1,y1-22);ctx.lineTo(x2,y2-22);ctx.stroke();   // 横桟
+    ctx.beginPath();ctx.moveTo(x1,y1-8);ctx.lineTo(x2,y2-8);ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.moveTo(x1,y1-2);ctx.lineTo(x2,y2-2);ctx.lineTo(x2,y2+2);ctx.lineTo(x1,y1+2);ctx.closePath();ctx.fill();
+  }else{
+    // 開: 扉を両端に畳む
+    for(const [bx,by,dir] of [[x1,y1,1],[x2,y2,-1]]){
+      ctx.fillStyle='#6d5a38';
+      ctx.fillRect(bx+dir*4-2,by-22,4,20);
+      ctx.fillRect(bx+dir*9-2,by-21,4,18);
+    }
+  }
+  const puls=0.6+Math.sin(time*3)*0.4;
+  ctx.fillStyle=g.open?'#9adf9a':`rgba(255,225,120,${puls})`;
+  ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText(`${g.name}${g.open?'(開)':''}`,sx,sy+16);
+}
 const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',okami:'npc_okami',guest:'npc_tokkuri'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
@@ -2832,6 +2951,8 @@ function render(){
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
       case 'house':case 'shop':case 'tavern':drawHouse(sx,sy,it.o);break;
+      case 'fence':drawFence(sx,sy,it.o);break;
+      case 'gate':drawGate(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
       case 'player':drawPlayer(sx,sy,it.o);break;
       case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
@@ -3000,6 +3121,32 @@ canvas.addEventListener('pointerdown',ev=>{
         player.talkTarget=n;player.target=null;
         player.path=findPath(player.x,player.y,n.x,n.y);
         log(`${n.name}のところへ向かう…`,'sys');
+      }
+      return;
+    }
+  }
+  // 門クリック(近ければ開閉、遠ければ歩いて行って開閉)
+  if(zone==='field')for(const g of GATES){
+    const gx=(g.tiles[0][0]+g.tiles[1][0])/2,gy=(g.tiles[0][1]+g.tiles[1][1])/2;
+    const nx=isoX(gx,gy)-camX+W/2;
+    const ny=isoY(gx,gy)-camY+H/2-14;
+    if(Math.hypot(nx-sx,ny-sy)<34){
+      if(dist(player,{x:gx,y:gy})<2.4){toggleGate(g);}
+      else{
+        player.gateTarget=g;player.target=null;player.talkTarget=null;
+        // 門の周囲8近傍のうち、プレイヤー側から実際に届くタイルへ歩く
+        const cand=[];
+        for(const [tx2,ty2] of g.tiles)for(let dy2=-1;dy2<=1;dy2++)for(let dx2=-1;dx2<=1;dx2++){
+          const cx2=tx2+dx2,cy2=ty2+dy2;
+          if(isB(cx2,cy2))continue;
+          cand.push({x:cx2,y:cy2,d:Math.hypot(cx2-player.x,cy2-player.y)});
+        }
+        cand.sort((a,b)=>a.d-b.d);
+        for(const c of cand){
+          const p=findPath(player.x,player.y,c.x,c.y);
+          if(p.length){player.path=p;break;}
+        }
+        log(`${g.name}へ向かう…`,'sys');
       }
       return;
     }
