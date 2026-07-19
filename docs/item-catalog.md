@@ -70,3 +70,23 @@
 
 既存の `kote` と `oni_kote` はID・価格・防御力を維持し、対応画像だけを追加する。
 将来用8点は価格・防御力・入手経路を決めるまで `ITEMS` へ登録しない。
+
+## 足装備
+
+提供素材「ChatGPT Image 2026年7月19日 13_36_51.png」の上段左から右、その後に下段左から右。
+
+| 順 | 名称 | 希少度 | ファイル | 状態 |
+|---:|---|---|---|---|
+| 1 | 白緒の草鞋 | 並 | `feet_shirao_waraji.png` | 使用中 (`waraji`) |
+| 2 | 旅人の革長靴 | 並 | `feet_kawa_nagagutsu.png` | 将来用 |
+| 3 | 影獄の忍足袋 | 上等 | `feet_kagegoku_nintabi.png` | 将来用 |
+| 4 | 冥鉄の脛当て | 名品 | `feet_meitetsu_suneate.png` | 使用中 (`suneate`) |
+| 5 | 青燐の武者具足 | 希少 | `feet_seirin_musha.png` | 将来用 |
+| 6 | 紫怨の呪足袋 | 希少 | `feet_shion_noroi_tabi.png` | 将来用 |
+| 7 | 白金の法具足 | 秘宝 | `feet_hakkin_hougusoku.png` | 将来用 |
+| 8 | 雪獣の毛皮靴 | 名品 | `feet_setsuju_kegawa.png` | 将来用 |
+| 9 | 鬼焔の大具足 | 伝説 | `feet_kien_ogusoku.png` | 将来用 |
+| 10 | 砂葬の数珠足袋 | 上等 | `feet_saso_juzu_tabi.png` | 将来用 |
+
+既存の `waraji` と `suneate` はID・価格・防御力を維持し、対応画像だけを追加する。
+将来用8点は価格・防御力・入手経路を決めるまで `ITEMS` へ登録しない。
