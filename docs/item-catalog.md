@@ -50,3 +50,23 @@
 
 既存の `kasa` と `oni_helm` はID・価格・防御力を維持し、対応画像だけを追加する。
 将来用8点は価格・防御力・入手経路を決めるまで `ITEMS` へ登録しない。
+
+## 腕装備
+
+提供素材「ChatGPT Image 2026年7月19日 13_35_18 (1).png」の上段左から右、その後に下段左から右。
+
+| 順 | 名称 | 希少度 | ファイル | 状態 |
+|---:|---|---|---|---|
+| 1 | 朽布の巻籠手 | 並 | `arms_kuchinuno_makigote.png` | 将来用 |
+| 2 | 革の籠手 | 並 | `arms_kawa_kote.png` | 使用中 (`kote`) |
+| 3 | 黒鉄の筒籠手 | 上等 | `arms_kurogane_tsutsugote.png` | 将来用 |
+| 4 | 朱縄の大籠手 | 名品 | `arms_shunawa_ogote.png` | 将来用 |
+| 5 | 鎖封じの鉄籠手 | 希少 | `arms_kusarifuji_kote.png` | 将来用 |
+| 6 | 彼岸朱印の斎手甲 | 希少 | `arms_higan_shuin_tekko.png` | 将来用 |
+| 7 | 鬼鉄の籠手 | 秘宝 | `arms_onitetsu_kote.png` | 使用中 (`oni_kote`) |
+| 8 | 獣骨の呪籠手 | 名品 | `arms_jukotsu_noroi.png` | 将来用 |
+| 9 | 影獄の忍手甲 | 上等 | `arms_kagegoku_nintekko.png` | 将来用 |
+| 10 | 紫怨の鬼火籠手 | 伝説 | `arms_shion_onibi.png` | 将来用 |
+
+既存の `kote` と `oni_kote` はID・価格・防御力を維持し、対応画像だけを追加する。
+将来用8点は価格・防御力・入手経路を決めるまで `ITEMS` へ登録しない。
