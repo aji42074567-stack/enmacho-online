@@ -506,12 +506,19 @@ const PIER_POSTS=[
   }
   if(PIER){
     const px=Math.round(PIER.x+0.5);
-    // デッキと砂浜側の進入口には余白を設け、岩が橋脚の下で瓦礫状に固まるのを防ぐ
+    // 桟橋本体と入口に重なるランダム装飾は除き、岩は岸側の脇へ1つだけ置き直す
     props=props.filter(pp=>{
-      if(pp.kind!=='shoal')return true;
       const along=pp.x-PIER.x,across=Math.abs(pp.y-PIER.y);
-      return !(along>-1.35&&along<PIER_DECK_LENGTH+0.75&&
-        across<PIER_DECK_HALF_WIDTH+1.3);
+      const overlaps=along>-1.1&&along<PIER_DECK_LENGTH+0.75&&
+        across<PIER_DECK_HALF_WIDTH+1.3;
+      if(overlaps&&(pp.kind==='tree'||pp.kind==='rock'||pp.kind==='palm')){
+        blocked[Math.floor(pp.y)*MAP+Math.floor(pp.x)]=0;
+      }
+      return !overlaps;
+    });
+    props.push({
+      x:PIER.x-0.65,y:PIER.y+1.55,
+      kind:'shoal',v:2,s:0.58,rot:-0.08
     });
     // 見た目の幅に合わせ、中央線だけでなく3タイル幅を歩行可能にする
     for(let dy=-PIER_DECK_HALF_WIDTH;dy<=PIER_DECK_HALF_WIDTH;dy++)
@@ -2157,45 +2164,8 @@ function pierDrawBox(sx,sy){
 function drawPierBase(sx,sy){
   const b=pierDrawBox(sx,sy);
   if(!b)return;
-  const {img,w,h,x:x0,y:y0}=b;
-  // 桟橋画像の陸側を同じ画像から1区画ぶん反復し、切れた端を自然に延長する
-  const landL={x:x0-26,y:y0+18},landR={x:x0+34,y:y0-4};
-  const deckL={x:x0+2,y:y0+62},deckR={x:x0+62,y:y0+40};
-  const approachPath=()=>{
-    ctx.beginPath();ctx.moveTo(landL.x,landL.y);ctx.lineTo(landR.x,landR.y);
-    ctx.lineTo(deckR.x,deckR.y);ctx.lineTo(deckL.x,deckL.y);ctx.closePath();
-  };
-  // 板の下の影は進入口の輪郭と揃え、砂側へ薄く溶かす
-  ctx.save();ctx.translate(0,6);approachPath();
-  const shadow=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
-  shadow.addColorStop(0,'rgba(42,29,17,0.12)');shadow.addColorStop(1,'rgba(30,21,13,0.38)');
-  ctx.fillStyle=shadow;ctx.fill();ctx.restore();
-  ctx.save();
-  approachPath();ctx.clip();
-  ctx.fillStyle='#51402b';
-  ctx.fillRect(x0-32,y0-8,108,82);
-  // 接合点から陸側へのベクトル(-28,-44px)だけ同じ桟橋をずらして再利用する。
-  // AI画像と別物の平板を重ねず、板幅・木目・色を元画像と完全に揃える。
-  ctx.drawImage(img,x0-28,y0-44,w,h);
-  // 砂側だけを薄く明るくし、板が岸へ沈み込む境界を作る
-  const fade=ctx.createLinearGradient(landL.x,landL.y,deckL.x,deckL.y);
-  fade.addColorStop(0,'rgba(156,126,77,0.16)');
-  fade.addColorStop(0.45,'rgba(94,70,40,0.04)');
-  fade.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=fade;
-  ctx.fillRect(x0-30,y0-8,100,76);
-  ctx.restore();
-  ctx.save();
-  approachPath();
-  ctx.clip();
-  // 岸の切り口は太い横棒ではなく、砂に埋もれた細い枕木だけにする
-  ctx.lineCap='round';
-  ctx.strokeStyle='rgba(35,25,15,0.48)';ctx.lineWidth=3;
-  ctx.beginPath();ctx.moveTo(landL.x,landL.y);ctx.lineTo(landR.x,landR.y);ctx.stroke();
-  ctx.strokeStyle='rgba(186,151,91,0.28)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(landL.x,landL.y-1);ctx.lineTo(landR.x,landR.y-1);ctx.stroke();
-  ctx.restore();
-  ctx.drawImage(img,x0,y0,w,h);
+  // 追加の板や補助描画は行わず、完成済みの桟橋素材をそのまま置く
+  ctx.drawImage(b.img,b.x,b.y,b.w,b.h);
 }
 function drawPierPost(sx,sy,p){
   const b=pierDrawBox(sx,sy);
