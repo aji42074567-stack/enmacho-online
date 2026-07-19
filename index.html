@@ -470,17 +470,7 @@ const FOAM_PTS=[];
 
 // ヤシの木・浜の小物・桟橋
 let PIER=null;
-const PIER_DECK_LENGTH=6,PIER_DECK_HALF_WIDTH=1;
-// pier.png内の7本の柱。足元のワールド座標で個別に深度ソートする
-const PIER_POSTS=[
-  {src:[38,0,62,111],foot:{x:-0.97,y:-0.78}},
-  {src:[220,106,41,108],foot:{x:1.41,y:-0.52}},
-  {src:[393,219,40,109],foot:{x:3.86,y:-0.19}},
-  {src:[549,327,40,109],foot:{x:6.15,y:0.17}},
-  {src:[60,190,51,199],foot:{x:2.58,y:2.54}},
-  {src:[212,295,53,209],foot:{x:4.93,y:3.02}},
-  {src:[368,393,53,190],foot:{x:6.92,y:3.08}},
-];
+const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=1;
 (function beachDecor(){
   const h=(x,y)=>{const n=Math.sin(x*53.1+y*97.7)*24634.6345;return n-Math.floor(n);};
   for(let y=2;y<MAP-2;y++)for(let x=2;x<MAP-2;x++){
@@ -506,7 +496,7 @@ const PIER_POSTS=[
   }
   if(PIER){
     const px=Math.round(PIER.x+0.5);
-    // 桟橋本体と入口に重なるランダム装飾は除き、岩は岸側の脇へ1つだけ置き直す
+    // 完成形の桟橋本体と入口に重なるランダム装飾だけを除く
     props=props.filter(pp=>{
       const along=pp.x-PIER.x,across=Math.abs(pp.y-PIER.y);
       const overlaps=along>-1.1&&along<PIER_DECK_LENGTH+0.75&&
@@ -515,10 +505,6 @@ const PIER_POSTS=[
         blocked[Math.floor(pp.y)*MAP+Math.floor(pp.x)]=0;
       }
       return !overlaps;
-    });
-    props.push({
-      x:PIER.x-0.65,y:PIER.y+1.55,
-      kind:'shoal',v:2,s:0.58,rot:-0.08
     });
     // 見た目の幅に合わせ、中央線だけでなく3タイル幅を歩行可能にする
     for(let dy=-PIER_DECK_HALF_WIDTH;dy<=PIER_DECK_HALF_WIDTH;dy++)
@@ -2159,21 +2145,13 @@ function pierDrawBox(sx,sy){
   const img=SPRITES.pier;
   if(!img)return null;
   const w=252,h=w*img.height/img.width;
-  return{img,w,h,x:sx-w*0.13,y:sy-h*0.30};
+  return{img,w,h,x:sx-w*0.13,y:sy-h*0.20};
 }
 function drawPierBase(sx,sy){
   const b=pierDrawBox(sx,sy);
   if(!b)return;
-  // 追加の板や補助描画は行わず、完成済みの桟橋素材をそのまま置く
+  // 提供された元素材から抜いた完成形の桟橋を1枚だけ描く
   ctx.drawImage(b.img,b.x,b.y,b.w,b.h);
-}
-function drawPierPost(sx,sy,p){
-  const b=pierDrawBox(sx,sy);
-  if(!b)return;
-  const [ix,iy,iw,ih]=p.src;
-  ctx.drawImage(b.img,ix,iy,iw,ih,
-    b.x+ix*b.w/b.img.width,b.y+iy*b.h/b.img.height,
-    iw*b.w/b.img.width,ih*b.h/b.img.height);
 }
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
@@ -2338,7 +2316,7 @@ function render(){
       }
     }
   }
-  // デッキ本体は常に人物より後ろ。柱だけを後段のitemsで個別ソートする
+  // 完成形の桟橋を1枚だけ背景側に描き、人物をその上へ重ねる
   if(zone==='field'&&PIER)drawPierBase(SX(PIER.x,PIER.y),SY(PIER.x,PIER.y));
   if(player.target&&!player.target.dead){
     const m=player.target;
@@ -2352,10 +2330,6 @@ function render(){
   for(const n of npcs)items.push({d:n.x+n.y,k:'npc',o:n});
   for(const c of corpses)items.push({d:c.x+c.y-0.01,k:'corpse',o:c});
   for(const m of mobs)if(!m.dead)items.push({d:m.x+m.y,k:m.type,o:m});
-  if(zone==='field'&&PIER)for(const post of PIER_POSTS){
-    const o={x:PIER.x+post.foot.x,y:PIER.y+post.foot.y,post};
-    items.push({d:o.x+o.y,k:'pierPost',o});
-  }
   items.push({d:player.x+player.y,k:player.dead?'pcorpse':'player',o:player});
   items.sort((a,b)=>a.d-b.d);
   for(const it of items){
@@ -2370,7 +2344,6 @@ function render(){
       case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'palm':drawPalm(sx,sy,it.o);break;
       case 'sundry':drawSundry(sx,sy,it.o);break;
-      case 'pierPost':drawPierPost(SX(PIER.x,PIER.y),SY(PIER.x,PIER.y),it.o.post);break;
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stone':drawStone(sx,sy);break;
