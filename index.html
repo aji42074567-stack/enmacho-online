@@ -470,7 +470,7 @@ const FOAM_PTS=[];
 
 // ヤシの木・浜の小物・桟橋
 let PIER=null;
-const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=1;
+const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0;
 (function beachDecor(){
   const h=(x,y)=>{const n=Math.sin(x*53.1+y*97.7)*24634.6345;return n-Math.floor(n);};
   for(let y=2;y<MAP-2;y++)for(let x=2;x<MAP-2;x++){
@@ -506,7 +506,7 @@ const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=1;
       }
       return !overlaps;
     });
-    // 見た目の幅に合わせ、中央線だけでなく3タイル幅を歩行可能にする
+    // 板の中央1タイルだけを開け、左右の海には立てないようにする
     for(let dy=-PIER_DECK_HALF_WIDTH;dy<=PIER_DECK_HALF_WIDTH;dy++)
       for(let dx=0;dx<PIER_DECK_LENGTH;dx++)blocked[(PIER.y+dy)*MAP+px+dx]=0;
   }
