@@ -3,6 +3,7 @@ const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
 const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
+const VALID_ATTACK_KIND = new Set(['melee', 'cast']);
 
 const newSessionId = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -43,6 +44,8 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     dir: VALID_DIRECTION.has(raw.dir) ? raw.dir : 'down',
     moving: Boolean(raw.moving),
     dead: Boolean(raw.dead),
+    attackSeq: Math.max(0, Math.trunc(cleanNumber(raw.attackSeq, 0))),
+    attackKind: VALID_ATTACK_KIND.has(raw.attackKind) ? raw.attackKind : 'melee',
     seq: Math.max(0, Math.trunc(cleanNumber(raw.seq, 0))),
     lastSeen: Date.now(),
   };
@@ -60,6 +63,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   let timer = 0;
   let lastSentAt = 0;
   let lastSentKey = '';
+  let lastSentAttackSeq = 0;
   let sequence = 0;
 
   function identityFor(snapshot = {}) {
@@ -82,6 +86,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       dir: VALID_DIRECTION.has(snapshot.dir) ? snapshot.dir : 'down',
       moving: Boolean(snapshot.moving),
       dead: Boolean(snapshot.dead),
+      attackSeq: Math.max(0, Math.trunc(cleanNumber(snapshot.attackSeq, 0))),
+      attackKind: VALID_ATTACK_KIND.has(snapshot.attackKind) ? snapshot.attackKind : 'melee',
       seq: ++sequence,
       sentAt: Date.now(),
     };
@@ -144,6 +150,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         if (!remote) continue;
         liveSessionIds.add(remote.sessionId);
         const previous = remotes.get(remote.sessionId);
+        if (previous && remote.seq && previous.seq && remote.seq < previous.seq) continue;
         remotes.set(remote.sessionId, { ...previous, ...remote });
       }
     }
@@ -159,6 +166,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     channelZone = '';
     subscribed = false;
     lastSentKey = '';
+    lastSentAttackSeq = 0;
     remotes.clear();
     publishRemotes();
     if (!oldChannel) return;
@@ -220,21 +228,27 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (!channel || !subscribed || snapshot.zone !== channelZone) return;
     const now = Date.now();
     const identity = identityFor(snapshot);
+    const attackSeq = Math.max(0, Math.trunc(cleanNumber(snapshot.attackSeq, 0)));
     const key = [
       Math.round(cleanNumber(snapshot.x) * 100),
       Math.round(cleanNumber(snapshot.y) * 100),
       snapshot.dir,
       Boolean(snapshot.moving),
       Boolean(snapshot.dead),
+      attackSeq,
+      VALID_ATTACK_KIND.has(snapshot.attackKind) ? snapshot.attackKind : 'melee',
       identity.displayName,
       identity.gender,
       identity.level,
     ].join('|');
     const changed = key !== lastSentKey;
-    const due = now - lastSentAt >= (changed ? POSITION_INTERVAL_MS : IDLE_HEARTBEAT_MS);
+    const attackChanged = attackSeq !== lastSentAttackSeq;
+    const due = attackChanged
+      || now - lastSentAt >= (changed ? POSITION_INTERVAL_MS : IDLE_HEARTBEAT_MS);
     if (!due) return;
     lastSentAt = now;
     lastSentKey = key;
+    lastSentAttackSeq = attackSeq;
     channel.send({
       type: 'broadcast',
       event: 'position',

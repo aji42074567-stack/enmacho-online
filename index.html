@@ -1194,7 +1194,7 @@ const player={
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   combatT:0,
   autoMode:false,
-  hitT:0,attackT:0,attackDur:0,pendingHit:null,
+  hitT:0,attackT:0,attackDur:0,pendingHit:null,attackSeq:0,attackKind:'melee',
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 const remotePlayers=new Map();
@@ -1606,14 +1606,12 @@ function damageMob(m,dmg,crit,kind='melee'){
   })){
     m.flash=0.14;
     addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
-    burst(m.x,m.y,'#e8d090',crit?12:6);
     if(crit)addShake(2.5,0.12);
     (crit?sfx.crit:sfx.hit)();
     return;
   }
   m.hp-=dmg;m.flash=0.14;
   addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
-  burst(m.x,m.y,'#e8d090',crit?12:6);
   if(crit)addShake(2.5,0.12);
   if(m.state==='idle'){m.state='chase';m.repath=0;}
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
@@ -1704,6 +1702,10 @@ function faceToward(e,t){
   const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向(アイソメ変換)
   e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
 }
+function signalPlayerAttack(kind){
+  player.attackSeq=(player.attackSeq||0)+1;
+  player.attackKind=kind==='cast'?'cast':'melee';
+}
 function playerAttack(){
   // 振りかぶり→0.3秒後にヒット判定(リネ風の「間」)
   const m=player.target;if(!m||m.dead)return;
@@ -1711,6 +1713,7 @@ function playerAttack(){
   player.attackT=0;player.attackDur=0.62;
   player.swingKind='melee';
   faceToward(player,m);
+  signalPlayerAttack('melee');
   player.pendingHit=m;
   sfx.swing();
 }
@@ -1729,6 +1732,7 @@ function castBolt(){
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
   player.mp-=8;player.cd.bolt=0.5;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
+  signalPlayerAttack('cast');
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
 }
@@ -1754,6 +1758,7 @@ function castFire(){
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
   player.mp-=20;player.cd.fire=4;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
+  signalPlayerAttack('cast');
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
 }
@@ -2367,7 +2372,12 @@ function updateRemotePlayers(dt){
     const moved=Math.hypot(e.x-oldX,e.y-oldY);
     if(moved>0.0001)e.walkT=(e.walkT||0)+moved;
     if(!e.remoteMoving&&d<0.015){e.x=e.targetX;e.y=e.targetY;}
-    e.moving=!e.dead&&(e.remoteMoving||d>=0.015);
+    if(e.attackDur>0){
+      e.attackT+=dt;
+      if(e.attackT>=e.attackDur){e.attackDur=0;e.attackT=0;}
+    }
+    if(e.swing>0)e.swing=Math.max(0,e.swing-dt);
+    e.moving=!e.dead&&e.attackDur<=0&&(e.remoteMoving||d>=0.015);
   }
 }
 function update(dt){
@@ -4585,6 +4595,8 @@ window.EnmaGameBridge={
       dir:player.dir,
       moving:player.moving,
       dead:player.dead,
+      attackSeq:player.attackSeq,
+      attackKind:player.attackKind,
     };
   },
   getSharedWorldPlayer(){
@@ -4659,10 +4671,23 @@ window.EnmaGameBridge={
       if(!id)continue;
       seen.add(id);
       let e=remotePlayers.get(id);
-      if(!e){
+      const sessionId=String(raw.sessionId||'');
+      if(!e||(sessionId&&e.sessionId!==sessionId)){
         e={x:raw.x,y:raw.y,targetX:raw.x,targetY:raw.y,walkT:0,
-          attackDur:0,attackT:0,hitT:0,swing:0,face:1,dir:'down',moving:false};
+          attackDur:0,attackT:0,hitT:0,swing:0,swingKind:'melee',
+          lastAttackSeq:Math.max(0,raw.attackSeq|0),sessionId,
+          face:1,dir:'down',moving:false};
         remotePlayers.set(id,e);
+      }else{
+        const attackSeq=Math.max(0,raw.attackSeq|0);
+        if(attackSeq!==e.lastAttackSeq){
+          e.lastAttackSeq=attackSeq;
+          if(raw.attackKind==='cast'){
+            e.swing=0.25;e.swingKind='cast';
+          }else{
+            e.attackT=0;e.attackDur=0.62;e.swingKind='melee';
+          }
+        }
       }
       const dx=raw.x-e.targetX;
       e.targetX=raw.x;e.targetY=raw.y;
