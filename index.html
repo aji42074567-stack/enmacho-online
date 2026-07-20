@@ -742,10 +742,11 @@ const BOSS_RESPAWN_SECONDS=120;
 const SAVE_KEY='aden_save_v1';
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
-let W=0,H=0,DPR=1,MOBILE_RENDER=false;
+let W=0,H=0,DPR=1;
+let MOBILE_RENDER=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
 function resize(){
   // スマホは高DPI Canvasの塗りつぶし量が大きいため、見た目を保てる1.5倍で抑える。
-  MOBILE_RENDER=window.matchMedia('(max-width:600px)').matches;
+  MOBILE_RENDER=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
   DPR=Math.min(MOBILE_RENDER?1.5:2,window.devicePixelRatio||1);
   W=canvas.clientWidth; H=canvas.clientHeight;
   canvas.width=W*DPR; canvas.height=H*DPR;
@@ -2564,35 +2565,70 @@ function update(dt){
 /* ================= 地面の事前描画 ================= */
 let ground=document.createElement('canvas');
 const terrainTexture=new Image();
-terrainTexture.onload=renderGround;
-terrainTexture.src='assets/map_forest_ground.png';
 const groundTiles={};
-function loadGroundTile(key,src){
-  const img=new Image();
-  img.onload=()=>{groundTiles[key]=img;renderGround();};
-  img.src=src;
+let terrainAssetsStarted=false,groundRenderQueued=false;
+const GROUND_TILE_SOURCES=[
+  ['path','assets/map_tile_path.png'],
+  ['stone','assets/map_tile_stone.png'],
+  ['sand','assets/map_tile_sand.png'],
+  ['sea','assets/map_tile_sea.png'],
+  ['cavefloor','assets/map_cave_floor.png'],
+  ['cavewall','assets/map_cave_wall.png'],
+];
+function scheduleActiveGroundRender(){
+  if(!started||groundRenderQueued)return;
+  groundRenderQueued=true;
+  requestAnimationFrame(()=>{
+    groundRenderQueued=false;
+    if(zone==='field')renderGround();
+    else renderGroundCave();
+  });
 }
-loadGroundTile('path','assets/map_tile_path.png');
-loadGroundTile('stone','assets/map_tile_stone.png');
-loadGroundTile('sand','assets/map_tile_sand.png');
-loadGroundTile('sea','assets/map_tile_sea.png');
-function loadCaveTile(key,src){
-  const img=new Image();
-  img.onload=()=>{
-    groundTiles[key]=img;
-    renderGround();               // 岩山の崖・高台にも使うのでフィールドも再描画
-    for(const w of [CAVE,CAVE2,CAVE3,...DGW])if(w)renderGroundCave(w);
+function startTerrainAssets(){
+  if(terrainAssetsStarted)return;
+  terrainAssetsStarted=true;
+  let remaining=GROUND_TILE_SOURCES.length+1;
+  const settled=()=>{
+    remaining--;
+    if(remaining===0)scheduleActiveGroundRender();
   };
-  img.src=src;
+  terrainTexture.onload=settled;
+  terrainTexture.onerror=settled;
+  terrainTexture.src='assets/map_forest_ground.png';
+  for(const [key,src] of GROUND_TILE_SOURCES){
+    const img=new Image();
+    img.onload=()=>{
+      groundTiles[key]=img;
+      settled();
+    };
+    img.onerror=settled;
+    img.src=src;
+  }
 }
-loadCaveTile('cavefloor','assets/map_cave_floor.png');
-loadCaveTile('cavewall','assets/map_cave_wall.png');
+const groundRenderScale=()=>MOBILE_RENDER?0.5:1;
+function prepareGroundCanvas(tgt){
+  const logicalWidth=MAP*TW+TW,logicalHeight=MAP*TH+TH*2;
+  const scale=groundRenderScale();
+  tgt.width=Math.ceil(logicalWidth*scale);
+  tgt.height=Math.ceil(logicalHeight*scale);
+  tgt._logicalWidth=logicalWidth;
+  tgt._logicalHeight=logicalHeight;
+  tgt._renderScale=scale;
+  const context=tgt.getContext('2d');
+  context.setTransform(scale,0,0,scale,0,0);
+  return{context,logicalWidth,logicalHeight,scale};
+}
+function releaseGroundCanvas(tgt){
+  if(!tgt||!tgt._groundReady)return;
+  tgt.width=1;tgt.height=1;
+  tgt._groundReady=false;
+}
 function renderGround(){
   const tgt=FIELD?FIELD.ground:ground;   // 画像の遅延読み込み後も必ずフィールド側へ描く
   const tkF=FIELD?FIELD.tileKind:tileKind;   // どのゾーンに居ても自分のマップで描く
-  const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
-  tgt.width=gW;tgt.height=gH;
-  const g=tgt.getContext('2d');
+  const prepared=prepareGroundCanvas(tgt);
+  const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
+  const renderScale=prepared.scale;
   const terrainPattern=terrainTexture.complete&&terrainTexture.naturalWidth
     ?g.createPattern(terrainTexture,'repeat'):null;
   const seaPattern=groundTiles.sea?g.createPattern(groundTiles.sea,'repeat'):null;
@@ -2634,8 +2670,11 @@ function renderGround(){
   }
   // 有機的なマスクを作ってテクスチャを重ねる(砂→草)
   const layerMask=(limit,r)=>{
-    const mc=document.createElement('canvas');mc.width=gW;mc.height=gH;
-    const mg=mc.getContext('2d');mg.fillStyle='#fff';
+    const mc=document.createElement('canvas');
+    mc.width=Math.ceil(gW*renderScale);mc.height=Math.ceil(gH*renderScale);
+    const mg=mc.getContext('2d');
+    mg.setTransform(renderScale,0,0,renderScale,0,0);
+    mg.fillStyle='#fff';
     for(let fy=0;fy<MAP;fy+=0.5)for(let fx=0;fx<MAP;fx+=0.5){
       if(islandF(fx,fy)>=limit)continue;
       mg.beginPath();mg.ellipse(GX(fx,fy),GY(fx,fy),r,r*0.55,0,0,6.29);mg.fill();
@@ -2643,14 +2682,17 @@ function renderGround(){
     return mc;
   };
   const paintLayer=(img,fallback,mask,tint)=>{
-    const lc=document.createElement('canvas');lc.width=gW;lc.height=gH;
+    const lc=document.createElement('canvas');
+    lc.width=Math.ceil(gW*renderScale);lc.height=Math.ceil(gH*renderScale);
     const lg=lc.getContext('2d');
+    lg.setTransform(renderScale,0,0,renderScale,0,0);
     lg.fillStyle=img?lg.createPattern(img,'repeat'):fallback;
     lg.fillRect(0,0,gW,gH);
     if(tint){lg.fillStyle=tint;lg.fillRect(0,0,gW,gH);}
     lg.globalCompositeOperation='destination-in';
-    lg.drawImage(mask,0,0);
-    g.drawImage(lc,0,0);
+    lg.drawImage(mask,0,0,gW,gH);
+    g.drawImage(lc,0,0,gW,gH);
+    mask.width=1;mask.height=1;lc.width=1;lc.height=1;
   };
   paintLayer(groundTiles.sand||null,'#6d5c40',layerMask(2.2,15),'rgba(30,24,12,0.18)');
   paintLayer(terrainTexture.complete&&terrainTexture.naturalWidth?terrainTexture:null,
@@ -2795,16 +2837,15 @@ function renderGround(){
     dia2(x,y,off);g.fill();
     if(e<1){g.fillStyle='rgba(0,0,0,0.12)';dia2(x,y,off);g.fill();}
   }
+  tgt._groundReady=true;
 }
-renderGround();
 
 /* ================= 洞窟(最初の試練)とゾーン切替 ================= */
 function renderGroundCave(world){
   const tgt=world?world.ground:ground;   // 画像の遅延読み込み後も洞窟側へ描く
   const tkC=world?world.tileKind:tileKind;
-  const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
-  tgt.width=gW;tgt.height=gH;
-  const g=tgt.getContext('2d');
+  const prepared=prepareGroundCanvas(tgt);
+  const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
   const fp=groundTiles.cavefloor?g.createPattern(groundTiles.cavefloor,'repeat'):null;
   const wp=groundTiles.cavewall?g.createPattern(groundTiles.cavewall,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
@@ -2849,6 +2890,7 @@ function renderGroundCave(world){
     g.fillStyle='rgba(70,72,84,0.25)';
     g.beginPath();g.ellipse(GX(x,y),GY(x,y)-8,14,6,0,0,6.29);g.fill();
   }
+  tgt._groundReady=true;
 }
 function buildCave(){
   blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
@@ -2870,7 +2912,6 @@ function buildCave(){
   spawnMob('oni_blue',49,30);   // 洞窟の主
   ground=document.createElement('canvas');
   CAVE={blocked,tileKind,props,npcs,mobs,ground};
-  renderGroundCave(CAVE);
 }
 function buildCave2(){
   blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
@@ -2892,7 +2933,6 @@ function buildCave2(){
   spawnMob('oni_bone',43,27);spawnMob('oni_bone',48,20);
   ground=document.createElement('canvas');
   CAVE2={blocked,tileKind,props,npcs,mobs,ground};
-  renderGroundCave(CAVE2);
 }
 function buildCave3(){
   blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
@@ -2913,7 +2953,6 @@ function buildCave3(){
   spawnMob('oni_king',51,30);   // 最深部の主
   ground=document.createElement('canvas');
   CAVE3={blocked,tileKind,props,npcs,mobs,ground};
-  renderGroundCave(CAVE3);
 }
 /* ---- 竜の洞窟(地下5階) ---- */
 let DGW=[];   // dg1〜dg5 のワールド
@@ -2951,7 +2990,6 @@ function buildDragonCaves(){
     }
     ground=document.createElement('canvas');
     const w={blocked,tileKind,props,npcs,mobs,ground};
-    renderGroundCave(w);
     DGW.push(w);
   }
 }
@@ -2968,10 +3006,16 @@ function checkDrake(){
 function switchZone(z,px,py){
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
+  const previousGround=ground;
   zone=z;
   const W2={field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]||DGW[+z.slice(2)-1];
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
+  // スマホでは離れたエリアの巨大Canvasを保持せず、戻ったときに再生成する。
+  if(MOBILE_RENDER&&previousGround!==ground)releaseGroundCanvas(previousGround);
+  if(started&&!ground._groundReady){
+    if(zone==='field')renderGround();else renderGroundCave();
+  }
   corpses.length=0;bolts.length=0;
   player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
   player.attackDur=0;player.attackT=0;player.combatT=0;
@@ -2999,10 +3043,23 @@ function switchZone(z,px,py){
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
 const SPRITES={};
+const SPRITE_SOURCES=[];
+let spriteAssetsStarted=false;
 function loadSprite(key,src){
-  const img=new Image();
-  img.onload=()=>{SPRITES[key]=img;};
-  img.src=src;
+  SPRITE_SOURCES.push([key,src]);
+}
+function startSpriteAssets(){
+  if(spriteAssetsStarted)return;
+  spriteAssetsStarted=true;
+  for(const [key,src] of SPRITE_SOURCES){
+    const img=new Image();
+    img.onload=()=>{SPRITES[key]=img;};
+    img.src=src;
+  }
+}
+function startGameplayAssets(){
+  startTerrainAssets();
+  startSpriteAssets();
 }
 loadSprite('player_m','assets/char_player_m.png');
 loadSprite('player_f','assets/char_player_f.png');
@@ -3896,7 +3953,11 @@ function render(){
 
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0b0d12';ctx.fillRect(0,0,W,H);
-  ctx.drawImage(ground, W/2-camX-ground.width/2+shakeX, H/2-camY-TH/2+shakeY);
+  const groundW=ground._logicalWidth||ground.width;
+  const groundH=ground._logicalHeight||ground.height;
+  ctx.drawImage(ground,
+    W/2-camX-groundW/2+shakeX,H/2-camY-TH/2+shakeY,
+    groundW,groundH);
 
   const SX=(x,y)=>isoX(x,y)-camX+W/2+shakeX;
   const SY=(x,y)=>isoY(x,y)-camY+H/2+shakeY;
@@ -4358,7 +4419,12 @@ $('startBtn').addEventListener('click',()=>{
   $('pname').textContent='亡者'+player.name;
   save();
   $('intro').classList.add('hidden');
-  started=true;audio();startBgm();
+  started=true;
+  startGameplayAssets();
+  if(!ground._groundReady){
+    if(zone==='field')renderGround();else renderGroundCave();
+  }
+  audio();startBgm();
   if(hasSaveData){
     log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
     if(migrationStatGrant>0)
@@ -4598,13 +4664,15 @@ if(hasSaveData){
 let last=0,lastFrameAt=0;
 function frame(t){
   requestAnimationFrame(frame);
+  // タイトル・魂籍画面の裏でゲーム全景を描き続けず、スマホの起動負荷を抑える。
+  if(!started)return;
   // 通信・描画が同時に走る実機では30fpsに抑え、入力と認証UIの応答余力を残す。
   if(MOBILE_RENDER&&t-lastFrameAt<32)return;
   lastFrameAt=t;
   let dt=Math.min(0.05,(t-last)/1000||0.016);
   last=t;
   if(hitstop>0){hitstop-=dt;dt*=0.15;}  // ヒットの瞬間だけ時間が止まる
-  if(started)update(dt);
+  update(dt);
   render();
   hud();
 }
