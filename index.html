@@ -525,7 +525,7 @@ const BOSS_HOME={x:10,y:7};
   // 村の石畳
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<9.2)tileKind[y*MAP+x]=2;   // 宿場町の広場(拡張)
-    if(y>=56&&y<=60&&x>=33&&x<=40&&Math.abs(y-(57.5+(x-33)*0.35))<1.6)tileKind[y*MAP+x]=2;   // 酒場へ続く通り
+    if(y>=57&&y<=60&&x>=25&&x<=34&&Math.abs(y-58.4)<1.5)tileKind[y*MAP+x]=2;   // 酒場へ続く通り(店前から左へ)
     if(x>=28&&x<=31&&y>=43&&y<=47)tileKind[y*MAP+x]=2;   // 北門へ続く通り
   }
   // 離小島(歪な菱形): 当たり判定は islandF で決定(見た目も同じ関数で滑らかに描く)
@@ -545,29 +545,24 @@ function placeBuilding(bx,by,kind,roof1,roof2){
 }
 placeBuilding(27,50,'house','#6e3a2e','#5a2f26');
 placeBuilding(36,49,'house','#3e5a4a','#33493d');
-placeBuilding(26,55,'house','#6e3a2e','#5a2f26');
 placeBuilding(35,54,'shop','#7a5a2a','#645022');
-placeBuilding(38,57,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」
+placeBuilding(27,56,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」(町の左・井戸の近く)
 placeBuilding(23,52,'house','#3e5a4a','#33493d');
-placeBuilding(25,45,'house','#6e3a2e','#5a2f26');    // 北の拡張区画
-placeBuilding(37,45,'house','#3e5a4a','#33493d');
-placeBuilding(40,53,'house','#6e3a2e','#5a2f26');
 blocked[50*MAP+32]=1;
 props.push({x:32,y:50,kind:'stone'});
 blocked[56*MAP+31]=1;
 props.push({x:31,y:56,kind:'well'});
 props.push({x:29,y:54,kind:'lamp'});
 props.push({x:37,y:52,kind:'lamp'});
-props.push({x:36,y:58.4,kind:'lamp'});   // 酒場前の通り
-props.push({x:40.6,y:59.2,kind:'lamp'});
+props.push({x:31,y:58.6,kind:'lamp'});   // 酒場前の通り
 props.push({x:29,y:46,kind:'lamp'});     // 北の通り
 props.push({x:31,y:44,kind:'lamp'});
 
 let npcs=[
   {x:34,y:56,kind:'merchant',name:'オババ'},
   {x:30,y:51,kind:'elder',name:'オキナ'},
-  {x:38.2,y:59.6,kind:'okami',name:'オカミ'},     // 酒場の女将
-  {x:35.6,y:59.2,kind:'guest',name:'トックリ'},   // 酔客の亡者
+  {x:28.2,y:58.8,kind:'okami',name:'オカミ'},     // 酒場の女将(店の前)
+  {x:25.8,y:58.4,kind:'guest',name:'トックリ'},   // 酔客の亡者
   {x:34.8,y:56.6,kind:'board',name:'高札'},       // クエスト掲示板(通り沿い)
 ];
 
