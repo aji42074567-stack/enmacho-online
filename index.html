@@ -1193,6 +1193,7 @@ const player={
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 const remotePlayers=new Map();
+const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
 let shakeT=0,shakeDur=0,shakePower=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
@@ -1213,6 +1214,7 @@ const mpRegenMul=()=>Math.min(2,1+0.02*ST().int);
 const dropMul=()=>Math.min(2,1+0.02*ST().luck);
 const dropChance=base=>base>=1?1:Math.min(0.75,base*dropMul());
 const speedNow=()=>player.speed*(player.hasteT>0?1.3:1);
+const sharedWorldActive=()=>sharedWorld.connected&&sharedWorld.zone==='field'&&zone==='field';
 function recalcMax(){
   player.maxHp=80+12*(player.lv-1)+10*ST().con+eqSum('hpb');
   player.maxMp=30+6*(player.lv-1)+8*ST().int+eqSum('mpb');
@@ -1362,6 +1364,7 @@ function spawnMob(type,x,y){
   ring(41,30,5,4,'wolf');  ring(22,34,5,4,'wolf');
   ring(42,16,4,3,'orc');   ring(16,24,4,3,'orc');
   ring(16,11,4,3,'skeleton');
+  mobs.forEach((mob,index)=>{mob.id=`field-${index}`;});
 })();
 
 /* ================= 演出・ログ ================= */
@@ -1590,9 +1593,19 @@ function questProgress(type,tag){
 }
 
 /* ================= 戦闘 ================= */
-function damageMob(m,dmg,crit){
+function damageMob(m,dmg,crit,kind='melee'){
   if(m.dead)return;
   player.combatT=COMBAT_HOLD_SECONDS;
+  if(sharedWorldActive()&&m.id&&window.EnmaWorldClient?.hit?.({
+    mobId:m.id,damage,crit,kind,
+  })){
+    m.flash=0.14;
+    addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
+    burst(m.x,m.y,'#e8d090',crit?12:6);
+    if(crit)addShake(2.5,0.12);
+    (crit?sfx.crit:sfx.hit)();
+    return;
+  }
   m.hp-=dmg;m.flash=0.14;
   addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
   burst(m.x,m.y,'#e8d090',crit?12:6);
@@ -1600,10 +1613,14 @@ function damageMob(m,dmg,crit){
   if(m.state==='idle'){m.state='chase';m.repath=0;}
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
 }
-function killMob(m){
-  m.dead=true;m.hp=0;m.respawn=m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS;
+function markMobDead(m,respawn=m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS){
+  if(m.dead){m.respawn=respawn;return false;}
+  m.dead=true;m.hp=0;m.respawn=respawn;
   corpses.push({x:m.x,y:m.y,type:m.type,face:m.face,age:0});  // 死体をその場に残す
   if(player.target===m)player.target=null;
+  return true;
+}
+function grantMobReward(m){
   kills++;
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
@@ -1652,6 +1669,10 @@ function killMob(m){
     log('これで業龍に挑む資格を得た…','sys');
   }
   save();
+}
+function killMob(m){
+  if(!markMobDead(m))return;
+  grantMobReward(m);
 }
 function gainXp(n){
   player.xp+=n;
@@ -1807,15 +1828,21 @@ function mobAttack(m){
   m.windup=m.def.boss?0.4:0.22;
 }
 function mobStrike(m){
+  const result=Math.random()<dodgeRate()?{dodge:true}:
+    Math.random()<0.06?{miss:true}:
+    {damage:Math.max(1,rndi(m.def.dmg[0],m.def.dmg[1])-defTotal())};
+  applySharedDamage(result,m);
+}
+function applySharedDamage(result,m){
   player.combatT=COMBAT_HOLD_SECONDS;
-  if(Math.random()<dodgeRate()){
+  if(result?.dodge){
     addFloat(player.x,player.y,'回避！','#9fdcff',true);sfx.miss();return;
   }
-  if(Math.random()<0.06){addFloat(player.x,player.y,'Miss','#b8b8b8');return;}
-  const dmg=Math.max(1,rndi(m.def.dmg[0],m.def.dmg[1])-defTotal());
+  if(result?.miss){addFloat(player.x,player.y,'Miss','#b8b8b8');return;}
+  const dmg=Math.max(1,Math.trunc(result?.damage||1));
   player.hp-=dmg;player.hitT=0.3;
   addFloat(player.x,player.y,String(dmg),'#ff7a6a');
-  sfx.hurt();addShake(m.def.boss?7:4,m.def.boss?0.3:0.18);
+  sfx.hurt();addShake(m?.def?.boss?7:4,m?.def?.boss?0.3:0.18);
   if(player.hp<=0){
     player.hp=0;player.dead=true;player.path=[];player.target=null;player.combatT=0;
     player.autoMode=false;$('btnAuto').classList.remove('on');
@@ -2428,6 +2455,23 @@ function update(dt){
   drakeChkT-=dt;
   if(drakeChkT<=0){drakeChkT=5;checkDrake();}
   for(const m of mobs){
+    if(sharedWorldActive()){
+      if(m.flash)m.flash-=dt;
+      if(m.swing>0)m.swing=Math.max(0,m.swing-dt);
+      if(m.dead)continue;
+      const tx=Number.isFinite(m.serverX)?m.serverX:m.x;
+      const ty=Number.isFinite(m.serverY)?m.serverY:m.y;
+      const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy);
+      if(d>4){m.x=tx;m.y=ty;}
+      else if(d>0.001){
+        faceToward(m,{x:tx,y:ty});
+        const blend=1-Math.exp(-12*dt),ox=m.x,oy=m.y;
+        m.x+=dx*blend;m.y+=dy*blend;
+        m.walkT=(m.walkT||0)+Math.hypot(m.x-ox,m.y-oy);
+      }
+      m.moving=!!m.serverMoving||d>0.025;
+      continue;
+    }
     if(m.dead){
       if(m.type==='drake')continue;   // 竜の再出現は偶数時0分の窓で管理
       m.respawn-=dt;
@@ -2481,10 +2525,10 @@ function update(dt){
         for(const m of mobs){
           if(m.dead)continue;
           if(Math.hypot(m.x-tx,m.y-(ty+0.4))<2.2)
-            damageMob(m,Math.round(atkTotal()*1.3+rnd(0,8)),false);
+            damageMob(m,Math.round(atkTotal()*1.3+rnd(0,8)),false,'fire');
         }
       }else{
-        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5+rnd(0,6)),false);
+        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5+rnd(0,6)),false,'bolt');
         burst(tx,ty,'#7fb0ff',10);
       }
     }else{
@@ -4448,6 +4492,62 @@ window.EnmaGameBridge={
       moving:player.moving,
       dead:player.dead,
     };
+  },
+  getSharedWorldPlayer(){
+    return{
+      active:started,
+      zone,
+      x:player.x,
+      y:player.y,
+      dead:player.dead,
+      defense:defTotal(),
+      dodge:dodgeRate(),
+    };
+  },
+  setSharedWorldConnection(status){
+    const wasConnected=sharedWorld.connected;
+    sharedWorld.connected=Boolean(status?.connected);
+    sharedWorld.zone=sharedWorld.connected&&status?.zone==='field'?'field':'';
+    if(started&&wasConnected!==sharedWorld.connected){
+      log(sharedWorld.connected
+        ? '賽の森の魔物が現世同期された'
+        : '現世同期が途切れたため、魔物は端末内の動きに戻った','sys');
+    }
+  },
+  setSharedMonsters(monsters){
+    if(!sharedWorld.connected||!FIELD)return;
+    sharedWorld.lastSnapshotAt=performance.now();
+    const byId=new Map(FIELD.mobs.map(mob=>[mob.id,mob]));
+    for(const raw of Array.isArray(monsters)?monsters:[]){
+      const mob=byId.get(String(raw?.id||''));
+      if(!mob||raw.type!==mob.type)continue;
+      const x=Number(raw.x),y=Number(raw.y),hp=Number(raw.hp);
+      if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(hp))continue;
+      mob.serverX=x;mob.serverY=y;
+      mob.maxHp=Math.max(1,Number(raw.maxHp)||mob.def.hp);
+      mob.hp=clamp(hp,0,mob.maxHp);
+      mob.state=['idle','chase','return','dead'].includes(raw.state)?raw.state:'idle';
+      mob.serverMoving=Boolean(raw.moving);
+      mob.face=raw.face<0?-1:1;
+      mob.swing=Math.max(mob.swing||0,Math.max(0,Number(raw.swing)||0));
+      if(raw.dead){
+        markMobDead(mob,Math.max(0,Number(raw.respawn)||0));
+      }else if(mob.dead){
+        mob.dead=false;mob.respawn=0;mob.path=[];
+        mob.x=x;mob.y=y;
+      }
+    }
+  },
+  awardSharedMob(mobId){
+    const mob=FIELD?.mobs?.find(candidate=>candidate.id===String(mobId||''));
+    if(!mob)return;
+    markMobDead(mob,Math.max(0,mob.respawn||MOB_RESPAWN_SECONDS));
+    grantMobReward(mob);
+  },
+  applySharedPlayerDamage(result){
+    if(!sharedWorldActive()||player.dead)return;
+    const mob=FIELD?.mobs?.find(candidate=>candidate.id===String(result?.mobId||''));
+    applySharedDamage(result,mob);
   },
   setRemotePlayers(players){
     const now=performance.now(),seen=new Set();

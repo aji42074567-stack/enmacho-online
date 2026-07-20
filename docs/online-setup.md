@@ -13,6 +13,8 @@ Secret key、service role key、Resend API keyはGitHubへ保存しない。
 - Supabase Custom SMTP: Resendへ接続済み
 - 登録確認・パスワード再設定メール: 閻魔庁仕様の日本語テンプレートへ変更済み
 - 同一マップのプレイヤーPresence・位置同期: 実装済み
+- 賽の森の魔物同期: Cloudflare Durable Objectsで実装済み
+- 魔物同期Worker: `https://enmacho-world.aji42074567.workers.dev`
 - Cloudflare Pages: GitHub連携・自動デプロイ設定済み
 - 公開URL: `https://enmacho-online.pages.dev/`
 - 暫定送信元: `閻魔庁ONLINE <noreply@notify.mkrainbowshiva.com>`
@@ -38,6 +40,7 @@ window.ENMA_ONLINE_CONFIG = {
   supabaseUrl: 'https://PROJECT_REF.supabase.co',
   supabasePublishableKey: 'sb_publishable_...',
   resendSyncFunction: 'sync-resend-contact',
+  worldServerUrl: 'https://enmacho-world.SUBDOMAIN.workers.dev',
 };
 ```
 
@@ -90,3 +93,24 @@ Edge Function用とSMTP用のAPIキーは分離する。
 吹き出しチャットは1通50文字、1秒1通、1分20通まで。
 履歴の保存期間は7日を想定し、定期処理から
 `select public.delete_expired_nearby_chat();` を実行する。
+
+## 6. 魔物の共有ワールド
+
+賽の森ではCloudflare Worker `enmacho-world`が、魔物25体の位置・標的・HP・
+死亡・20秒後の復活を管理する。1マップにつき1つのDurable Objectを使い、
+ログイン中のプレイヤーとはWebSocketで同期する。
+
+- クライアントは移動位置と攻撃命令だけを送る。
+- 魔物AI、ダメージ確定、死亡、復活はDurable Objectが決める。
+- 他サイトからの接続を拒否し、Supabaseのアクセストークンを接続時に検証する。
+- 誰もいない時は更新ループを止め、最後の魔物状態をSQLite-backed storageへ保存する。
+- 未ログイン、同期障害、洞窟内では従来の端末内AIへ自動的に戻る。
+
+デプロイ:
+
+```sh
+npx wrangler deploy
+```
+
+`wrangler.jsonc`のSupabase値は公開可能なProject URLとPublishable keyだけを置く。
+`service_role`やSecret keyは置かない。

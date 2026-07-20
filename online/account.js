@@ -1,4 +1,5 @@
 import { createPresenceController } from './presence.js';
+import { createWorldController } from './world.js';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -33,6 +34,7 @@ const state = {
 
 let accountLoadRevision = 0;
 let presenceController = null;
+let worldController = null;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -205,6 +207,7 @@ async function loadAccountData() {
     state.preferences = null;
     state.cloudSave = null;
     await presenceController?.setAccount(null, null);
+    await worldController?.setAccount(null, null);
     render();
     return;
   }
@@ -250,6 +253,7 @@ async function loadAccountData() {
   state.preferences = preferences;
   state.cloudSave = cloudSave;
   await presenceController?.setAccount(state.session, state.profile);
+  await worldController?.setAccount(state.session, state.profile);
   render();
 }
 
@@ -350,6 +354,7 @@ async function updateProfile(event) {
     state.profile = data;
     state.preferences = preferences;
     await presenceController?.setAccount(state.session, state.profile);
+    await worldController?.setAccount(state.session, state.profile);
     if (config.resendSyncFunction) {
       const { error: syncError } = await state.client.functions.invoke(
         config.resendSyncFunction,
@@ -400,6 +405,7 @@ async function signOut() {
     state.preferences = null;
     state.cloudSave = null;
     await presenceController?.setAccount(null, null);
+    await worldController?.setAccount(null, null);
     setFeedback('ログアウトしました');
   });
 }
@@ -415,6 +421,8 @@ async function initialize() {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
     presenceController = createPresenceController(state.client);
+    worldController = createWorldController(config);
+    window.EnmaWorldClient = worldController;
     const { data, error } = await state.client.auth.getSession();
     if (error) throw error;
     state.session = data.session;
@@ -422,6 +430,7 @@ async function initialize() {
       state.session = session;
       if (event === 'TOKEN_REFRESHED') {
         void presenceController?.setAccount(session, state.profile);
+        void worldController?.setAccount(session, state.profile);
         return;
       }
       setTimeout(() => loadAccountData(), 0);
