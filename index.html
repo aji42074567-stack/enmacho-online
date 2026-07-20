@@ -404,7 +404,7 @@
 
   <div class="overlay hidden" id="tavern">
     <div class="scroll">
-      <h2>酒場 彼岸亭</h2>
+      <h2>酒場 千本亭</h2>
       <div class="sub">「死んでからも、飯と噂話は残るのさ」</div>
       <div id="tavernList"></div>
       <div class="goldrow">所持金 <span id="tavernGold">0</span> モン</div>
@@ -583,7 +583,7 @@ function placeBuilding(bx,by,kind,roof1,roof2){
 placeBuilding(27,47,'house','#6e3a2e','#5a2f26');
 placeBuilding(36,46,'house','#3e5a4a','#33493d');
 placeBuilding(35,51,'shop','#7a5a2a','#645022');
-placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」(町の左・井戸の近く)
+placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
 placeBuilding(23,49,'house','#3e5a4a','#33493d');
 blocked[47*MAP+32]=1;
 props.push({x:32,y:47,kind:'stone'});
@@ -598,9 +598,9 @@ props.push({x:31,y:41,kind:'lamp'});
 let npcs=[
   {x:34,y:53,kind:'merchant',name:'オババ'},
   {x:30,y:48,kind:'elder',name:'オキナ'},
-  {x:29.4,y:54.6,kind:'okami',name:'オカミ'},     // 酒場の女将(店の右前)
+  {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
   {x:31.5,y:45.5,kind:'smith',name:'カナヤマ'},   // 鍛冶屋(広場の北・家に隠れない位置)
-  {x:32.2,y:54.6,kind:'guest',name:'トックリ'},   // 酔客の亡者(井戸の右・通りの真ん中)
+  {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
   {x:28.2,y:41.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
 ];
 
@@ -641,7 +641,7 @@ function toggleGate(g){
   sfx.click();
 }
 const ELDER_LINES=[
-  '「森の最深部にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
+  '「北西の竜の洞窟にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
   '「オババの店で装備を整えよ。銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
   '「印は徳が積まれれば自然と授かる。回向は徳位3、業火は徳位6じゃ」',
   '「アッキは大太刀を、ガシャドクロは鎖帷子を落とすことがある。執着の強い品ほど、よく落ちるものでな」',
@@ -650,11 +650,11 @@ const ELDER_LINES=[
   '「ここだけの話じゃがな……この世界、時々"ほころび"のようなものが見える。まあ、わしの気のせいじゃろうて」',
 ];
 const OKAMI_LINES=[
-  '「いらっしゃい。ここは彼岸亭。転生待ちの亡者が、束の間の憂さを晴らす店さ」',
-  '「まかない飯は体にいいよ。……体なんて、もうないはずなんだけどねえ。おかしな話さ」',
-  '「高札の頼み事、受けてやっておくれよ。この町の亡者は気が弱いのばかりでね」',
-  '「オキナの旦那は長生きだよ。あたしがこの店を開いた時にはもう、あの姿だった」',
-  '「たまにね、お客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどさ」',
+  '「いらっしゃい。ここは千本亭。転生待ちの亡者が、束の間の憂さを晴らす店だ」',
+  '「まかない飯は体にいいぞ。……体なんて、もうないはずなんだけどな。おかしな話だ」',
+  '「高札の頼み事、受けてやってくれよ。この町の亡者は気が弱いのばかりでな」',
+  '「オキナの旦那は長生きだな。おれがこの店を開いた時にはもう、あの姿だった」',
+  '「たまにな、客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどな」',
 ];
 const GUEST_LINES=[
   '「ひっく……なあ、兄さんも飲むかい。死んでから酒の味が薄いんだ。誰かが手を抜いてやがる」',
@@ -665,7 +665,7 @@ const GUEST_LINES=[
 /* ================= クエスト(高札) ================= */
 const QUESTS=[
   {id:'q_gaki',   name:'ガキ退治',        desc:'村の周りのガキを5体成仏させる',    type:'kill', mob:['goblin','goblin_red'], n:5, rw:{gold:80, xp:40}},
-  {id:'q_tokkuri',name:'酔客の戯言',      desc:'彼岸亭のトックリの話を聞いてやる',  type:'talk', n:1, rw:{gold:50, xp:30}},
+  {id:'q_tokkuri',name:'酔客の戯言',      desc:'千本亭のカズーの話を聞いてやる',    type:'talk', n:1, rw:{gold:50, xp:30}},
   {id:'q_inugami',name:'イヌガミの群れ',  desc:'森のイヌガミを5体成仏させる',      type:'kill', mob:['wolf'], n:5, rw:{gold:150,xp:90}},
   {id:'q_akki',   name:'アッキ討伐',      desc:'森の奥のアッキを3体成仏させる',    type:'kill', mob:['orc'], n:3, rw:{gold:220,xp:160}},
 ];
@@ -1484,7 +1484,7 @@ function buy(id){
   sfx.coin();save();renderShop();
 }
 
-/* ---- 酒場 彼岸亭 ---- */
+/* ---- 酒場 千本亭 ---- */
 const FOODS=[
   {id:'onigiri',name:'鬼焼き握り',fx:'60秒 攻撃+4',price:40,t:'foodAtkT'},
   {id:'gusokuni',name:'具足煮',   fx:'60秒 防御+4',price:40,t:'foodDefT'},
@@ -1498,7 +1498,7 @@ function renderTavern(){
       <span class="pr">${f.price} モン</span>
       <button class="buyb" data-food="${f.id}" ${player.gold<f.price?'disabled':''}>${eating?'おかわり':'食べる'}</button></div>`;
   }
-  html+=`<div class="itemrow"><span class="nm">女将の噂話 <span class="fx">タダで聞ける</span></span>
+  html+=`<div class="itemrow"><span class="nm">エイネルの話 <span class="fx">タダで聞ける</span></span>
     <button class="buyb" data-rumor="1">聞く</button></div>`;
   $('tavernList').innerHTML=html;
   $('tavernGold').textContent=player.gold;
@@ -1514,7 +1514,7 @@ function renderTavern(){
   const r=$('tavernList').querySelector('[data-rumor]');
   if(r)r.addEventListener('click',()=>{
     $('tavern').classList.add('hidden');
-    $('talkTitle').textContent='オカミ';$('talkSub').textContent='彼岸亭の女将';
+    $('talkTitle').textContent='エイネル';$('talkSub').textContent='千本亭の主人';
     $('talkText').textContent=OKAMI_LINES[okamiIdx++%OKAMI_LINES.length];
     $('talk').classList.remove('hidden');
     sfx.click();
@@ -1684,10 +1684,10 @@ function openNpc(npc){
       log('武器強化の巻物と防具強化の巻物を1枚ずつもらった！','gain');
     }else{renderSmith();$('smith').classList.remove('hidden');}
   }
-  else if(npc.kind==='okami'){renderTavern();$('tavern').classList.remove('hidden');}
+  else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='guest'){
-    $('talkTitle').textContent='トックリ';$('talkSub').textContent='彼岸亭の酔客';
+    $('talkTitle').textContent='カズー';$('talkSub').textContent='千本亭の常連客';
     $('talkText').textContent=GUEST_LINES[guestIdx++%GUEST_LINES.length];
     $('talk').classList.remove('hidden');
     questProgress('talk','guest');
@@ -2440,8 +2440,8 @@ loadSprite('map_stone_well','assets/map_stone_well.png');
 // 酒場まわり(画像が来たら自動で差し替わる仮キー)
 loadSprite('map_tavern','assets/map_tavern.png');
 loadSprite('map_kosatsu','assets/map_kosatsu.png');
-loadSprite('npc_okami','assets/npc_okami.png');
-loadSprite('npc_tokkuri','assets/npc_tokkuri.png');
+loadSprite('npc_einer','assets/npc_einer.png');
+loadSprite('npc_kazu','assets/npc_kazu.png');
 loadSprite('map_fence_x','assets/map_fence_x.png');
 loadSprite('map_fence_y','assets/map_fence_y.png');
 loadSprite('map_gate','assets/map_gate.png');
@@ -2842,8 +2842,6 @@ function drawHouse(sx,sy,p){
         gl.addColorStop(0,`rgba(255,140,80,${0.18*fl})`);gl.addColorStop(1,'rgba(255,140,80,0)');
         ctx.fillStyle=gl;ctx.fillRect(sx+lx+sw-30,cy-30,60,60);
       }
-      ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
-      ctx.fillText('彼岸亭',sx,sy+30);
     }
     return;
   }
@@ -3123,7 +3121,7 @@ function drawGate(sx,sy,p){
   ctx.font='10px sans-serif';ctx.textAlign='center';
   ctx.fillText(`${g.name}${g.open?'(開)':''}`,sx,sy+16);
 }
-const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',okami:'npc_okami',guest:'npc_tokkuri'};
+const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',guest:'npc_kazu'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
   const img=SPRITES[NPC_SPRITE[n.kind]];
@@ -3147,19 +3145,17 @@ function drawNpc(sx,sy,n){
     ctx.fillStyle='#e0b89a';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
     ctx.fillStyle='#a8342a';
     ctx.beginPath();ctx.moveTo(-8,-24);ctx.lineTo(0,-33);ctx.lineTo(8,-24);ctx.closePath();ctx.fill();
-  }else if(n.kind==='okami'){
-    // 女将: 茜色の着物+白い前掛け+お盆
-    ctx.fillStyle='#9a3a4a';
+  }else if(n.kind==='einer'){
+    // エイネル: 藍の作務衣+前掛け+手ぬぐい、徳利を提げる
+    ctx.fillStyle='#2e4258';
     ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#e8e2d2';
-    ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(-3,-10);ctx.lineTo(3,-10);ctx.lineTo(4,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#9a8568';
+    ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(4,0);ctx.closePath();ctx.fill();
     ctx.fillStyle='#e0b89a';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
-    ctx.fillStyle='#2a2320';
-    ctx.beginPath();ctx.arc(0,-24,4.5,Math.PI,0);ctx.fill();
-    ctx.beginPath();ctx.arc(0,-27,2.4,0,6.29);ctx.fill();   // 団子髪
-    ctx.strokeStyle='#8a6d3a';ctx.lineWidth=1.6;
-    ctx.beginPath();ctx.moveTo(7,-14);ctx.lineTo(12,-16);ctx.stroke();
-    ctx.fillStyle='#6d5a38';ctx.beginPath();ctx.ellipse(13,-17,4,1.6,-0.3,0,6.29);ctx.fill();   // お盆
+    ctx.fillStyle='#e8e2d2';
+    ctx.beginPath();ctx.moveTo(-6,-25);ctx.lineTo(6,-25);ctx.lineTo(5,-27);ctx.lineTo(-5,-27);ctx.closePath();ctx.fill();   // 手ぬぐい
+    ctx.fillStyle='#7a4a3a';
+    ctx.beginPath();ctx.ellipse(9,-13,2.6,3.6,0.2,0,6.29);ctx.fill();   // 徳利
   }else if(n.kind==='guest'){
     // 酔客: 青白い亡者+徳利、ゆらゆら
     const sway=Math.sin(time*1.8)*2;
