@@ -540,7 +540,7 @@ function elevF(x,y){
   return 0;
 }
 const isB=(x,y)=>x<0||y<0||x>=MAP||y>=MAP||blocked[y*MAP+x];
-const SPAWN={x:32,y:53};
+const SPAWN={x:32,y:50};
 const BOSS_HOME={x:10,y:7};
 
 (function genMap(){
@@ -556,8 +556,8 @@ const BOSS_HOME={x:10,y:7};
   // 村の石畳
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<9.2)tileKind[y*MAP+x]=2;   // 宿場町の広場(拡張)
-    if(y>=57&&y<=60&&x>=25&&x<=34&&Math.abs(y-58.4)<1.5)tileKind[y*MAP+x]=2;   // 酒場へ続く通り(店前から左へ)
-    if(x>=28&&x<=31&&y>=43&&y<=47)tileKind[y*MAP+x]=2;   // 北門へ続く通り
+    if(y>=54&&y<=57&&x>=25&&x<=34&&Math.abs(y-55.4)<1.5)tileKind[y*MAP+x]=2;   // 酒場へ続く通り(店前から左へ)
+    if(x>=28&&x<=31&&y>=40&&y<=44)tileKind[y*MAP+x]=2;   // 北門へ続く通り
   }
   // 離小島(歪な菱形): 当たり判定は islandF で決定(見た目も同じ関数で滑らかに描く)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
@@ -574,36 +574,36 @@ function placeBuilding(bx,by,kind,roof1,roof2){
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
   props.push({x:bx+0.5,y:by+0.5,kind,roof1,roof2});
 }
-placeBuilding(27,50,'house','#6e3a2e','#5a2f26');
-placeBuilding(36,49,'house','#3e5a4a','#33493d');
-placeBuilding(35,54,'shop','#7a5a2a','#645022');
-placeBuilding(27,56,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」(町の左・井戸の近く)
-placeBuilding(23,52,'house','#3e5a4a','#33493d');
-blocked[50*MAP+32]=1;
-props.push({x:32,y:50,kind:'stone'});
-blocked[56*MAP+31]=1;
-props.push({x:31,y:56,kind:'well'});
-props.push({x:29,y:54,kind:'lamp'});
-props.push({x:37,y:52,kind:'lamp'});
-props.push({x:31,y:58.6,kind:'lamp'});   // 酒場前の通り
-props.push({x:29,y:46,kind:'lamp'});     // 北の通り
-props.push({x:31,y:44,kind:'lamp'});
+placeBuilding(27,47,'house','#6e3a2e','#5a2f26');
+placeBuilding(36,46,'house','#3e5a4a','#33493d');
+placeBuilding(35,51,'shop','#7a5a2a','#645022');
+placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「彼岸亭」(町の左・井戸の近く)
+placeBuilding(23,49,'house','#3e5a4a','#33493d');
+blocked[47*MAP+32]=1;
+props.push({x:32,y:47,kind:'stone'});
+blocked[53*MAP+31]=1;
+props.push({x:31,y:53,kind:'well'});
+props.push({x:29,y:51,kind:'lamp'});
+props.push({x:37,y:49,kind:'lamp'});
+props.push({x:31,y:55.6,kind:'lamp'});   // 酒場前の通り
+props.push({x:29,y:43,kind:'lamp'});     // 北の通り
+props.push({x:31,y:41,kind:'lamp'});
 
 let npcs=[
-  {x:34,y:56,kind:'merchant',name:'オババ'},
-  {x:30,y:51,kind:'elder',name:'オキナ'},
-  {x:28.2,y:58.8,kind:'okami',name:'オカミ'},     // 酒場の女将(店の前)
-  {x:33,y:47,kind:'smith',name:'カナヤマ'},       // 鍛冶屋(町の中央通り)
-  {x:25.8,y:58.4,kind:'guest',name:'トックリ'},   // 酔客の亡者
-  {x:28.2,y:44.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
+  {x:34,y:53,kind:'merchant',name:'オババ'},
+  {x:30,y:48,kind:'elder',name:'オキナ'},
+  {x:28.2,y:55.8,kind:'okami',name:'オカミ'},     // 酒場の女将(店の前)
+  {x:31.5,y:45.5,kind:'smith',name:'カナヤマ'},   // 鍛冶屋(広場の北・家に隠れない位置)
+  {x:29.5,y:56.2,kind:'guest',name:'トックリ'},   // 酔客の亡者(酒場の前の通り)
+  {x:28.2,y:41.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
 ];
 
 /* ---- 町を囲う柵と門 ---- */
-const TOWN={x0:21,y0:42,x1:42,y1:60};
+const TOWN={x0:21,y0:39,x1:42,y1:57};
 const GATES=[
-  {tiles:[[29,42],[30,42]],open:false,name:'北門'},   // 賽の森への街道
-  {tiles:[[42,49],[42,50]],open:false,name:'東門'},   // 試練の洞窟方面
-  {tiles:[[39,60],[40,60]],open:false,name:'南門'},   // 浜辺と桟橋へ
+  {tiles:[[29,39],[30,39]],open:false,name:'北門'},   // 賽の森への街道
+  {tiles:[[42,46],[42,47]],open:false,name:'東門'},   // 試練の洞窟方面
+  {tiles:[[39,57],[40,57]],open:false,name:'南門'},   // 浜辺と桟橋へ
 ];
 function gateAt(x,y){return GATES.find(g=>g.tiles.some(t=>t[0]===x&&t[1]===y));}
 (function buildFence(){
@@ -973,7 +973,7 @@ function spawnMob(type,x,y){
       spawnMob(type,Math.round(cx+Math.cos(a)*d),Math.round(cy+Math.sin(a)*d));
     }
   };
-  ring(31,36,5,8,'goblin');   // 町の柵(y42)の外側
+  ring(31,33,5,8,'goblin');   // 町の柵(y39)の外側
   ring(38,35,4,3,'goblin_red');
   ring(41,30,5,5,'wolf');  ring(22,34,5,5,'wolf');
   ring(42,16,4,4,'orc');   ring(16,24,4,4,'orc');
@@ -1273,7 +1273,7 @@ function castBolt(){
   if(player.cd.bolt>0)return;
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=8;player.cd.bolt=1.5;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=8;player.cd.bolt=0.5;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
@@ -1298,7 +1298,7 @@ function castFire(){
   const t=pickSpellTarget(7);
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=20;player.cd.fire=8;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=20;player.cd.fire=4;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
