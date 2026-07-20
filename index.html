@@ -2464,6 +2464,7 @@ loadSprite('npc_kazu','assets/npc_kazu.png');
 loadSprite('map_fence_x','assets/map_fence_x.png');
 loadSprite('map_fence_y','assets/map_fence_y.png');
 loadSprite('map_gate','assets/map_gate.png');
+loadSprite('map_gate_closed','assets/map_gate_closed.png');
 (function(){  // 武器振りエフェクト用にアイコン画像も読む
   const seen=new Set();
   for(const id in ITEMS){
@@ -3092,7 +3093,8 @@ function drawFence(sx,sy,p){
   fencePost(sx,sy,1);
 }
 function drawGate(sx,sy,p){
-  const g=p.g,img=SPRITES.map_gate;
+  const g=p.g,frameImg=SPRITES.map_gate,closedImg=SPRITES.map_gate_closed;
+  const img=!g.open&&closedImg?closedImg:frameImg;
   // 2タイル分の門: 両端の太い柱+閉なら扉、開なら脇に寄せた扉
   const ex=p.vert?-48:48,ey=24;   // 両端柱の画面オフセット(縦門は左右反転)
   const x1=sx-ex,y1=sy-ey,x2=sx+ex,y2=sy+ey;
@@ -3109,7 +3111,7 @@ function drawGate(sx,sy,p){
     ctx.strokeStyle='#5d4a30';ctx.lineWidth=4;
     ctx.beginPath();ctx.moveTo(x1,y1-30);ctx.lineTo(x2,y2-30);ctx.stroke();
   }
-  if(!g.open){
+  if(!g.open&&!closedImg){
     // 閉: 板戸で塞ぐ(奥行きに沿った平行四辺形、アーチの高さに合わせる)
     const dh=img?62:28;
     ctx.fillStyle='#7a6543';
@@ -3127,7 +3129,7 @@ function drawGate(sx,sy,p){
     ctx.fillStyle='rgba(0,0,0,0.18)';
     ctx.beginPath();
     ctx.moveTo(x1,y1-2);ctx.lineTo(x2,y2-2);ctx.lineTo(x2,y2+2);ctx.lineTo(x1,y1+2);ctx.closePath();ctx.fill();
-  }else{
+  }else if(g.open&&!frameImg){
     // 開: 扉を両端に畳む
     for(const [bx,by,dir] of [[x1,y1,1],[x2,y2,-1]]){
       ctx.fillStyle='#6d5a38';
