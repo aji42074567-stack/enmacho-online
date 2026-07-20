@@ -3,7 +3,10 @@ const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
 const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
-const VALID_ATTACK_KIND = new Set(['melee', 'cast']);
+const VALID_ATTACK_KIND = new Set([
+  'melee', 'bolt', 'fire', 'heal',
+  'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
+]);
 
 const newSessionId = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -31,6 +34,10 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
   if (!Number.isFinite(x) || !Number.isFinite(y) || x < -2 || x > 74 || y < -2 || y > 74) {
     return null;
   }
+  const rawTargetX = cleanNumber(raw.targetX, x);
+  const rawTargetY = cleanNumber(raw.targetY, y);
+  const targetX = rawTargetX >= -2 && rawTargetX <= 74 ? rawTargetX : x;
+  const targetY = rawTargetY >= -2 && rawTargetY <= 74 ? rawTargetY : y;
 
   return {
     userId,
@@ -46,6 +53,8 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     dead: Boolean(raw.dead),
     attackSeq: Math.max(0, Math.trunc(cleanNumber(raw.attackSeq, 0))),
     attackKind: VALID_ATTACK_KIND.has(raw.attackKind) ? raw.attackKind : 'melee',
+    targetX,
+    targetY,
     seq: Math.max(0, Math.trunc(cleanNumber(raw.seq, 0))),
     lastSeen: Date.now(),
   };
@@ -88,6 +97,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       dead: Boolean(snapshot.dead),
       attackSeq: Math.max(0, Math.trunc(cleanNumber(snapshot.attackSeq, 0))),
       attackKind: VALID_ATTACK_KIND.has(snapshot.attackKind) ? snapshot.attackKind : 'melee',
+      targetX: Math.round(cleanNumber(snapshot.targetX, snapshot.x) * 1000) / 1000,
+      targetY: Math.round(cleanNumber(snapshot.targetY, snapshot.y) * 1000) / 1000,
       seq: ++sequence,
       sentAt: Date.now(),
     };
@@ -258,6 +269,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       Boolean(snapshot.dead),
       attackSeq,
       VALID_ATTACK_KIND.has(snapshot.attackKind) ? snapshot.attackKind : 'melee',
+      Math.round(cleanNumber(snapshot.targetX, snapshot.x) * 100),
+      Math.round(cleanNumber(snapshot.targetY, snapshot.y) * 100),
       identity.displayName,
       identity.gender,
       identity.level,

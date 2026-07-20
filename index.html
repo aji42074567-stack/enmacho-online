@@ -1191,10 +1191,11 @@ const player={
   wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
   cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
-  target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
+  target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
   combatT:0,
   autoMode:false,
   hitT:0,attackT:0,attackDur:0,pendingHit:null,attackSeq:0,attackKind:'melee',
+  actionTargetX:SPAWN.x,actionTargetY:SPAWN.y,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 const remotePlayers=new Map();
@@ -1373,7 +1374,7 @@ function spawnMob(type,x,y){
 })();
 
 /* ================= 演出・ログ ================= */
-const floats=[],sparks=[],bolts=[],corpses=[];
+const floats=[],sparks=[],bolts=[],actionFx=[],corpses=[];
 const wisps=[];   // 人魂(雰囲気演出)
 for(let i=0;i<7;i++)wisps.push({x:0,y:0,dir:rnd(0,6.28),sp:rnd(0.25,0.6),ph:rnd(0,6.28),init:false});
 let clickMark=null,banner=null;
@@ -1383,6 +1384,11 @@ function burst(x,y,color,n){
     const a=rnd(0,6.28),s=rnd(0.5,2.5);
     sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.2,age:0,color});
   }
+}
+function addActionEffect(kind,x,y,targetX=x,targetY=y){
+  const projectile=kind==='bolt'||kind==='fire';
+  actionFx.push({kind,x,y:projectile?y-0.5:y,targetX,targetY:projectile?targetY-0.4:targetY,
+    age:0,dur:projectile?(kind==='fire'?0.48:0.38):kind==='heal'?1.05:0.82});
 }
 const logEl=document.getElementById('log');
 function log(txt,cls){
@@ -1702,9 +1708,11 @@ function faceToward(e,t){
   const sdx=dx-dy,sdy=dx+dy;  // 画面上の見た目の方向(アイソメ変換)
   e.dir=Math.abs(sdx)>Math.abs(sdy)?(sdx>=0?'right':'left'):(sdy>=0?'down':'up');
 }
-function signalPlayerAttack(kind){
+function signalPlayerAction(kind,target=player){
   player.attackSeq=(player.attackSeq||0)+1;
-  player.attackKind=kind==='cast'?'cast':'melee';
+  player.attackKind=kind;
+  player.actionTargetX=Number.isFinite(target?.x)?target.x:player.x;
+  player.actionTargetY=Number.isFinite(target?.y)?target.y:player.y;
 }
 function playerAttack(){
   // 振りかぶり→0.3秒後にヒット判定(リネ風の「間」)
@@ -1713,7 +1721,7 @@ function playerAttack(){
   player.attackT=0;player.attackDur=0.62;
   player.swingKind='melee';
   faceToward(player,m);
-  signalPlayerAttack('melee');
+  signalPlayerAction('melee',m);
   player.pendingHit=m;
   sfx.swing();
 }
@@ -1730,9 +1738,10 @@ function castBolt(){
   if(player.cd.bolt>0)return;
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=8;player.cd.bolt=0.5;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=8;player.cd.bolt=0.5;player.target=t;
+  player.swing=0.25;player.swingMax=0.25;player.swingKind='cast';
   faceToward(player,t);
-  signalPlayerAttack('cast');
+  signalPlayerAction('bolt',t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
 }
@@ -1743,9 +1752,12 @@ function castHeal(){
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
   player.mp-=12;player.cd.heal=3;
+  player.swing=0.32;player.swingMax=0.32;player.swingKind='cast';
+  signalPlayerAction('heal');
   const n=45+7*player.lv;
   player.hp=Math.min(player.maxHp,player.hp+n);
   addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
+  addActionEffect('heal',player.x,player.y);
   burst(player.x,player.y,'#7fe07f',12);
   sfx.heal();
 }
@@ -1756,9 +1768,10 @@ function castFire(){
   const t=pickSpellTarget(7);
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=20;player.cd.fire=4;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=20;player.cd.fire=4;player.target=t;
+  player.swing=0.25;player.swingMax=0.25;player.swingKind='cast';
   faceToward(player,t);
-  signalPlayerAttack('cast');
+  signalPlayerAction('fire',t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
 }
@@ -1772,7 +1785,10 @@ function drinkPotion(tier=player.potionTier){
   player[p.field]--;
   player.hp+=healed;
   player.cd.potion=p.delay;
+  player.swing=0.36;player.swingMax=0.36;player.swingKind='use';
+  signalPlayerAction(`potion_${tier}`);
   addFloat(player.x,player.y-0.6,'+'+Math.ceil(healed),'#7fe07f');
+  addActionEffect(`potion_${tier}`,player.x,player.y);
   burst(player.x,player.y,'#7fe07f',10);
   sfx.potion();save();
 }
@@ -1781,7 +1797,10 @@ function drinkHaste(){
   if(player.hastePots<=0){log('韋駄天の水がない','sys');return;}
   if(player.hasteT>0){log('すでに韋駄天の加護がある','sys');return;}
   player.hastePots--;player.hasteT=300;
+  player.swing=0.36;player.swingMax=0.36;player.swingKind='use';
+  signalPlayerAction('haste');
   addFloat(player.x,player.y-0.6,'韋駄天！','#9fe0ff');
+  addActionEffect('haste',player.x,player.y);
   burst(player.x,player.y,'#9fe0ff',12);
   sfx.potion();save();
 }
@@ -1790,7 +1809,10 @@ function drinkCrit(){
   if(player.critPots<=0){log('修羅の酒がない','sys');return;}
   if(player.critT>0){log('すでに修羅の血が滾っている','sys');return;}
   player.critPots--;player.critT=300;
+  player.swing=0.36;player.swingMax=0.36;player.swingKind='use';
+  signalPlayerAction('crit');
   addFloat(player.x,player.y-0.6,'修羅！','#ffb46a');
+  addActionEffect('crit',player.x,player.y);
   burst(player.x,player.y,'#ffb46a',12);
   sfx.potion();save();
 }
@@ -2380,15 +2402,34 @@ function updateRemotePlayers(dt){
     e.moving=!e.dead&&e.attackDur<=0&&(e.remoteMoving||d>=0.015);
   }
 }
-function playRemoteAttackPose(e,kind){
+function playRemoteActionPose(e,kind){
   e.moving=false;
-  if(kind==='cast'){
+  if(kind==='bolt'||kind==='fire'||kind==='heal'){
     e.attackT=0;e.attackDur=0;
-    e.swing=0.32;e.swingKind='cast';
+    e.swing=0.38;e.swingMax=0.38;e.swingKind='cast';
+  }else if(String(kind).startsWith('potion_')||kind==='haste'||kind==='crit'){
+    e.attackT=0;e.attackDur=0;
+    e.swing=0.42;e.swingMax=0.42;e.swingKind='use';
   }else{
     e.swing=0;
     e.attackT=0;e.attackDur=0.7;e.swingKind='melee';
   }
+}
+function playRemoteActionEffect(e,raw){
+  const kind=String(raw.attackKind||'melee'),seq=Math.max(0,raw.attackSeq|0);
+  if(kind==='melee'||seq===e.lastEffectSeq)return;
+  e.lastEffectSeq=seq;
+  const targetX=Number.isFinite(raw.targetX)?raw.targetX:e.x;
+  const targetY=Number.isFinite(raw.targetY)?raw.targetY:e.y;
+  addActionEffect(kind,e.x,e.y,targetX,targetY);
+  if(kind==='heal')addFloat(e.x,e.y-0.65,'回向','#8ff0a0');
+  else if(String(kind).startsWith('potion_'))addFloat(e.x,e.y-0.65,'甘露','#8ff0a0');
+  else if(kind==='haste')addFloat(e.x,e.y-0.65,'韋駄天','#9fe0ff');
+  else if(kind==='crit')addFloat(e.x,e.y-0.65,'修羅','#ffb46a');
+}
+function playRemoteAction(e,raw){
+  playRemoteActionPose(e,raw.attackKind);
+  playRemoteActionEffect(e,raw);
 }
 function update(dt){
   time+=dt;
@@ -2570,6 +2611,8 @@ function update(dt){
   for(let i=bolts.length-1;i>=0;i--)if(bolts[i].done)bolts.splice(i,1);
   for(const f of floats)f.age+=dt;
   for(let i=floats.length-1;i>=0;i--)if(floats[i].age>1)floats.splice(i,1);
+  for(const fx of actionFx)fx.age+=dt;
+  for(let i=actionFx.length-1;i>=0;i--)if(actionFx[i].age>actionFx[i].dur)actionFx.splice(i,1);
   for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=3*dt;}
   for(let i=sparks.length-1;i>=0;i--)if(sparks[i].age>0.7)sparks.splice(i,1);
   for(const c of corpses)c.age+=dt;
@@ -3040,7 +3083,7 @@ function switchZone(z,px,py){
   if(started&&!ground._groundReady){
     if(zone==='field')renderGround();else renderGroundCave();
   }
-  corpses.length=0;bolts.length=0;
+  corpses.length=0;bolts.length=0;actionFx.length=0;
   player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
   player.attackDur=0;player.attackT=0;player.combatT=0;
   player.x=px;player.y=py;camInit=false;
@@ -3237,8 +3280,13 @@ function drawPlayer(sx,sy,e){
     const fr=Math.floor((e.walkT||0)*2.6)%4;
     ctx.drawImage(walkS,fr*F,row*F,F,F,-D/2,-D+3,D,D);
   }else{
-    const t2=e.swing>0?(0.25-e.swing)/0.25:-1;   // 印を結ぶ身振り(詠唱)
+    const swingMax=e.swingMax||0.25;
+    const t2=e.swing>0?clamp(1-e.swing/swingMax,0,1):-1;   // 印・道具を使う身振り
     if(t2>=0&&e.swingKind==='cast')ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t2*Math.PI)*0.12);
+    if(t2>=0&&e.swingKind==='use'){
+      ctx.translate(0,-Math.sin(t2*Math.PI)*2.5);
+      ctx.rotate((e.dir==='left'?-1:1)*Math.sin(t2*Math.PI)*0.07);
+    }
     if(base)ctx.drawImage(base,row*F,0,F,F,-D/2,-D+3,D,D);
     else ctx.drawImage(walkS,F,row*F,F,F,-D/2,-D+3,D,D);
   }
@@ -3261,6 +3309,62 @@ function drawRemotePlayerLabel(sx,sy,e){
   ctx.fillStyle='#79c783';
   const textWidth=Math.min(128,ctx.measureText(name).width);
   ctx.beginPath();ctx.arc(sx-textWidth/2-5,sy-55,2.3,0,6.29);ctx.fill();
+}
+function drawActionEffect(fx){
+  const p=clamp(fx.age/fx.dur,0,1),projectile=fx.kind==='bolt'||fx.kind==='fire';
+  const effectX=(x,y)=>isoX(x,y)-camX+W/2;
+  const effectY=(x,y)=>isoY(x,y)-camY+H/2;
+  // 一部のスマホGPUでは加算合成中のCanvas更新が残像化するため、通常合成で描く。
+  ctx.save();
+  if(projectile){
+    const travel=Math.min(1,p/0.72),ease=1-Math.pow(1-travel,2);
+    const x=fx.x+(fx.targetX-fx.x)*ease,y=fx.y+(fx.targetY-fx.y)*ease;
+    const sx=effectX(x,y),sy=effectY(x,y)-(zone==='field'?ELEV_PX*elevF(x,y):0);
+    const tx=effectX(fx.targetX,fx.targetY),ty=effectY(fx.targetX,fx.targetY)
+      -(zone==='field'?ELEV_PX*elevF(fx.targetX,fx.targetY):0);
+    const color=fx.kind==='fire'?'255,116,46':'105,174,255';
+    const impact=clamp((p-0.68)/0.32,0,1),orbAlpha=1-impact;
+    for(let i=3;i>=1;i--){
+      const back=i*4,dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy)||1;
+      ctx.fillStyle=`rgba(${color},${orbAlpha*(0.15+i*0.08)})`;
+      ctx.beginPath();ctx.arc(sx-dx/d*back,sy-dy/d*back,2+i*0.7,0,6.29);ctx.fill();
+    }
+    const glow=ctx.createRadialGradient(sx,sy,0,sx,sy,fx.kind==='fire'?14:11);
+    glow.addColorStop(0,`rgba(255,255,235,${orbAlpha})`);
+    glow.addColorStop(0.4,`rgba(${color},${orbAlpha*0.9})`);
+    glow.addColorStop(1,`rgba(${color},0)`);
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(sx,sy,fx.kind==='fire'?14:11,0,6.29);ctx.fill();
+    if(impact>0){
+      ctx.strokeStyle=`rgba(${color},${1-impact})`;ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(tx,ty,5+impact*(fx.kind==='fire'?24:15),0,6.29);ctx.stroke();
+    }
+    ctx.restore();return;
+  }
+
+  const sx=effectX(fx.x,fx.y),sy=effectY(fx.x,fx.y)
+    -(zone==='field'?ELEV_PX*elevF(fx.x,fx.y):0);
+  const heal=fx.kind==='heal',haste=fx.kind==='haste',crit=fx.kind==='crit';
+  const rgb=haste?'105,204,255':crit?'255,137,66':'101,232,139';
+  const alpha=Math.sin(Math.PI*p),radius=(heal?11:8)+(heal?22:15)*p;
+  ctx.strokeStyle=`rgba(${rgb},${alpha*0.8})`;ctx.lineWidth=heal?3:2;
+  ctx.beginPath();ctx.ellipse(sx,sy-2,radius,radius*0.36,0,0,6.29);ctx.stroke();
+  ctx.strokeStyle=`rgba(235,255,225,${alpha*0.38})`;ctx.lineWidth=1;
+  ctx.beginPath();ctx.ellipse(sx,sy-2,radius*0.68,radius*0.22,0,0,6.29);ctx.stroke();
+  const count=heal?7:4,lift=heal?46:30;
+  for(let i=0;i<count;i++){
+    const q=(p+i/count)%1,px=sx+Math.sin(i*2.2+time*3.5)*(heal?13:9)*(1-q*.25);
+    const py=sy-5-q*lift,r=heal?2.2:1.8;
+    ctx.fillStyle=`rgba(${rgb},${alpha*(1-q)*0.9})`;
+    ctx.beginPath();ctx.arc(px,py,r+(1-q)*1.2,0,6.29);ctx.fill();
+    if(heal){ctx.fillRect(px-0.8,py-8,1.6,9);}
+  }
+  if(heal){
+    const py=sy-32-p*5;
+    ctx.strokeStyle=`rgba(225,255,218,${alpha*0.9})`;ctx.lineWidth=3;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(sx,py-7);ctx.lineTo(sx,py+7);
+    ctx.moveTo(sx-7,py);ctx.lineTo(sx+7,py);ctx.stroke();
+  }
+  ctx.restore();
 }
 function drawPlayerCorpse(sx,sy,e){
   const img=SPRITES['player_'+(e.gender||'m')+'_death'];
@@ -4141,6 +4245,7 @@ function render(){
     ctx.fillStyle=g;
     ctx.beginPath();ctx.arc(sx,sy,fire?11:8,0,6.29);ctx.fill();
   }
+  for(const fx of actionFx)drawActionEffect(fx);
   for(const s of sparks){
     const a=1-s.age/0.7;
     ctx.fillStyle=s.color;ctx.globalAlpha=Math.max(0,a);
@@ -4607,6 +4712,8 @@ window.EnmaGameBridge={
       dead:player.dead,
       attackSeq:player.attackSeq,
       attackKind:player.attackKind,
+      targetX:player.actionTargetX,
+      targetY:player.actionTargetY,
     };
   },
   getSharedWorldPlayer(){
@@ -4685,14 +4792,15 @@ window.EnmaGameBridge={
       if(!e||(sessionId&&e.sessionId!==sessionId)){
         e={x:raw.x,y:raw.y,targetX:raw.x,targetY:raw.y,walkT:0,
           attackDur:0,attackT:0,hitT:0,swing:0,swingKind:'melee',
-          lastAttackSeq:Math.max(0,raw.attackSeq|0),lastActionEventSeq:-1,sessionId,
+          lastAttackSeq:Math.max(0,raw.attackSeq|0),lastActionEventSeq:-1,
+          lastEffectSeq:-1,sessionId,
           face:1,dir:'down',moving:false};
         remotePlayers.set(id,e);
       }else{
         const attackSeq=Math.max(0,raw.attackSeq|0);
         if(attackSeq!==e.lastAttackSeq){
           e.lastAttackSeq=attackSeq;
-          playRemoteAttackPose(e,raw.attackKind);
+          playRemoteAction(e,raw);
         }
       }
       const dx=raw.x-e.targetX;
@@ -4718,7 +4826,7 @@ window.EnmaGameBridge={
     e.dir=['up','down','left','right'].includes(raw.dir)?raw.dir:e.dir;
     if(e.dir==='left')e.face=-1;else if(e.dir==='right')e.face=1;
     e.lastSeen=performance.now();
-    playRemoteAttackPose(e,raw.attackKind);
+    playRemoteAction(e,raw);
   },
 };
 document.dispatchEvent(new CustomEvent('enma-game-ready'));
