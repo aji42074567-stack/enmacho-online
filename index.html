@@ -390,6 +390,7 @@
 
   <div class="overlay hidden" id="smith">
     <div class="scroll">
+      <div id="smithPortrait" class="portrait" style="background-image:url(assets/npc_kanayama.png)"></div>
       <h2>鍛冶屋 カナヤマ</h2>
       <div class="sub">「+3までは腕の保証つき。その先は…業と相談だな」</div>
       <div id="smithList"></div>
@@ -1683,9 +1684,8 @@ for(const b of document.querySelectorAll('.mtab')){
 let okamiIdx=0,guestIdx=0;
 function setTalkPortrait(kind){
   const key=NPC_SPRITE[kind];
-  const img=key&&SPRITES[key];
   const p=$('talkPortrait');
-  if(img){p.style.backgroundImage=`url(assets/${key}.png)`;p.classList.remove('hidden');}
+  if(key){p.style.backgroundImage=`url(assets/${key}.png)`;p.classList.remove('hidden');}
   else p.classList.add('hidden');
 }
 function openNpc(npc){
