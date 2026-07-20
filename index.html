@@ -460,6 +460,10 @@ const ITEMS={
   oni_kote:    {slot:'arms',  name:'鬼鉄の籠手',  def:3, price:280,icon:'items/arms_onitetsu_kote.png'},
   waraji:      {slot:'feet',  name:'白緒の草鞋',  def:1, price:70, icon:'items/feet_shirao_waraji.png'},
   suneate:     {slot:'feet',  name:'冥鉄の脛当て',def:3, price:300,icon:'items/feet_meitetsu_suneate.png'},
+  kagenui:     {slot:'head',  name:'影縫いの頭巾',  def:2, price:0,  icon:'items/head_kagenui_hood.png'},
+  jukotsu_crown:{slot:'head', name:'獣骨の呪冠',  def:7, price:0,rare:true,icon:'items/head_jukotsu_crown.png'},
+  gokusotsu:   {slot:'body',  name:'獄卒の綿鎧',  def:8, price:0,  icon:'items/armor_gokusotsu_padded.png'},
+  kusarifuji:  {slot:'arms',  name:'鎖封じの鉄籠手',def:5, price:0,  icon:'items/arms_kusarifuji_kote.png'},
   juzu:        {slot:'acc',   name:'六道の数珠',  hpb:30,price:200},
   magatama:    {slot:'acc',   name:'蒼の勾玉',    mpb:20,price:200},
 };
@@ -477,9 +481,17 @@ const POTION_PRICE=30,HASTE_PRICE=60,CRIT_PRICE=80;
 /* ================= マップ生成 ================= */
 let blocked=new Uint8Array(MAP*MAP);
 let tileKind=new Uint8Array(MAP*MAP);   // 0草 1道 2石畳 3砂浜 4海 5洞窟床
-let zone='field',FIELD=null,CAVE=null;
+let zone='field',FIELD=null,CAVE=null,CAVE2=null,CAVE3=null;
 const CAVE_DOOR={x:50.5,y:21.8};   // 試練の洞窟の入口(フィールド東)
 const CAVE_TRIG={x:49.2,y:23.2};   // ここに触れると洞窟へ
+// 階層間の階段(from階のat地点に触れるとto階のentryへ)
+const CAVE_LINKS=[
+  {from:'cave', at:{x:52,y:35.5}, to:'cave2',entry:{x:14.5,y:30},  kind:'stairdown'},
+  {from:'cave2',at:{x:12.5,y:30}, to:'cave', entry:{x:50.3,y:34.8},kind:'stairup'},
+  {from:'cave2',at:{x:51,y:19.5}, to:'cave3',entry:{x:14.5,y:31},  kind:'stairdown'},
+  {from:'cave3',at:{x:12.5,y:31}, to:'cave2',entry:{x:49.5,y:21},  kind:'stairup'},
+];
+const CAVE_DEPTH={cave:1,cave2:2,cave3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
@@ -891,9 +903,14 @@ const MOBS={
   orc:     {name:'アッキ',      lv:5,hp:95, dmg:[10,16],xp:62, gold:[12,26], speed:1.9,aggro:4.2,atkCd:1.9,size:1},
   skeleton:{name:'ガシャドクロ',lv:7,hp:150,dmg:[14,22],xp:120,gold:[30,60], speed:1.6,aggro:4.0,atkCd:1.8,size:1.05},
   oni_blue:{name:'アオオニ',    lv:8,hp:380,dmg:[16,26],xp:300,gold:[80,140], speed:2.0,aggro:5.5,atkCd:1.7,size:1.15,bar:72},
+  dark_dog:{name:'ヤミイヌガミ',lv:9, hp:200,dmg:[17,27],xp:170,gold:[30,55], speed:2.5,aggro:5.0,atkCd:1.5,size:.95,tint:'hue-rotate(230deg) brightness(0.72)'},
+  oni_bone:{name:'オニビドクロ',lv:11,hp:290,dmg:[21,32],xp:260,gold:[50,90], speed:1.7,aggro:4.5,atkCd:1.8,size:1.1,tint:'hue-rotate(150deg) brightness(0.85)'},
+  gozu:    {name:'ゴズ',        lv:13,hp:420,dmg:[26,40],xp:380,gold:[70,120],speed:1.9,aggro:4.8,atkCd:1.9,size:1.15,tint:'hue-rotate(315deg) saturate(1.4) brightness(0.8)'},
+  oni_king:{name:'オニオウ',    lv:16,hp:2600,dmg:[34,52],xp:1400,gold:[300,450],speed:2.0,aggro:6.0,atkCd:1.8,size:1.55,bar:96,boss:true},
   drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[80,180],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
-const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1]};
+const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1],
+  dark_dog:['kagenui',0.08],oni_bone:['gokusotsu',0.07],gozu:['kusarifuji',0.08],oni_king:['jukotsu_crown',0.35]};
 const DRAGON_BLOOD_DROP_RATE=0.07;
 let mobs=[];
 function spawnMob(type,x,y){
@@ -1147,7 +1164,8 @@ function killMob(m){
   }
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
-  if(m.def.boss){banner={txt:'ゴウリュウ鎮魂！',age:0};log('賽の森が静まりかえった…(90秒後にまた迷い出る)','sys');}
+  if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};
+    log(m.type==='drake'?'賽の森が静まりかえった…(90秒後にまた迷い出る)':'洞窟の最深部が静まりかえった…(90秒後にまた迷い出る)','sys');}
   questProgress('kill',m.type);
   if(m.type==='oni_blue'&&player.quests.trial<2){
     player.quests.trial=2;
@@ -1679,6 +1697,12 @@ function update(dt){
       switchZone('cave',CAVE_ENTRY.x,CAVE_ENTRY.y);
     }else if(zone==='cave'&&dist(player,CAVE_EXIT)<0.8){
       switchZone('field',CAVE_TRIG.x-1.2,CAVE_TRIG.y+1.4);
+    }else{
+      for(const L of CAVE_LINKS){
+        if(zone===L.from&&dist(player,L.at)<0.9){
+          switchZone(L.to,L.entry.x,L.entry.y);break;
+        }
+      }
     }
     const inVillage=zone==='field'&&dist(player,SPAWN)<6.5;
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2));
@@ -1789,7 +1813,7 @@ function loadCaveTile(key,src){
   img.onload=()=>{
     groundTiles[key]=img;
     renderGround();               // 岩山の崖・高台にも使うのでフィールドも再描画
-    if(CAVE)renderGroundCave();
+    for(const w of [CAVE,CAVE2,CAVE3])if(w)renderGroundCave(w);
   };
   img.src=src;
 }
@@ -2007,9 +2031,9 @@ function renderGround(){
 renderGround();
 
 /* ================= 洞窟(最初の試練)とゾーン切替 ================= */
-function renderGroundCave(){
-  const tgt=CAVE?CAVE.ground:ground;   // 画像の遅延読み込み後も洞窟側へ描く
-  const tkC=CAVE?CAVE.tileKind:tileKind;
+function renderGroundCave(world){
+  const tgt=world?world.ground:ground;   // 画像の遅延読み込み後も洞窟側へ描く
+  const tkC=world?world.tileKind:tileKind;
   const gW=MAP*TW+TW,gH=MAP*TH+TH*2;
   tgt.width=gW;tgt.height=gH;
   const g=tgt.getContext('2d');
@@ -2072,23 +2096,73 @@ function buildCave(){
     props.push({x:tx,y:ty,kind:'torch'});
   }
   props.push({x:CAVE_EXIT.x-0.6,y:CAVE_EXIT.y,kind:'cavexit'});
+  props.push({x:CAVE_LINKS[0].at.x,y:CAVE_LINKS[0].at.y,kind:'stairdown'});
   spawnMob('skeleton',30,27);spawnMob('skeleton',33,33);spawnMob('skeleton',28,31);
   spawnMob('skeleton',43,26);spawnMob('skeleton',44,35);
   spawnMob('oni_blue',49,30);   // 洞窟の主
   ground=document.createElement('canvas');
-  renderGroundCave();
   CAVE={blocked,tileKind,props,npcs,mobs,ground};
+  renderGroundCave(CAVE);
+}
+function buildCave2(){
+  blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+  tileKind=new Uint8Array(MAP*MAP);
+  props=[];npcs=[];mobs=[];
+  const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*MAP+x]=0;tileKind[y*MAP+x]=5;}};
+  carve(11,27,17,33);   // 階段の間
+  carve(17,29,25,31);   // 西通路
+  carve(25,24,35,36);   // 大広間
+  carve(35,29,41,31);   // 東通路
+  carve(41,25,49,35);   // 東の間
+  carve(45,17,53,25);   // 北東の間(下り階段)
+  for(const [tx,ty] of [[11,27],[11,33],[17,29],[25,24],[25,36],[35,29],[41,25],[41,35],[45,17],[53,17],[53,25],[49,35]]){
+    props.push({x:tx,y:ty,kind:'torch'});
+  }
+  props.push({x:CAVE_LINKS[1].at.x,y:CAVE_LINKS[1].at.y,kind:'stairup'});
+  props.push({x:CAVE_LINKS[2].at.x,y:CAVE_LINKS[2].at.y,kind:'stairdown'});
+  spawnMob('dark_dog',28,27);spawnMob('dark_dog',33,33);spawnMob('dark_dog',30,31);spawnMob('dark_dog',44,33);
+  spawnMob('oni_bone',43,27);spawnMob('oni_bone',47,31);spawnMob('oni_bone',48,20);
+  ground=document.createElement('canvas');
+  CAVE2={blocked,tileKind,props,npcs,mobs,ground};
+  renderGroundCave(CAVE2);
+}
+function buildCave3(){
+  blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+  tileKind=new Uint8Array(MAP*MAP);
+  props=[];npcs=[];mobs=[];
+  const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*MAP+x]=0;tileKind[y*MAP+x]=5;}};
+  carve(11,28,17,34);   // 階段の間
+  carve(17,30,27,32);   // 通路
+  carve(27,24,39,38);   // 罪火の広間
+  carve(39,28,43,32);   // 王の間への通路
+  carve(43,22,55,38);   // 王の間
+  for(const [tx,ty] of [[11,28],[11,34],[17,30],[27,24],[27,38],[39,28],[39,32],[43,22],[43,38],[49,22],[49,38],[55,22],[55,38]]){
+    props.push({x:tx,y:ty,kind:'torch'});
+  }
+  props.push({x:CAVE_LINKS[3].at.x,y:CAVE_LINKS[3].at.y,kind:'stairup'});
+  spawnMob('gozu',30,27);spawnMob('gozu',36,35);spawnMob('gozu',33,31);spawnMob('gozu',45,25);
+  spawnMob('oni_bone',31,35);spawnMob('oni_bone',37,26);
+  spawnMob('oni_king',51,30);   // 最深部の主
+  ground=document.createElement('canvas');
+  CAVE3={blocked,tileKind,props,npcs,mobs,ground};
+  renderGroundCave(CAVE3);
 }
 function switchZone(z,px,py){
   zone=z;
-  const W2=z==='cave'?CAVE:FIELD;
+  const W2={field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z];
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
   corpses.length=0;bolts.length=0;
   player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
   player.attackDur=0;player.attackT=0;
   player.x=px;player.y=py;camInit=false;
-  if(started)log(z==='cave'?'試練の洞窟に足を踏み入れた…':'賽の森へ戻ってきた','sys');
+  const ZMSG={
+    field:'賽の森へ戻ってきた',
+    cave:'試練の洞窟に足を踏み入れた…',
+    cave2:'地下二層へ降りた。空気が冷たく、重い…',
+    cave3:'地下三層——最深部。奥で何かが待っている…',
+  };
+  if(started)log(ZMSG[z],'sys');
 }
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
@@ -2272,9 +2346,9 @@ function drawCorpse(sx,sy,c){
   const fake={type:c.type,def:MOBS[c.type],moving:false,face:c.face,phase:0,swing:0};
   switch(c.type){
     case 'goblin':case 'goblin_red':drawGoblin(0,0,fake);break;
-    case 'wolf':drawWolf(0,0,fake);break;
-    case 'orc':case 'oni_blue':drawOrc(0,0,fake);break;
-    case 'skeleton':drawSkeleton(0,0,fake);break;
+    case 'wolf':case 'dark_dog':drawWolf(0,0,fake);break;
+    case 'orc':case 'oni_blue':case 'gozu':case 'oni_king':drawOrc(0,0,fake);break;
+    case 'skeleton':case 'oni_bone':drawSkeleton(0,0,fake);break;
     case 'drake':drawDrake(0,0,fake);break;
   }
   ctx.restore();
@@ -2289,6 +2363,7 @@ function drawMobImg(sx,sy,m,key){
   const t=m.swing>0?(0.35-m.swing)/0.35:-1;
   const atk=SPRITES[key+'_attack'];
   ctx.save();
+  if(m.def.tint)ctx.filter=m.def.tint;   // 色変え(深層の強化種)
   ctx.translate(sx,sy-(m.moving?Math.abs(Math.sin((m.walkT||0)*7))*2:0));
   if(m.face>=0)ctx.scale(-1,1);   // 元画像は左向き
   if(t>=0&&atk){
@@ -2332,6 +2407,7 @@ function drawGoblin(sx,sy,m){
 }
 function drawWolf(sx,sy,m){
   if(drawMobImg(sx,sy,m,'mob_wolf'))return;
+  // 以下は画像なし時のコード描画フォールバック
   const s=m.def.size,bob=m.moving?Math.sin(time*16+m.phase)*1.2:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,10*s);
@@ -2350,7 +2426,7 @@ function drawWolf(sx,sy,m){
   ctx.restore();
 }
 function drawOrc(sx,sy,m){
-  if(drawMobImg(sx,sy,m,m.type==='oni_blue'?'mob_orc_blue':'mob_orc'))return;
+  if(drawMobImg(sx,sy,m,(m.type==='oni_blue'||m.type==='oni_king')?'mob_orc_blue':'mob_orc'))return;
   const s=m.def.size,bob=m.moving?Math.sin(time*10+m.phase)*1.5:0;
   const y=sy+bob;
   drawShadow(sx,sy+2,11*s);
@@ -2733,6 +2809,28 @@ function drawCaveExit(sx,sy){
   ctx.fillText('出口',0,8);
   ctx.restore();
 }
+function drawStairs(sx,sy,down){
+  // 下り=奥へ沈む暗い段差、上り=手前へ上がる明るい段差
+  ctx.save();ctx.translate(sx,sy);
+  const p2=0.5+Math.sin(time*2.4)*0.3;
+  const col=down?'255,120,80':'150,210,255';
+  const g3=ctx.createRadialGradient(0,-8,0,0,-8,42);
+  g3.addColorStop(0,`rgba(${col},${0.16+p2*0.12})`);g3.addColorStop(1,`rgba(${col},0)`);
+  ctx.fillStyle=g3;ctx.fillRect(-46,-52,92,66);
+  for(let i=0;i<4;i++){
+    const w=26-i*5,t=down?-i*5:-(3-i)*5;
+    ctx.fillStyle=down?`rgb(${34-i*6},${30-i*5},${30-i*5})`:`rgb(${28+i*9},${27+i*9},${32+i*9})`;
+    ctx.beginPath();
+    ctx.moveTo(0,t-7);ctx.lineTo(w,t);ctx.lineTo(0,t+7);ctx.lineTo(-w,t);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=1;ctx.stroke();
+  }
+  if(down){ctx.fillStyle='#090607';
+    ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(9,-17);ctx.lineTo(0,-12);ctx.lineTo(-9,-17);ctx.closePath();ctx.fill();}
+  ctx.fillStyle=down?'#ffb9a0':'#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
+  ctx.fillText(down?'下り階段':'上り階段',0,20);
+  ctx.restore();
+}
 function fencePost(px,py,s){
   ctx.fillStyle='#4a3a26';
   ctx.fillRect(px-2.5*s,py-24*s,5*s,24*s);
@@ -2949,6 +3047,8 @@ function render(){
       case 'sundry':drawSundry(sx,sy,it.o);break;
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
+      case 'stairdown':drawStairs(sx,sy,true);break;
+      case 'stairup':drawStairs(sx,sy,false);break;
       case 'stone':drawStone(sx,sy);break;
       case 'house':case 'shop':case 'tavern':drawHouse(sx,sy,it.o);break;
       case 'fence':drawFence(sx,sy,it.o);break;
@@ -2958,9 +3058,9 @@ function render(){
       case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
       case 'corpse':drawCorpse(sx,sy,it.o);break;
       case 'goblin':case 'goblin_red':drawGoblin(sx,sy,it.o);break;
-      case 'wolf':drawWolf(sx,sy,it.o);break;
-      case 'orc':case 'oni_blue':drawOrc(sx,sy,it.o);break;
-      case 'skeleton':drawSkeleton(sx,sy,it.o);break;
+      case 'wolf':case 'dark_dog':drawWolf(sx,sy,it.o);break;
+      case 'orc':case 'oni_blue':case 'gozu':case 'oni_king':drawOrc(sx,sy,it.o);break;
+      case 'skeleton':case 'oni_bone':drawSkeleton(sx,sy,it.o);break;
       case 'drake':drawDrake(sx,sy,it.o);break;
     }
     if(it.o.def&&it.o.flash>0&&it.k!=='corpse'){  // 被弾の白フラッシュ
@@ -3053,9 +3153,9 @@ function render(){
   const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.max(W,H)*0.75);
   vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(4,6,12,0.55)');
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
-  if(zone==='cave'){  // 洞窟はさらに暗く
+  if(CAVE_DEPTH[zone]){  // 洞窟はさらに暗く(深いほど濃く)
     const cv=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.22,W/2,H/2,Math.max(W,H)*0.7);
-    cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,'rgba(2,3,8,0.5)');
+    cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${0.38+CAVE_DEPTH[zone]*0.12})`);
     ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
   }
 }
@@ -3296,7 +3396,7 @@ $('resetConfirmBtn').addEventListener('click',()=>{
 });
 $('reviveBtn').addEventListener('click',()=>{
   player.dead=false;
-  if(zone==='cave')switchZone('field',SPAWN.x,SPAWN.y);
+  if(zone!=='field')switchZone('field',SPAWN.x,SPAWN.y);
   player.x=SPAWN.x;player.y=SPAWN.y;
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;
@@ -3309,6 +3409,8 @@ $('reviveBtn').addEventListener('click',()=>{
 /* ================= 起動 ================= */
 FIELD={blocked,tileKind,props,npcs,mobs,ground};
 buildCave();
+buildCave2();
+buildCave3();
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
 if(hasSaveData){
