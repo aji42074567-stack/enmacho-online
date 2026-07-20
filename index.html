@@ -78,6 +78,9 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:0}
   .skill:hover{border-color:#6b5730}
+  .cdov{position:absolute;inset:0;background:rgba(8,6,4,0.6);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:bold;color:#ffd97a;pointer-events:none}
   .skill:active{transform:translateY(1px)}
   .skill:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   .skill .icon{font-size:18px;line-height:1}
@@ -287,14 +290,17 @@
     <div id="skills">
       <button class="skill" id="btnBolt" title="破魔の印 (E) MP8">
         <span class="key">E</span><span class="icon">✦</span><span>破魔</span>
+        <span class="cdov hidden" id="cdBolt"></span>
       </button>
       <button class="skill" id="btnHeal" title="回向の印 (R) MP12 / 徳位3で習得">
         <span class="key">R</span><span class="icon">✚</span><span>回向</span>
         <span class="lock hidden" id="lockHeal">徳3</span>
+        <span class="cdov hidden" id="cdHeal"></span>
       </button>
       <button class="skill" id="btnFire" title="業火の印 (F) MP20 / 徳位6で習得">
         <span class="key">F</span><span class="icon">🔥</span><span>業火</span>
         <span class="lock hidden" id="lockFire">徳6</span>
+        <span class="cdov hidden" id="cdFire"></span>
       </button>
       <button class="skill" id="btnPotion" title="甘露水 (Q)">
         <span class="key">Q</span><span class="icon item-icon"><img src="assets/items/potion_kanro.png" alt=""></span><span>回復</span>
@@ -812,6 +818,8 @@ const player={
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
+  plus:{},                                  // 武器の強化値 {武器id:+n}
+  cd:{bolt:0,heal:0,fire:0},                // 印のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
@@ -820,7 +828,14 @@ let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
-const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk+(player.foodAtkT>0?4:0);
+const weaponPlus=id=>player.plus[id]||0;
+const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)+(player.foodAtkT>0?4:0);
+const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'');};
+/* ---- 武器強化 ---- */
+const ENH_MAX=9;
+const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
+const enhCost=n=>n*50;
+const enhNeedsBlood=n=>n>=7;
 const defTotal=()=>eqSum('def')+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
 const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
 const spellMul=()=>1+0.06*ST().int;
@@ -843,7 +858,7 @@ function save(){
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
-      quests:player.quests,qb:player.qb
+      quests:player.quests,qb:player.qb,plus:player.plus
     }));
   }catch(e){}
 }
@@ -882,6 +897,7 @@ function load(){
       ?{active:(d.qb.active&&questById(d.qb.active))?d.qb.active:null,
         prog:d.qb.prog|0,done:d.qb.done&&typeof d.qb.done==='object'?d.qb.done:{}}
       :{active:null,prog:0,done:{}};
+    player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -1215,9 +1231,10 @@ function pickSpellTarget(range){
 function castBolt(){
   if(player.dead||!started)return;
   const t=pickSpellTarget(7);
+  if(player.cd.bolt>0)return;
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<8){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=8;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=8;player.cd.bolt=1.5;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt'});
   sfx.bolt();
@@ -1225,9 +1242,10 @@ function castBolt(){
 function castHeal(){
   if(player.dead||!started)return;
   if(player.lv<3){log('印「回向」は徳位3で授かる','sys');return;}
+  if(player.cd.heal>0)return;
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
-  player.mp-=12;
+  player.mp-=12;player.cd.heal=3;
   const n=45+7*player.lv+8*ST().int;
   player.hp=Math.min(player.maxHp,player.hp+n);
   addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
@@ -1237,10 +1255,11 @@ function castHeal(){
 function castFire(){
   if(player.dead||!started)return;
   if(player.lv<6){log('印「業火」は徳位6で授かる','sys');return;}
+  if(player.cd.fire>0)return;
   const t=pickSpellTarget(7);
   if(!t){log('射程内に迷える魂がいない','sys');return;}
   if(player.mp<20){log('霊力(MP)が足りない','sys');return;}
-  player.mp-=20;player.target=t;player.swing=0.25;player.swingKind='cast';
+  player.mp-=20;player.cd.fire=8;player.target=t;player.swing=0.25;player.swingKind='cast';
   faceToward(player,t);
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
@@ -1322,11 +1341,50 @@ function renderShop(){
       <span class="pr">${it.price} モン</span>
       <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
   }
+  // ---- 鍛冶(武器強化) ----
+  const wid=player.eq.weapon,wit=ITEMS[wid],cur=weaponPlus(wid);
+  html+=`<h2 style="margin-top:14px">オババの鍛冶場</h2>
+    <div class="sub">「+3までは腕の保証つき。その先は…業と相談だね」</div>`;
+  if(cur>=ENH_MAX){
+    html+=`<div class="itemrow"><span class="nm">${esc(dispName(wid))} <span class="fx">これ以上は強化できない</span></span></div>`;
+  }else{
+    const nx=cur+1,rate=ENH_RATE[nx-1],cost=enhCost(nx),blood=enhNeedsBlood(nx);
+    const lack=player.gold<cost||(blood&&player.dragonBlood<1);
+    html+=`<div class="itemrow"><img class="icn" src="assets/${wit.icon}" alt="">
+      <span class="nm">${esc(dispName(wid))} → +${nx} <span class="fx">成功${Math.round(rate*100)}%${rate<1?' / 失敗で+0に戻る':''}</span></span>
+      <span class="pr">${cost}モン${blood?' + 竜の血1':''}</span>
+      <button class="buyb" data-enh="1" ${lack?'disabled':''}>強化</button></div>`;
+    if(blood)html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個</div>`;
+  }
   list.innerHTML=html;
   $('shopGold').textContent=player.gold;
   for(const b of list.querySelectorAll('[data-buy]')){
     b.addEventListener('click',()=>buy(b.getAttribute('data-buy')));
   }
+  const eb=list.querySelector('[data-enh]');
+  if(eb)eb.addEventListener('click',enhance);
+}
+function enhance(){
+  const wid=player.eq.weapon,cur=weaponPlus(wid);
+  if(cur>=ENH_MAX)return;
+  const nx=cur+1,rate=ENH_RATE[nx-1],cost=enhCost(nx),blood=enhNeedsBlood(nx);
+  if(player.gold<cost||(blood&&player.dragonBlood<1))return;
+  player.gold-=cost;
+  if(blood)player.dragonBlood--;
+  if(Math.random()<rate){
+    player.plus[wid]=nx;
+    log(`${dispName(wid)}に強化成功！ 攻撃+${nx}`,'gain');
+    addFloat(player.x,player.y-0.8,`+${nx} 成功！`,'#ffe27a',true);
+    burst(player.x,player.y,'#ffe27a',16);
+    sfx.coin();
+  }else{
+    delete player.plus[wid];
+    log(`強化失敗… ${ITEMS[wid].name}の強化値が失われた`,'sys');
+    addFloat(player.x,player.y-0.8,'失敗…','#ff7a6a',true);
+    burst(player.x,player.y,'#8a4a3a',14);
+    sfx.hit();
+  }
+  save();renderShop();
 }
 function buy(id){
   if(id==='potion'){
@@ -1447,7 +1505,7 @@ function renderEquipTab(){
     const icn=it&&it.icon?`<img src="assets/${it.icon}" alt="">`:'';
     html+=`<div class="slotbox ${selSlot===slot?'sel':''} ${it?'':'empty'}" data-slot="${slot}" style="${SLOT_POS[slot]}">
       <span class="sl">${nm}</span>${icn}
-      <span class="eqn">${it?esc(it.name):'なし'}</span></div>`;
+      <span class="eqn">${it?esc(dispName(id)):'なし'}</span></div>`;
   }
   doll.innerHTML=html;
   for(const b of doll.querySelectorAll('[data-slot]')){
@@ -1461,7 +1519,7 @@ function renderEquipTab(){
     const it=ITEMS[id];if(!it||it.slot!==selSlot)continue;cnt++;
     const on=player.eq[selSlot]===id;
     const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn"></span>';
-    list+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${itemFx(it)}</span></span>
+    list+=`<div class="itemrow">${icn}<span class="nm">${esc(dispName(id))} <span class="fx">${itemFx(it)}</span></span>
       <button class="buyb ${on?'on':''}" data-eq="${id}">${on?(selSlot==='weapon'?'装備中':'外す'):'装備する'}</button></div>`;
   }
   if(!cnt)list+=`<div class="itemrow"><span class="fx">この部位の装備を持っていない。オババの店を覗いてみよう</span></div>`;
@@ -1638,6 +1696,7 @@ function update(dt){
   if(!player.dead){
     player.atkCd-=dt;player.swing-=dt;
     if(player.hitT>0)player.hitT-=dt;
+    for(const k in player.cd)if(player.cd[k]>0)player.cd[k]-=dt;
     if(player.hasteT>0)player.hasteT-=dt;
     if(player.critT>0)player.critT-=dt;
     if(player.foodAtkT>0)player.foodAtkT-=dt;
@@ -3162,6 +3221,7 @@ const el={
   hp:document.querySelector('#hpbar i'),mp:document.querySelector('#mpbar i'),
   hpn:$('hpnum'),mpn:$('mpnum'),
   pot:$('potN'),bolt:$('btnBolt'),heal:$('btnHeal'),fire:$('btnFire'),
+  cdBolt:$('cdBolt'),cdHeal:$('cdHeal'),cdFire:$('cdFire'),
   lockHeal:$('lockHeal'),lockFire:$('lockFire'),
   buffs:$('buffs'),pt:$('ptN'),
   goal:document.querySelector('#quest .goal')
@@ -3194,9 +3254,13 @@ function hud(){
   if(player.foodDefT>0)bf+=`🍲防+4 ${Math.ceil(player.foodDefT)}秒　`;
   if(player.foodRegenT>0)bf+=`🍵回復 ${Math.ceil(player.foodRegenT)}秒`;
   el.buffs.textContent=bf;
-  el.bolt.classList.toggle('disabled',player.mp<8);
-  el.heal.classList.toggle('disabled',player.lv<3||player.mp<12);
-  el.fire.classList.toggle('disabled',player.lv<6||player.mp<20);
+  el.bolt.classList.toggle('disabled',player.mp<8||player.cd.bolt>0);
+  el.heal.classList.toggle('disabled',player.lv<3||player.mp<12||player.cd.heal>0);
+  el.fire.classList.toggle('disabled',player.lv<6||player.mp<20||player.cd.fire>0);
+  const cdShow=(elm,v)=>{elm.classList.toggle('hidden',v<=0);if(v>0)elm.textContent=Math.ceil(v);};
+  cdShow(el.cdBolt,player.cd.bolt);
+  cdShow(el.cdHeal,player.lv>=3?player.cd.heal:0);
+  cdShow(el.cdFire,player.lv>=6?player.cd.fire:0);
   el.lockHeal.classList.toggle('hidden',player.lv>=3);
   el.lockFire.classList.toggle('hidden',player.lv>=6);
 }
