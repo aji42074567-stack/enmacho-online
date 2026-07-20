@@ -289,6 +289,67 @@
   .account-actions{display:flex;gap:7px;margin-top:10px}
   .account-actions .buyb{flex:1;padding-inline:7px}
 
+  /* ---- title / account gateway ---- */
+  .title-screen{align-items:stretch;justify-content:stretch;box-sizing:border-box;
+    padding:max(20px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right))
+      max(20px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
+    overflow:auto;background:
+      linear-gradient(90deg,rgba(2,4,7,.96) 0%,rgba(2,4,7,.82) 24%,
+        rgba(2,4,7,.2) 58%,rgba(2,4,7,.12) 100%),
+      url(assets/title_enmacho_pc.jpg) center/cover no-repeat}
+  .title-screen::before{content:"";position:fixed;inset:0;pointer-events:none;
+    background:
+      linear-gradient(180deg,rgba(0,0,0,.5),transparent 24%,transparent 70%,rgba(0,0,0,.62)),
+      radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.5) 100%)}
+  .title-shell{position:relative;z-index:1;width:min(1440px,100%);min-height:100%;
+    margin:auto;display:grid;grid-template-columns:minmax(360px,470px) 1fr;
+    grid-template-rows:auto minmax(0,auto);grid-template-areas:"brand ." "card .";
+    align-content:center;gap:20px}
+  .title-brand{grid-area:brand;color:var(--parchment);text-shadow:0 3px 16px #000}
+  .title-kicker{font:12px/1.5 var(--serif);letter-spacing:.2em;color:#e4d3af}
+  .title-logo{margin:8px 0 14px;font-family:var(--serif);line-height:1}
+  .title-logo span{display:block;font-size:clamp(50px,5.6vw,82px);font-weight:700;
+    letter-spacing:.12em;color:#d9b768;
+    background:linear-gradient(180deg,#f2d98d 8%,#b17b2d 64%,#6c3e15);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 1px #251100)}
+  .title-logo small{display:block;margin-top:11px;padding-left:.12em;
+    font:300 clamp(18px,2vw,28px)/1 var(--sans);letter-spacing:.62em;color:#d9edff;
+    text-shadow:0 0 10px rgba(82,174,237,.9),0 2px 8px #000}
+  .title-statement{margin:0;font:600 clamp(18px,2.1vw,30px)/1.75 var(--serif);
+    letter-spacing:.08em;color:#f3eadb}
+  .title-statement em{font-style:normal;color:#bc3d30}
+  .title-description{margin:10px 0 0;font:12px/1.9 var(--serif);
+    letter-spacing:.08em;color:#c9b991}
+  .title-status{display:flex;align-items:center;gap:8px;margin-top:14px;width:max-content;
+    padding:7px 11px;border:1px solid rgba(83,196,222,.5);border-radius:3px;
+    background:rgba(3,15,21,.62);color:#73d4e7;font:9px var(--sans);
+    letter-spacing:.14em;box-shadow:0 0 18px rgba(29,138,175,.12)}
+  .title-status i{width:6px;height:6px;border-radius:50%;background:#74e6d5;
+    box-shadow:0 0 8px #74e6d5}
+  .title-status b{font-weight:600;color:#a5f1ff}
+  .title-card.scroll{grid-area:card;width:100%;max-width:none;max-height:min(58vh,610px);
+    padding:22px 24px;border-color:#7b5a25;border-radius:8px;text-align:center;
+    background:linear-gradient(145deg,rgba(24,17,11,.94),rgba(8,9,12,.9));
+    box-shadow:0 18px 60px rgba(0,0,0,.7),inset 0 0 0 1px rgba(210,168,76,.08);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .title-card::before{content:"";display:block;width:54px;height:2px;margin:0 auto 12px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .title-card-kicker{font:9px var(--sans);letter-spacing:.32em;color:var(--gold);
+    margin-bottom:7px}
+  .title-card.scroll h2{font-size:21px}
+  .title-card .sub{margin-bottom:14px}
+  .intro-card .say{font-size:12px;line-height:1.8}
+  .intro-card ul{font-size:11px;line-height:1.8}
+  .intro-card .goal{font-size:12px}
+  .account-screen .title-card{max-height:min(64vh,660px)}
+  .account-screen .account-lead{margin-bottom:12px}
+  .account-screen .account-primary{border-color:#a27a31;
+    background:linear-gradient(180deg,#751f19,#3c0d0b);color:#fff3d2;
+    box-shadow:inset 0 0 0 1px rgba(239,192,91,.14)}
+  .account-screen .account-primary:hover{border-color:#e0b95f;color:#fff}
+  .account-screen #accountClose{margin-top:14px}
+
   /* ---- 行嚢メニュー(装備/道具/ステータス) ---- */
   #menuTabs{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
   .mtab{flex:1;max-width:110px;font-family:var(--serif);font-size:13px;letter-spacing:.14em;
@@ -351,6 +412,36 @@
     .reset-paper h2{font-size:19px}
     .reset-actions{flex-direction:column}
     .reset-actions .btn{width:100%;min-height:48px}
+    .title-screen{padding:max(12px,env(safe-area-inset-top)) 10px
+        max(8px,env(safe-area-inset-bottom));
+      background:
+        linear-gradient(180deg,rgba(1,3,6,.08) 0%,rgba(1,3,6,.14) 34%,
+          rgba(1,3,6,.8) 66%,rgba(1,3,6,.98) 100%),
+        url(assets/title_enmacho_mobile.jpg) center top/cover no-repeat}
+    .title-screen::before{background:
+      linear-gradient(180deg,rgba(0,0,0,.16),transparent 28%,rgba(0,0,0,.76) 69%,#030507 100%)}
+    .title-shell{display:flex;flex-direction:column;justify-content:flex-end;
+      width:100%;min-height:100%;gap:8px}
+    .title-brand{text-align:center;flex:none}
+    .title-kicker{font-size:9px;letter-spacing:.17em}
+    .title-logo{margin:3px 0 5px}
+    .title-logo span{font-size:38px;letter-spacing:.12em}
+    .title-logo small{margin-top:6px;font-size:12px;letter-spacing:.52em}
+    .title-statement{font-size:13px;line-height:1.5;letter-spacing:.05em}
+    .title-description,.title-status{display:none}
+    .title-card.scroll,.account-screen .title-card{width:100%;max-height:61dvh;
+      padding:18px 16px 20px;border-radius:10px 10px 4px 4px;
+      background:linear-gradient(160deg,rgba(24,17,11,.96),rgba(6,8,11,.95));
+      box-shadow:0 -10px 40px rgba(0,0,0,.62)}
+    .title-card.scroll h2{font-size:18px}
+    .title-card .sub{font-size:9px;margin-bottom:12px}
+    .intro-card .say{display:none}
+    .intro-card ul{display:none}
+    .intro-card .rule{display:none}
+    .intro-card .goal{margin-top:8px;font-size:10px}
+    .account-actions{flex-direction:column}
+    .account-actions .buyb{min-height:42px}
+    .account-code strong{font-size:19px}
   }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
@@ -422,29 +513,42 @@
     </div>
   </div>
 
-  <div class="overlay" id="intro">
-    <div class="scroll">
-      <div id="pickRow">
-        <div class="pick" id="pickM" role="button" tabindex="0" aria-label="男の子を選ぶ"></div>
-        <div class="pick" id="pickF" role="button" tabindex="0" aria-label="女の子を選ぶ"></div>
+  <div class="overlay title-screen" id="intro">
+    <div class="title-shell">
+      <section class="title-brand" aria-label="閻魔庁ONLINE">
+        <div class="title-kicker">和風ダークファンタジー MMORPG</div>
+        <h1 class="title-logo"><span>閻魔庁</span><small>ONLINE</small></h1>
+        <p class="title-statement">あなたは死んだのではない。<br>
+          一度目の人生を<em>終了</em>しただけだ。</p>
+        <p class="title-description">転生、寿命、徳、罪、記憶。<br>
+          すべてが管理される冥府で、世界の正体を知る。</p>
+        <div class="title-status"><i aria-hidden="true"></i>
+          現世接続 <b>STATUS: CONNECTED</b></div>
+      </section>
+      <div class="scroll title-card intro-card">
+        <div class="title-card-kicker">魂の姿を定める</div>
+        <h2>入庁準備</h2>
+        <div class="sub">THE FIRST JUDGEMENT DISTRICT</div>
+        <div id="pickRow">
+          <div class="pick" id="pickM" role="button" tabindex="0" aria-label="男の子を選ぶ"></div>
+          <div class="pick" id="pickF" role="button" tabindex="0" aria-label="女の子を選ぶ"></div>
+        </div>
+        <div style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
+        <input id="nameIn" maxlength="8" placeholder="なまえを入力 (8文字まで)" autocomplete="off">
+        <div class="rule"></div>
+        <div class="say" style="margin-bottom:12px">あなたは死にました。<br>
+          ここは地獄庁 第七審査区「賽の森」。<br>
+          迷える魂を成仏させて徳を積み、転生許可の審査に進みなさい。</div>
+        <ul>
+          <li><b>地面をクリック / タップ</b> … 移動</li>
+          <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
+          <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
+          <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー</li>
+        </ul>
+        <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
+        <button class="btn" id="startBtn">入庁する</button>
+        <br><button class="linkbtn hidden" id="resetBtn">記録を消して転生し直す（最初から）</button>
       </div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
-      <input id="nameIn" maxlength="8" placeholder="なまえを入力 (8文字まで)" autocomplete="off">
-      <h1>閻魔庁ONLINE</h1>
-      <div class="sub">死後に知る。生前こそが地獄だった。</div>
-      <div class="rule"></div>
-      <div class="say" style="margin-bottom:12px">あなたは死にました。<br>
-        ここは地獄庁 第七審査区「賽の森」。<br>
-        迷える魂を成仏させて徳を積み、転生許可の審査に進みなさい。</div>
-      <ul>
-        <li><b>地面をクリック / タップ</b> … 移動</li>
-        <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
-        <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 選択中の道具 / <b>I</b> メニュー</li>
-      </ul>
-      <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
-      <button class="btn" id="startBtn">入庁する</button>
-      <br><button class="linkbtn hidden" id="resetBtn">記録を消して転生し直す（最初から）</button>
     </div>
   </div>
 
@@ -595,15 +699,26 @@
     </div>
   </div>
 
-  <div class="overlay hidden" id="accountPanel" role="dialog" aria-modal="true"
+  <div class="overlay title-screen account-screen" id="accountPanel" role="dialog" aria-modal="true"
     aria-labelledby="accountTitle">
-    <div class="scroll">
-      <h2 id="accountTitle">魂籍</h2>
-      <div class="sub">転生を越えて残る魂の記録</div>
-      <div id="accountContent">
-        <p class="account-lead">魂籍台帳を準備しています…</p>
+    <div class="title-shell">
+      <section class="title-brand" aria-label="閻魔庁ONLINE">
+        <div class="title-kicker">和風ダークファンタジー MMORPG</div>
+        <h1 class="title-logo"><span>閻魔庁</span><small>ONLINE</small></h1>
+        <p class="title-statement">魂籍は、端末を越えて<br>あなたの業を記録する。</p>
+        <p class="title-description">魂籍へ入れば、別の端末でも同じ徳位・装備・記憶を呼び戻せる。</p>
+        <div class="title-status"><i aria-hidden="true"></i>
+          魂籍台帳 <b>STATUS: ONLINE</b></div>
+      </section>
+      <div class="scroll title-card account-card-shell">
+        <div class="title-card-kicker">魂籍照合</div>
+        <h2 id="accountTitle">閻魔庁への入口</h2>
+        <div class="sub">ACCOUNT &amp; SOUL RECORD</div>
+        <div id="accountContent">
+          <p class="account-lead">魂籍台帳を準備しています…</p>
+        </div>
+        <button class="btn small" id="accountClose">端末の記録で続ける</button>
       </div>
-      <button class="btn small" id="accountClose">魂籍を閉じる</button>
     </div>
   </div>
 </div>
@@ -4242,8 +4357,18 @@ window.EnmaGameBridge={
   importSave(payload){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
       payload.v<1||payload.v>7)throw new Error('対応していない記録です');
-    localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
-    location.reload();
+    const serialized=JSON.stringify(payload);
+    resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
+    try{
+      localStorage.setItem(SAVE_KEY,serialized);
+      if(localStorage.getItem(SAVE_KEY)!==serialized)
+        throw new Error('クラウド記録を端末へ保存できませんでした');
+      try{sessionStorage.setItem('enma_cloud_import_notice',String(payload.lv||1));}catch(e){}
+      location.reload();
+    }catch(error){
+      resetting=false;
+      throw error;
+    }
   },
   getProfile(){
     return{

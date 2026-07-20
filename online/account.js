@@ -2,6 +2,18 @@ const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
 const accountButton = document.getElementById('accountBtn');
 const accountDot = document.getElementById('accountDot');
+const accountTitle = document.getElementById('accountTitle');
+const accountClose = document.getElementById('accountClose');
+
+const importedCloudLevel = (() => {
+  try {
+    const level = sessionStorage.getItem('enma_cloud_import_notice');
+    sessionStorage.removeItem('enma_cloud_import_notice');
+    return level && /^\d+$/.test(level) ? Number(level) : null;
+  } catch {
+    return null;
+  }
+})();
 
 const state = {
   client: null,
@@ -10,7 +22,9 @@ const state = {
   preferences: null,
   cloudSave: null,
   configured: Boolean(config.supabaseUrl && config.supabasePublishableKey),
-  message: '',
+  message: importedCloudLevel
+    ? `クラウド記録を読み込みました（徳位${importedCloudLevel}）。ゲーム画面へ進めます`
+    : '',
   error: '',
   busy: false,
 };
@@ -29,6 +43,11 @@ const setFeedback = (message = '', error = '') => {
   state.error = error;
 };
 
+const setGatewayCopy = (title, closeLabel) => {
+  if (accountTitle) accountTitle.textContent = title;
+  if (accountClose) accountClose.textContent = closeLabel;
+};
+
 function setButtonState(kind) {
   accountButton?.classList.toggle('online', kind === 'online');
   accountButton?.classList.toggle('pending', kind === 'pending');
@@ -44,6 +63,7 @@ function feedbackHtml() {
 
 function renderUnconfigured() {
   setButtonState('offline');
+  setGatewayCopy('端末記録で入庁', 'ゲーム画面へ進む');
   content.innerHTML = `
     <div class="account-seal" aria-hidden="true">準備中</div>
     <p class="account-lead">魂籍は、亡者から転生者になっても残るオンライン上の身分証です。</p>
@@ -57,6 +77,7 @@ function renderUnconfigured() {
 
 function renderSignedOut() {
   setButtonState(state.message.includes('確認メール') ? 'pending' : 'offline');
+  setGatewayCopy('魂籍を登録・照合', '登録せず端末の記録で続ける');
   content.innerHTML = `
     ${feedbackHtml()}
     <p class="account-lead">無料の魂籍を作ると、端末を越えて記録を残せます。</p>
@@ -108,6 +129,7 @@ function renderSignedIn() {
   const local = window.EnmaGameBridge?.getProfile?.() || {};
   const cloud = state.cloudSave;
   setButtonState('online');
+  setGatewayCopy('魂籍照合済み', 'ゲーム画面へ進む');
   content.innerHTML = `
     ${feedbackHtml()}
     <div class="account-code">
@@ -135,12 +157,12 @@ function renderSignedIn() {
     <div class="account-divider"><span>魂の記録</span></div>
     <div class="account-cloud">
       <p>${cloud
-        ? `クラウド記録：v${esc(cloud.save_version)}・${esc(new Date(cloud.updated_at).toLocaleString('ja-JP'))}`
+        ? `クラウド記録：徳位${esc(cloud.payload?.lv ?? '—')}・v${esc(cloud.save_version)}・${esc(new Date(cloud.updated_at).toLocaleString('ja-JP'))}`
         : 'クラウド記録はまだありません'}</p>
       <div class="account-actions">
-        <button class="buyb" id="cloudUpload" type="button" ${state.busy ? 'disabled' : ''}>この端末から保存</button>
+        <button class="buyb" id="cloudUpload" type="button" ${state.busy ? 'disabled' : ''}>端末 → クラウドへ保存</button>
         <button class="buyb" id="cloudDownload" type="button"
-          ${state.busy || !cloud ? 'disabled' : ''}>この端末へ読込</button>
+          ${state.busy || !cloud ? 'disabled' : ''}>クラウド → この端末へ読込</button>
       </div>
     </div>
     <button class="linkbtn account-logout" id="soulLogout" type="button">ログアウト</button>`;
@@ -167,7 +189,7 @@ async function fetchAccountData(userId) {
     state.client.from('profiles').select('*').eq('id', userId).single(),
     state.client.from('account_preferences').select('newsletter_opt_in')
       .eq('user_id', userId).single(),
-    state.client.from('game_saves').select('save_version,revision,updated_at')
+    state.client.from('game_saves').select('save_version,revision,updated_at,payload')
       .eq('user_id', userId).maybeSingle(),
   ]);
   return { profileResult, preferencesResult, cloudSaveResult };
@@ -343,7 +365,8 @@ async function uploadCloudSave() {
       payload,
       revision: (state.cloudSave?.revision || 0) + 1,
       client_updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' }).select('save_version,revision,updated_at').single();
+    }, { onConflict: 'user_id' })
+      .select('save_version,revision,updated_at,payload').single();
     if (error) throw error;
     state.cloudSave = data;
     setFeedback('この端末の記録をクラウドへ保存しました');
@@ -351,11 +374,13 @@ async function uploadCloudSave() {
 }
 
 async function downloadCloudSave() {
-  if (!confirm('この端末の記録をクラウド記録で置き換えます。よろしいですか？')) return;
   await withBusy(async () => {
     const { data, error } = await state.client.from('game_saves').select('payload')
       .eq('user_id', state.session.user.id).single();
     if (error) throw error;
+    const localLevel = window.EnmaGameBridge?.getProfile?.().level ?? '—';
+    const cloudLevel = data.payload?.lv ?? '—';
+    if (!confirm(`この端末の徳位${localLevel}の記録を、クラウドの徳位${cloudLevel}の記録で置き換えます。よろしいですか？`)) return;
     window.EnmaGameBridge?.importSave?.(data.payload);
   });
 }
