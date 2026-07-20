@@ -583,13 +583,13 @@ const BOSS_HOME={x:10,y:7};
 })();
 
 /* ================= 構造物・NPC ================= */
-let props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/lamp/well/cave/torch/cavexit
+let props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/smithy/lamp/well/cave/torch/cavexit
 function placeBuilding(bx,by,kind,roof1,roof2){
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
   props.push({x:bx+0.5,y:by+0.5,kind,roof1,roof2});
 }
 placeBuilding(27,47,'house','#6e3a2e','#5a2f26');
-placeBuilding(36,46,'house','#3e5a4a','#33493d');
+placeBuilding(36,46,'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
 placeBuilding(35,51,'shop','#7a5a2a','#645022');
 placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
 placeBuilding(23,49,'house','#3e5a4a','#33493d');
@@ -607,7 +607,7 @@ let npcs=[
   {x:34,y:53,kind:'merchant',name:'オババ'},
   {x:30,y:48,kind:'elder',name:'オキナ'},
   {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
-  {x:31.5,y:45.5,kind:'smith',name:'カナヤマ'},   // 鍛冶屋(広場の北・家に隠れない位置)
+  {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
   {x:28.2,y:41.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
 ];
@@ -2450,6 +2450,8 @@ loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
+loadSprite('map_smithy','assets/map_smithy.png');
+loadSprite('map_respawn_statue','assets/map_respawn_statue.png');
 loadSprite('map_pine_tall','assets/map_pine_tall.png');
 loadSprite('map_pine_full','assets/map_pine_full.png');
 loadSprite('map_rock_spire','assets/map_rock_spire.png');
@@ -2822,6 +2824,18 @@ function drawVillageProp(sx,sy,p){
   }
 }
 function drawStone(sx,sy){
+  const img=SPRITES.map_respawn_statue;
+  if(img){
+    const h=80,w=h*img.width/img.height;
+    drawShadow(sx,sy+2,w*0.32);
+    const pulse=0.45+Math.sin(time*2)*0.15;
+    const glow=ctx.createRadialGradient(sx,sy-h*0.55,0,sx,sy-h*0.55,26);
+    glow.addColorStop(0,`rgba(120,205,255,${pulse*0.28})`);
+    glow.addColorStop(1,'rgba(80,160,255,0)');
+    ctx.fillStyle=glow;ctx.fillRect(sx-28,sy-h*0.55-28,56,56);
+    ctx.drawImage(img,sx-w/2,sy-h+3,w,h);
+    return;
+  }
   drawShadow(sx,sy+2,12);
   ctx.save();ctx.translate(sx,sy);
   ctx.fillStyle='#4d5361';
@@ -2835,10 +2849,12 @@ function drawStone(sx,sy){
   ctx.restore();
 }
 function drawHouse(sx,sy,p){
-  const key=p.kind==='shop'?'map_shop_green'
+  const key=p.kind==='smithy'?'map_smithy'
+    :p.kind==='shop'?'map_shop_green'
     :p.kind==='tavern'?'map_tavern'
     :((Math.floor(p.x)&1)?'map_house_red':'map_house_blue');
-  const img=SPRITES[key]||(p.kind==='tavern'?SPRITES.map_house_red:null);   // 酒場画像が来るまで赤屋根の家で代用
+  const img=SPRITES[key]
+    ||(p.kind==='tavern'?SPRITES.map_house_red:p.kind==='smithy'?SPRITES.map_house_blue:null);
   if(img){
     const w=p.kind==='shop'?202:p.kind==='tavern'?210:180;
     const h=w*img.height/img.width;
@@ -3308,7 +3324,7 @@ function render(){
       case 'stairdown':drawStairs(sx,sy,true);break;
       case 'stairup':drawStairs(sx,sy,false);break;
       case 'stone':drawStone(sx,sy);break;
-      case 'house':case 'shop':case 'tavern':drawHouse(sx,sy,it.o);break;
+      case 'house':case 'shop':case 'smithy':case 'tavern':drawHouse(sx,sy,it.o);break;
       case 'fence':drawFence(sx,sy,it.o);break;
       case 'gate':drawGate(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;

@@ -110,6 +110,8 @@ enmacho-online/
 - `map_forest_ground.png` — 森床の反復テクスチャ
 - `map_tile_path.png` / `map_tile_stone.png` — 土道・村の石畳
 - `map_house_*.png` / `map_shop_green.png` — 村の家と商店
+- `map_smithy.png` — 鍛冶屋(旧・青屋根の家を置換)
+- `map_respawn_statue.png` — 死亡後に戻る「賽の石像」
 - `map_pine_*.png` / `map_rock_*.png` — 森の樹木と岩
 - `map_lamp_post.png` / `map_stone_well.png` — 灯籠と井戸
 - 画像の読み込み前または失敗時は、従来のコード描画へフォールバックする
