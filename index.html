@@ -1599,7 +1599,7 @@ function damageMob(m,dmg,crit,kind='melee'){
   if(m.dead)return;
   player.combatT=COMBAT_HOLD_SECONDS;
   if(sharedWorldActive()&&m.id&&window.EnmaWorldClient?.hit?.({
-    mobId:m.id,damage,crit,kind,
+    mobId:m.id,damage:dmg,crit,kind,
   })){
     m.flash=0.14;
     addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
@@ -2517,6 +2517,8 @@ function update(dt){
     moveAlong(m,dt,m.def.speed);
   }
   for(const b of bolts){
+    // 命中処理で例外が起きても、完了済みの弾を次フレームで再処理しない。
+    if(b.done)continue;
     const t=b.target;
     const tx=t.x,ty=t.y-0.4;
     const dx=tx-b.x,dy=ty-b.y,d=Math.hypot(dx,dy);
