@@ -15,9 +15,14 @@ const state = {
   busy: false,
 };
 
+let accountLoadRevision = 0;
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[char]));
+
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const isJwtClockSkew = error => /JWT issued at future/i.test(error?.message || '');
 
 const setFeedback = (message = '', error = '') => {
   state.message = message;
@@ -157,7 +162,19 @@ function render() {
   return renderSignedIn();
 }
 
+async function fetchAccountData(userId) {
+  const [profileResult, preferencesResult, cloudSaveResult] = await Promise.all([
+    state.client.from('profiles').select('*').eq('id', userId).single(),
+    state.client.from('account_preferences').select('newsletter_opt_in')
+      .eq('user_id', userId).single(),
+    state.client.from('game_saves').select('save_version,revision,updated_at')
+      .eq('user_id', userId).maybeSingle(),
+  ]);
+  return { profileResult, preferencesResult, cloudSaveResult };
+}
+
 async function loadAccountData() {
+  const revision = ++accountLoadRevision;
   if (!state.session || !state.client) {
     state.profile = null;
     state.preferences = null;
@@ -166,21 +183,43 @@ async function loadAccountData() {
     return;
   }
   const userId = state.session.user.id;
-  const [
-    { data: profile, error: profileError },
-    { data: preferences, error: preferencesError },
-    { data: cloudSave, error: saveError },
-  ] =
-    await Promise.all([
-      state.client.from('profiles').select('*').eq('id', userId).single(),
-      state.client.from('account_preferences').select('newsletter_opt_in')
-        .eq('user_id', userId).single(),
-      state.client.from('game_saves').select('save_version,revision,updated_at')
-        .eq('user_id', userId).maybeSingle(),
-    ]);
-  if (profileError) setFeedback('', `プロフィールを読めませんでした：${profileError.message}`);
-  else if (preferencesError) setFeedback('', `メール設定を読めませんでした：${preferencesError.message}`);
-  else if (saveError) setFeedback('', `クラウド記録を確認できませんでした：${saveError.message}`);
+  let results = await fetchAccountData(userId);
+  const firstErrors = [
+    results.profileResult.error,
+    results.preferencesResult.error,
+    results.cloudSaveResult.error,
+  ].filter(Boolean);
+
+  if (firstErrors.some(isJwtClockSkew)) {
+    await wait(2500);
+    if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
+    const { data, error } = await state.client.auth.refreshSession();
+    if (!error && data.session) state.session = data.session;
+    results = await fetchAccountData(userId);
+  }
+
+  if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
+  const {
+    profileResult: { data: profile, error: profileError },
+    preferencesResult: { data: preferences, error: preferencesError },
+    cloudSaveResult: { data: cloudSave, error: saveError },
+  } = results;
+
+  if (profileError) {
+    setFeedback('', isJwtClockSkew(profileError)
+      ? '認証情報の時刻を同期できませんでした。数秒待ってアカウント画面を開き直してください'
+      : `プロフィールを読めませんでした：${profileError.message}`);
+  } else if (preferencesError) {
+    setFeedback('', isJwtClockSkew(preferencesError)
+      ? '認証情報の時刻を同期できませんでした。数秒待ってアカウント画面を開き直してください'
+      : `メール設定を読めませんでした：${preferencesError.message}`);
+  } else if (saveError) {
+    setFeedback('', isJwtClockSkew(saveError)
+      ? '認証情報の時刻を同期できませんでした。数秒待ってアカウント画面を開き直してください'
+      : `クラウド記録を確認できませんでした：${saveError.message}`);
+  } else {
+    state.error = '';
+  }
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;

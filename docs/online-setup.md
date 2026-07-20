@@ -10,9 +10,12 @@ Secret key、service role key、Resend API keyはGitHubへ保存しない。
 - 魂籍DB・RLS・Auth URL: 設定済み
 - Edge Function `sync-resend-contact`: デプロイ済み
 - Resend Segment `閻魔庁ONLINE 更新情報`: 作成・接続済み
-- Resendの送信ドメインとSupabase Custom SMTP: 閻魔庁用ドメイン決定後に設定
+- Supabase Custom SMTP: Resendへ接続済み
+- 登録確認・パスワード再設定メール: 閻魔庁仕様の日本語テンプレートへ変更済み
+- 暫定送信元: `閻魔庁ONLINE <noreply@notify.mkrainbowshiva.com>`
 
-送信ドメイン決定までは、魂籍の確認メールにSupabase標準メールを使用する。
+閻魔庁専用ドメイン決定後は、Resendで送信ドメインを認証し、
+Custom SMTPの送信元とSMTP用APIキーの対象ドメインを差し替える。
 
 ## 1. Supabaseプロジェクト
 
@@ -36,7 +39,11 @@ window.ENMA_ONLINE_CONFIG = {
 ## 2. Resend
 
 1. 閻魔庁用の送信ドメインをResendで認証する。
-2. Supabase IntegrationsからResendを接続し、AuthのCustom SMTPを有効にする。
+2. 送信専用APIキーを作成し、Supabase AuthのCustom SMTPを有効にする。
+   - Host: `smtp.resend.com`
+   - Port: `465`
+   - Username: `resend`
+   - Password: Resendの送信専用APIキー
 3. Resendで「閻魔庁ONLINE 更新情報」用Segmentを作る。
 4. Edge Functionの秘密情報を設定する。
 
@@ -46,7 +53,8 @@ supabase secrets set RESEND_SEGMENT_ID=segment_xxx
 supabase functions deploy sync-resend-contact
 ```
 
-ResendのAPIキーはEdge Functionだけで使用する。
+Edge Function用とSMTP用のAPIキーは分離する。
+どちらもリポジトリには保存しない。
 
 ## 3. 登録者の確認
 
