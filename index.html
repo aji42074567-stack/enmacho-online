@@ -46,7 +46,7 @@
     font-variant-numeric:tabular-nums}
   #sndBtn{position:absolute;top:82px;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
-    font-size:16px;cursor:pointer;padding:0;line-height:1}
+    color:var(--parchment);font-size:19px;cursor:pointer;padding:0;line-height:1}
   #sndBtn:hover{border-color:#6b5730}
 
   /* ---- message log ---- */
@@ -221,6 +221,17 @@
   .buyb.on{border-color:var(--gold);color:var(--gold)}
   .goldrow{font-family:var(--sans);font-size:12px;color:var(--dim);margin-top:12px;
     font-variant-numeric:tabular-nums}
+  .settings-list{display:flex;flex-direction:column;gap:14px;text-align:left}
+  .setting-row{font-family:var(--sans);font-size:12px;color:var(--parchment)}
+  .setting-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+  .setting-head output{color:var(--gold);font-variant-numeric:tabular-nums}
+  .setting-row input[type="range"]{width:100%;accent-color:var(--gold);cursor:pointer}
+  .setting-toggle{display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--sans);font-size:12px;color:var(--parchment);
+    border-top:1px solid #33291a;padding-top:13px;cursor:pointer}
+  .setting-toggle input{width:20px;height:20px;accent-color:var(--gold)}
+  .setting-note{font-family:var(--sans);font-size:10.5px;color:var(--dim);
+    line-height:1.7;text-align:left;margin:14px 0 0}
 
   /* ---- 行嚢メニュー(装備/道具/ステータス) ---- */
   #menuTabs{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
@@ -297,7 +308,7 @@
     <div class="n">成仏させた魂 <span id="kills">0</span></div>
   </div>
 
-  <button id="sndBtn" title="音のオン/オフ">🔊</button>
+  <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
 
   <div id="log" aria-live="polite"></div>
 
@@ -480,6 +491,34 @@
       <div id="tabItem" class="hidden"><div id="itemList"></div></div>
       <div id="tabStat" class="hidden"><div id="statList"></div></div>
       <button class="btn small" id="equipClose">閉じる (I)</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="settingsPanel" role="dialog" aria-modal="true"
+    aria-labelledby="settingsTitle">
+    <div class="scroll">
+      <h2 id="settingsTitle">設定</h2>
+      <div class="sub">音響・画面</div>
+      <div class="settings-list">
+        <label class="setting-row" for="bgmVolume">
+          <span class="setting-head"><span>BGM音量</span><output id="bgmValue">55%</output></span>
+          <input id="bgmVolume" type="range" min="0" max="100" step="5" value="55">
+        </label>
+        <label class="setting-row" for="sfxVolume">
+          <span class="setting-head"><span>効果音音量</span><output id="sfxValue">100%</output></span>
+          <input id="sfxVolume" type="range" min="0" max="100" step="5" value="100">
+        </label>
+        <label class="setting-row" for="brightnessSetting">
+          <span class="setting-head"><span>画面の明るさ</span><output id="brightnessValue">100%</output></span>
+          <input id="brightnessSetting" type="range" min="70" max="130" step="5" value="100">
+        </label>
+        <label class="setting-toggle" for="screenShakeSetting">
+          <span>戦闘時の画面揺れ</span>
+          <input id="screenShakeSetting" type="checkbox" checked>
+        </label>
+      </div>
+      <p class="setting-note">音量を0%にすると消音になります。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
+      <button class="btn small" id="settingsClose">設定を閉じる</button>
     </div>
   </div>
 </div>
@@ -915,10 +954,11 @@ function findPath(fx,fy,tx,ty){
 }
 
 /* ================= プレイヤー ================= */
+const settings={bgm:55,sfx:100,brightness:100,shake:true};
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
-  stats:{str:0,con:0,agi:0,int:0},statPts:5,
+  stats:{str:0,con:0,agi:0,int:0,luck:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   name:'',quests:{trial:0},
@@ -940,6 +980,7 @@ const player={
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
+let shakeT=0,shakeDur=0,shakePower=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
@@ -953,8 +994,11 @@ const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の
 const SCROLL_DROP_RATE=0.07;   // 中ボス・竜からの強化巻物ドロップ率
 const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/4)+(player.foodDefT>0?4:0);
 const critRate=()=>Math.min(0.75,Math.min(0.5,0.1+0.01*ST().agi)+(player.critT>0?0.25:0));
-const spellMul=()=>Math.min(2.5,1+0.03*ST().int);
-const speedNow=()=>player.speed*Math.min(1.35,1+0.007*ST().agi)*(player.hasteT>0?1.3:1);
+const dodgeRate=()=>Math.min(0.3,0.005*ST().agi);
+const mpRegenMul=()=>Math.min(2,1+0.02*ST().int);
+const dropMul=()=>Math.min(2,1+0.02*ST().luck);
+const dropChance=base=>base>=1?1:Math.min(0.75,base*dropMul());
+const speedNow=()=>player.speed*(player.hasteT>0?1.3:1);
 function recalcMax(){
   player.maxHp=80+12*(player.lv-1)+10*ST().con+eqSum('hpb');
   player.maxMp=30+6*(player.lv-1)+8*ST().int+eqSum('mpb');
@@ -967,7 +1011,7 @@ function save(){
   if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:5,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:6,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       dragonBlood:player.dragonBlood,
       items:player.items,eq:player.eq,kills,
@@ -977,14 +1021,14 @@ function save(){
       quests:player.quests,qb:player.qb,plus:player.plus,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
-      story:player.story,ferrymanCoin:player.ferrymanCoin
+      story:player.story,ferrymanCoin:player.ferrymanCoin,settings
     }));
   }catch(e){}
 }
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5))return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -1006,12 +1050,13 @@ function load(){
     player.name=(typeof d.name==='string'&&d.name.trim())?d.name.trim().slice(0,8):'アジ';
     kills=d.kills||0;
     if(d.v>=2&&d.stats){
-      player.stats={str:d.stats.str|0,con:d.stats.con|0,agi:d.stats.agi|0,int:d.stats.int|0};
+      player.stats={str:d.stats.str|0,con:d.stats.con|0,agi:d.stats.agi|0,
+        int:d.stats.int|0,luck:d.stats.luck|0};
       player.statPts=d.statPts|0;
       player.hastePots=d.hastePots|0;player.critPots=d.critPots|0;
     }else{
       // 旧セーブ: 初期5pt+10レベルごとの分をまとめて付与
-      player.stats={str:0,con:0,agi:0,int:0};
+      player.stats={str:0,con:0,agi:0,int:0,luck:0};
       player.statPts=5+Math.floor(player.lv/10);
     }
     if(d.v<5){
@@ -1045,6 +1090,11 @@ function load(){
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     player.smithIntro=!!d.smithIntro;player.drakeKilledAt=d.drakeKilledAt||0;
+    const cfg=d.settings&&typeof d.settings==='object'?d.settings:{};
+    settings.bgm=clamp(Number.isFinite(+cfg.bgm)?+cfg.bgm:55,0,100);
+    settings.sfx=clamp(Number.isFinite(+cfg.sfx)?+cfg.sfx:100,0,100);
+    settings.brightness=clamp(Number.isFinite(+cfg.brightness)?+cfg.brightness:100,70,130);
+    settings.shake=cfg.shake!==false;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -1116,20 +1166,20 @@ function log(txt,cls){
 }
 
 /* ================= サウンド ================= */
-let AC=null,soundOn=true,bgmStarted=false,bgmGain=null;
+let AC=null,bgmStarted=false,bgmGain=null;
 function audio(){
   if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(AC&&AC.state==='suspended')AC.resume();
   return AC;
 }
 function beep(f0,f1,dur,type,gain){
-  if(!soundOn)return;
+  if(settings.sfx<=0)return;
   const ac=audio();if(!ac)return;
   const o=ac.createOscillator(),g=ac.createGain();
   o.type=type||'square';
   o.frequency.setValueAtTime(f0,ac.currentTime);
   o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),ac.currentTime+dur);
-  g.gain.setValueAtTime(gain||.05,ac.currentTime);
+  g.gain.setValueAtTime((gain||.05)*(settings.sfx/100),ac.currentTime);
   g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+dur);
   o.connect(g).connect(ac.destination);
   o.start();o.stop(ac.currentTime+dur);
@@ -1154,7 +1204,7 @@ const sfx={
 function startBgm(){
   const ac=audio();if(!ac||bgmStarted)return;
   bgmStarted=true;
-  bgmGain=ac.createGain();bgmGain.gain.value=0.5;
+  bgmGain=ac.createGain();bgmGain.gain.value=settings.bgm/100*0.9;
   bgmGain.connect(ac.destination);
   // 残響(山寺のような響き)
   const delay=ac.createDelay(1);delay.delayTime.value=0.45;
@@ -1185,7 +1235,7 @@ function startBgm(){
   // 琴の音(陰旋法・都節音階)
   const SCALE=[293.66,311.13,392.00,440.00,466.16,587.33,622.25];
   function pluck(){
-    if(soundOn){
+    if(settings.bgm>0){
       const f=SCALE[Math.floor(Math.random()*SCALE.length)]/(Math.random()<0.3?2:1);
       const o=ac.createOscillator(),g=ac.createGain();
       o.type='triangle';o.frequency.value=f;
@@ -1204,7 +1254,7 @@ function startBgm(){
 
 /* ---- フィールド曲: 2曲をクロスフェードで連結して無限ループ ---- */
 const BGM_TRACKS=['assets/bgm_field_1.m4a','assets/bgm_field_2.m4a'];
-const MUSIC_VOL=0.55,XFADE=1.6;
+const XFADE=1.6;
 let musicBuf=null,musicReady=false,musicGain=null;
 function loadMusic(){
   const ac=audio();if(!ac||musicBuf)return;
@@ -1217,7 +1267,7 @@ function loadMusic(){
     musicGain=ac.createGain();
     musicGain.gain.value=0.0001;
     musicGain.connect(ac.destination);
-    musicGain.gain.linearRampToValueAtTime(soundOn?MUSIC_VOL:0.0001,ac.currentTime+3);
+    musicGain.gain.linearRampToValueAtTime(settings.bgm/100,ac.currentTime+3);
     if(bgmGain)bgmGain.gain.linearRampToValueAtTime(0.0001,ac.currentTime+4);  // 琴の生成BGMは静かに退場
     scheduleTrack(0,ac.currentTime+0.2);
   })
@@ -1236,6 +1286,28 @@ function scheduleTrack(i,when){
   src.start(when);
   const nextWhen=when+buf.duration-XFADE;  // 曲尻に次の曲頭を重ねる
   setTimeout(()=>scheduleTrack(i+1,nextWhen),Math.max(0,(nextWhen-ac.currentTime-1)*1000));
+}
+function applyAudioSettings(){
+  if(!AC)return;
+  const t=AC.currentTime,v=settings.bgm/100;
+  if(musicGain){
+    musicGain.gain.cancelScheduledValues(t);
+    musicGain.gain.setTargetAtTime(v,t,0.04);
+  }
+  if(bgmGain){
+    bgmGain.gain.cancelScheduledValues(t);
+    bgmGain.gain.setTargetAtTime(musicReady?0:v*0.9,t,0.04);
+  }
+}
+function applyVisualSettings(){
+  canvas.style.filter=`brightness(${settings.brightness}%)`;
+  if(!settings.shake){shakeT=0;shakeDur=0;shakePower=0;}
+}
+function addShake(power,duration=0.18){
+  if(!settings.shake)return;
+  shakePower=Math.max(shakePower,power);
+  shakeT=Math.max(shakeT,duration);
+  shakeDur=Math.max(shakeDur,duration);
 }
 
 /* ================= アイテム入手・装備 ================= */
@@ -1304,6 +1376,7 @@ function damageMob(m,dmg,crit){
   m.hp-=dmg;m.flash=0.14;
   addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
   burst(m.x,m.y,'#e8d090',crit?12:6);
+  if(crit)addShake(2.5,0.12);
   if(m.state==='idle'){m.state='chase';m.repath=0;}
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
 }
@@ -1317,17 +1390,17 @@ function killMob(m){
   gainXp(m.def.xp);
   log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
   const drop=DROPS[m.type];
-  if(drop&&Math.random()<drop[1]&&!player.items.includes(drop[0])){
+  if(drop&&Math.random()<dropChance(drop[1])&&!player.items.includes(drop[0])){
     gainItem(drop[0]);
-  }else if(Math.random()<0.28){
+  }else if(Math.random()<dropChance(0.28)){
     player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');
   }
-  if(m.type==='drake'&&Math.random()<DRAGON_BLOOD_DROP_RATE){
+  if(m.type==='drake'&&Math.random()<dropChance(DRAGON_BLOOD_DROP_RATE)){
     player.dragonBlood++;
     addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
     log('希少素材「竜の血」を手に入れた！','gain');
   }
-  if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<SCROLL_DROP_RATE){
+  if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
     const wpn=Math.random()<0.5;
     if(wpn)player.wScrolls++;else player.aScrolls++;
     addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
@@ -1347,8 +1420,8 @@ function killMob(m){
   }
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
-  if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};
-    log(m.type==='drake'?'竜の巣が静まりかえった…(次の竜は偶数時0分に現れる)':'洞窟の最深部が静まりかえった…(90秒後にまた迷い出る)','sys');}
+  if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};addShake(7,0.35);
+    log(m.type==='drake'?'竜の巣が静まりかえった…(次の竜は偶数時0分に現れる)':'洞窟の最深部が静まりかえった…(120秒後にまた迷い出る)','sys');}
   questProgress('kill',m.type);
   if(m.type==='oni_blue'&&player.quests.trial<2){
     player.quests.trial=2;
@@ -1419,7 +1492,7 @@ function castHeal(){
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
   player.mp-=12;player.cd.heal=3;
-  const n=45+7*player.lv+8*ST().int;
+  const n=45+7*player.lv;
   player.hp=Math.min(player.maxHp,player.hp+n);
   addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
   burst(player.x,player.y,'#7fe07f',12);
@@ -1483,11 +1556,14 @@ function mobAttack(m){
 }
 function mobStrike(m){
   player.combatT=COMBAT_HOLD_SECONDS;
+  if(Math.random()<dodgeRate()){
+    addFloat(player.x,player.y,'回避！','#9fdcff',true);sfx.miss();return;
+  }
   if(Math.random()<0.06){addFloat(player.x,player.y,'Miss','#b8b8b8');return;}
   const dmg=Math.max(1,rndi(m.def.dmg[0],m.def.dmg[1])-defTotal());
   player.hp-=dmg;player.hitT=0.3;
   addFloat(player.x,player.y,String(dmg),'#ff7a6a');
-  sfx.hurt();
+  sfx.hurt();addShake(m.def.boss?7:4,m.def.boss?0.3:0.18);
   if(player.hp<=0){
     player.hp=0;player.dead=true;player.path=[];player.target=null;player.combatT=0;
     player.autoMode=false;$('btnAuto').classList.remove('on');
@@ -1806,8 +1882,9 @@ function renderStatTab(){
   const STATS=[
     ['str','力','物理攻撃 +1'],
     ['con','体','最大HP +10 / 4ごとに防御+1'],
-    ['agi','速','会心 +1% / 移動 +0.7%（上限あり）'],
-    ['int','知','最大MP +8 / 印の威力 +3%（上限2.5倍）'],
+    ['agi','速','会心 +1% / 回避 +0.5%（回避上限30%）'],
+    ['int','知','最大MP +8 / MP回復 +2%（上限2倍）'],
+    ['luck','運','ドロップ率 +2%（相対・上限2倍）'],
   ];
   for(const [k,nm,fx] of STATS){
     html+=`<div class="itemrow"><span class="nm">${nm} <b>${st[k]}</b> <span class="fx">${fx}</span></span>`+
@@ -1818,9 +1895,11 @@ function renderStatTab(){
   html+=`<div class="statline"><span>攻撃</span><b>${atkTotal()}</b></div>`;
   html+=`<div class="statline"><span>防御</span><b>${defTotal()}</b></div>`;
   html+=`<div class="statline"><span>会心率</span><b>${Math.round(critRate()*100)}%</b></div>`;
+  html+=`<div class="statline"><span>回避率</span><b>${(dodgeRate()*100).toFixed(1)}%</b></div>`;
   html+=`<div class="statline"><span>最大HP</span><b>${player.maxHp}</b></div>`;
   html+=`<div class="statline"><span>最大MP</span><b>${player.maxMp}</b></div>`;
-  html+=`<div class="statline"><span>印の威力</span><b>×${spellMul().toFixed(2)}</b></div>`;
+  html+=`<div class="statline"><span>MP回復量</span><b>×${mpRegenMul().toFixed(2)}</b></div>`;
+  html+=`<div class="statline"><span>ドロップ率</span><b>×${dropMul().toFixed(2)}</b></div>`;
   $('statList').innerHTML=html;
   for(const b of $('statList').querySelectorAll('[data-st]')){
     b.addEventListener('click',()=>{
@@ -1997,6 +2076,10 @@ function moveAlong(e,dt,speed){
 }
 function update(dt){
   time+=dt;
+  if(shakeT>0){
+    shakeT=Math.max(0,shakeT-dt);
+    if(shakeT===0){shakeDur=0;shakePower=0;}
+  }
   if(player.combatT>0)player.combatT=Math.max(0,player.combatT-dt);
   if(!player.dead){
     player.atkCd-=dt;player.swing-=dt;
@@ -2074,7 +2157,7 @@ function update(dt){
       }
     }
     const inVillage=zone==='field'&&dist(player,SPAWN)<6.5;
-    player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2));
+    player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2)*mpRegenMul());
     if(inVillage||!player.moving)
       player.hp=Math.min(player.maxHp,player.hp+dt*(inVillage?6:1.5));
   }
@@ -2134,10 +2217,10 @@ function update(dt){
         for(const m of mobs){
           if(m.dead)continue;
           if(Math.hypot(m.x-tx,m.y-(ty+0.4))<2.2)
-            damageMob(m,Math.round(atkTotal()*1.3*spellMul()+rnd(0,8)),false);
+            damageMob(m,Math.round(atkTotal()*1.3+rnd(0,8)),false);
         }
       }else{
-        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5*spellMul()+rnd(0,6)),false);
+        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5+rnd(0,6)),false);
         burst(tx,ty,'#7fb0ff',10);
       }
     }else{
@@ -3477,13 +3560,16 @@ function render(){
   const tx=isoX(player.x,player.y),ty=isoY(player.x,player.y);
   if(!camInit){camX=tx;camY=ty;camInit=true;}
   camX+=(tx-camX)*0.08;camY+=(ty-camY)*0.08;
+  const shakeRatio=shakeDur>0?shakeT/shakeDur:0;
+  const shakeX=shakeT>0?(Math.random()*2-1)*shakePower*shakeRatio:0;
+  const shakeY=shakeT>0?(Math.random()*2-1)*shakePower*shakeRatio:0;
 
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0b0d12';ctx.fillRect(0,0,W,H);
-  ctx.drawImage(ground, W/2-camX-ground.width/2, H/2-camY-TH/2);
+  ctx.drawImage(ground, W/2-camX-ground.width/2+shakeX, H/2-camY-TH/2+shakeY);
 
-  const SX=(x,y)=>isoX(x,y)-camX+W/2;
-  const SY=(x,y)=>isoY(x,y)-camY+H/2;
+  const SX=(x,y)=>isoX(x,y)-camX+W/2+shakeX;
+  const SY=(x,y)=>isoY(x,y)-camY+H/2+shakeY;
 
   if(clickMark){
     const a=1-clickMark.age/0.5;
@@ -3818,6 +3904,11 @@ canvas.addEventListener('pointerdown',ev=>{
   clickMark={x:t.x,y:t.y,age:0};
 });
 window.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'&&!$('settingsPanel').classList.contains('hidden')){
+    ev.preventDefault();
+    closeSettings();
+    return;
+  }
   if(ev.key==='Escape'&&$('resetConfirm').open){
     ev.preventDefault();
     closeResetConfirm();
@@ -3848,12 +3939,45 @@ $('btnFire').addEventListener('click',castFire);
 $('btnPotion').addEventListener('click',()=>drinkPotion());
 $('btnEquip').addEventListener('click',toggleEquip);
 $('btnAuto').addEventListener('click',toggleAuto);
-$('sndBtn').addEventListener('click',()=>{
-  soundOn=!soundOn;
-  if(bgmGain)bgmGain.gain.value=soundOn?(musicReady?0:0.5):0;
-  if(musicGain)musicGain.gain.value=soundOn?MUSIC_VOL:0;
-  $('sndBtn').textContent=soundOn?'🔊':'🔇';
+function renderSettings(){
+  $('bgmVolume').value=settings.bgm;$('bgmValue').textContent=`${settings.bgm}%`;
+  $('sfxVolume').value=settings.sfx;$('sfxValue').textContent=`${settings.sfx}%`;
+  $('brightnessSetting').value=settings.brightness;
+  $('brightnessValue').textContent=`${settings.brightness}%`;
+  $('screenShakeSetting').checked=settings.shake;
+}
+function openSettings(){
+  renderSettings();
+  $('settingsPanel').classList.remove('hidden');
+  sfx.click();
+}
+function closeSettings(){
+  $('settingsPanel').classList.add('hidden');
+  if(started||hasSaveData)save();
+  sfx.click();
+}
+for(const [id,key,out] of [
+  ['bgmVolume','bgm','bgmValue'],
+  ['sfxVolume','sfx','sfxValue'],
+  ['brightnessSetting','brightness','brightnessValue'],
+]){
+  $(id).addEventListener('input',ev=>{
+    settings[key]=+ev.target.value;
+    $(out).textContent=`${settings[key]}%`;
+    if(key==='brightness')applyVisualSettings();else applyAudioSettings();
+  });
+  $(id).addEventListener('change',()=>{
+    if(key==='sfx')sfx.click();
+    if(started||hasSaveData)save();
+  });
+}
+$('screenShakeSetting').addEventListener('change',ev=>{
+  settings.shake=ev.target.checked;
+  applyVisualSettings();
+  if(started||hasSaveData)save();
 });
+$('sndBtn').addEventListener('click',openSettings);
+$('settingsClose').addEventListener('click',closeSettings);
 function setGender(g){
   player.gender=g;
   $('pickM').classList.toggle('on',g==='m');
@@ -3960,6 +4084,8 @@ buildCave3();
 buildDragonCaves();
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
+applyVisualSettings();
+renderSettings();
 checkDrake();
 if(hasSaveData){
   $('nameIn').value=player.name;
