@@ -1,3 +1,5 @@
+import { createPresenceController } from './presence.js';
+
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
 const accountButton = document.getElementById('accountBtn');
@@ -30,6 +32,7 @@ const state = {
 };
 
 let accountLoadRevision = 0;
+let presenceController = null;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -201,6 +204,7 @@ async function loadAccountData() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    await presenceController?.setAccount(null, null);
     render();
     return;
   }
@@ -245,6 +249,7 @@ async function loadAccountData() {
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;
+  await presenceController?.setAccount(state.session, state.profile);
   render();
 }
 
@@ -344,6 +349,7 @@ async function updateProfile(event) {
     if (preferencesError) throw preferencesError;
     state.profile = data;
     state.preferences = preferences;
+    await presenceController?.setAccount(state.session, state.profile);
     if (config.resendSyncFunction) {
       const { error: syncError } = await state.client.functions.invoke(
         config.resendSyncFunction,
@@ -393,6 +399,7 @@ async function signOut() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    await presenceController?.setAccount(null, null);
     setFeedback('ログアウトしました');
   });
 }
@@ -407,12 +414,16 @@ async function initialize() {
     state.client = createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
+    presenceController = createPresenceController(state.client);
     const { data, error } = await state.client.auth.getSession();
     if (error) throw error;
     state.session = data.session;
     state.client.auth.onAuthStateChange((event, session) => {
       state.session = session;
-      if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'TOKEN_REFRESHED') {
+        void presenceController?.setAccount(session, state.profile);
+        return;
+      }
       setTimeout(() => loadAccountData(), 0);
     });
     await loadAccountData();

@@ -56,6 +56,12 @@
   #accountBtn.online{border-color:#6f9b65;color:#d6efcf}
   #accountBtn.online .status-dot{background:#75c36c;box-shadow:0 0 6px rgba(117,195,108,.7)}
   #accountBtn.pending .status-dot{background:var(--gold)}
+  #accountBtn.realtime{box-shadow:0 0 10px rgba(117,195,108,.2)}
+  #onlineCount{position:absolute;right:-6px;top:-7px;min-width:17px;height:17px;
+    box-sizing:border-box;padding:1px 4px;border-radius:9px;background:#315d37;
+    border:1px solid #9bc58f;color:#effbe9;font:700 9px/13px var(--sans);
+    text-align:center;box-shadow:0 1px 5px rgba(0,0,0,.7)}
+  #onlineCount[hidden]{display:none}
 
   /* ---- message log ---- */
   #log{position:absolute;left:12px;bottom:122px;pointer-events:none;
@@ -468,6 +474,7 @@
   <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
   <button id="accountBtn" title="魂籍を開く" aria-label="魂籍を開く">
     <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
+    <span id="onlineCount" hidden aria-hidden="true">1</span>
   </button>
 
   <div id="log" aria-live="polite"></div>
@@ -1185,6 +1192,7 @@ const player={
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
+const remotePlayers=new Map();
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
 let shakeT=0,shakeDur=0,shakePower=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
@@ -2312,8 +2320,26 @@ function moveAlong(e,dt,speed){
     e.moving=true;
   }
 }
+function updateRemotePlayers(dt){
+  const now=performance.now();
+  for(const [id,e] of remotePlayers){
+    if(now-e.lastSeen>8500){remotePlayers.delete(id);continue;}
+    const dx=e.targetX-e.x,dy=e.targetY-e.y,d=Math.hypot(dx,dy);
+    if(d>6){
+      e.x=e.targetX;e.y=e.targetY;e.moving=false;continue;
+    }
+    const blend=1-Math.exp(-11*dt);
+    const oldX=e.x,oldY=e.y;
+    e.x+=dx*blend;e.y+=dy*blend;
+    const moved=Math.hypot(e.x-oldX,e.y-oldY);
+    if(moved>0.0001)e.walkT=(e.walkT||0)+moved;
+    if(!e.remoteMoving&&d<0.015){e.x=e.targetX;e.y=e.targetY;}
+    e.moving=!e.dead&&(e.remoteMoving||d>=0.015);
+  }
+}
 function update(dt){
   time+=dt;
+  updateRemotePlayers(dt);
   if(shakeT>0){
     shakeT=Math.max(0,shakeT-dt);
     if(shakeT===0){shakeDur=0;shakePower=0;}
@@ -3088,6 +3114,24 @@ function drawPlayer(sx,sy,e){
     else ctx.drawImage(walkS,F,row*F,F,F,-D/2,-D+3,D,D);
   }
   ctx.restore();
+}
+function drawRemotePlayer(sx,sy,e){
+  ctx.save();
+  ctx.globalAlpha=0.9;
+  if(e.dead)drawPlayerCorpse(sx,sy,e);
+  else drawPlayer(sx,sy,e);
+  ctx.restore();
+}
+function drawRemotePlayerLabel(sx,sy,e){
+  if(e.dead)return;
+  const name=`${e.name||'ナナシ'}  徳位${e.level||1}`;
+  ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.strokeStyle='rgba(0,0,0,.92)';ctx.lineWidth=3;
+  ctx.strokeText(name,sx,sy-52,128);
+  ctx.fillStyle='#bfe7d0';ctx.fillText(name,sx,sy-52,128);
+  ctx.fillStyle='#79c783';
+  const textWidth=Math.min(128,ctx.measureText(name).width);
+  ctx.beginPath();ctx.arc(sx-textWidth/2-5,sy-55,2.3,0,6.29);ctx.fill();
 }
 function drawPlayerCorpse(sx,sy,e){
   const img=SPRITES['player_'+(e.gender||'m')+'_death'];
@@ -3864,6 +3908,8 @@ function render(){
   for(const n of npcs)items.push({d:n.x+n.y,k:'npc',o:n});
   for(const c of corpses)items.push({d:c.x+c.y-0.01,k:'corpse',o:c});
   for(const m of mobs)if(!m.dead)items.push({d:m.x+m.y,k:m.type,o:m});
+  for(const e of remotePlayers.values())if(e.zone===zone)
+    items.push({d:e.x+e.y,k:'remote_player',o:e});
   items.push({d:player.x+player.y,k:player.dead?'pcorpse':'player',o:player});
   items.sort((a,b)=>a.d-b.d);
   for(const it of items){
@@ -3894,6 +3940,7 @@ function render(){
       case 'gate':drawGate(sx,sy,it.o);break;
       case 'npc':drawNpc(sx,sy,it.o);break;
       case 'player':drawPlayer(sx,sy,it.o);break;
+      case 'remote_player':drawRemotePlayer(sx,sy,it.o);break;
       case 'pcorpse':drawPlayerCorpse(sx,sy,it.o);break;
       case 'corpse':drawCorpse(sx,sy,it.o);break;
       case 'goblin':case 'goblin_red':drawGoblin(sx,sy,it.o);break;
@@ -3927,6 +3974,13 @@ function render(){
       ctx.fillStyle='#e8dcc4';
       ctx.fillText(`${m.name} Lv${m.def.lv}`,sx,top-3);
     }
+  }
+  for(const e of remotePlayers.values()){
+    if(e.zone!==zone)continue;
+    const sx=SX(e.x,e.y);
+    const sy=SY(e.x,e.y)-(zone==='field'?ELEV_PX*elevF(e.x,e.y):0);
+    if(sx<-140||sx>W+140||sy<-160||sy>H+120)continue;
+    drawRemotePlayerLabel(sx,sy,e);
   }
   drawPlayerMobileHud(
     SX(player.x,player.y),
@@ -4380,6 +4434,45 @@ window.EnmaGameBridge={
       x:player.x,
       y:player.y,
     };
+  },
+  getRealtimeState(){
+    return{
+      active:started,
+      displayName:player.name||$('nameIn').value.trim()||'ナナシ',
+      gender:player.gender,
+      level:player.lv,
+      zone,
+      x:player.x,
+      y:player.y,
+      dir:player.dir,
+      moving:player.moving,
+      dead:player.dead,
+    };
+  },
+  setRemotePlayers(players){
+    const now=performance.now(),seen=new Set();
+    for(const raw of Array.isArray(players)?players:[]){
+      if(!raw||raw.zone!==zone||!Number.isFinite(raw.x)||!Number.isFinite(raw.y))continue;
+      const id=String(raw.userId||'');
+      if(!id)continue;
+      seen.add(id);
+      let e=remotePlayers.get(id);
+      if(!e){
+        e={x:raw.x,y:raw.y,targetX:raw.x,targetY:raw.y,walkT:0,
+          attackDur:0,attackT:0,hitT:0,swing:0,face:1,dir:'down',moving:false};
+        remotePlayers.set(id,e);
+      }
+      const dx=raw.x-e.targetX;
+      e.targetX=raw.x;e.targetY=raw.y;
+      e.face=Math.abs(dx)>0.01?(dx>=0?1:-1):e.face;
+      e.dir=['up','down','left','right'].includes(raw.dir)?raw.dir:e.dir;
+      e.remoteMoving=!!raw.moving;e.dead=!!raw.dead;
+      e.gender=raw.gender==='f'?'f':'m';
+      e.name=String(raw.displayName||'ナナシ').slice(0,16);
+      e.level=Math.max(1,raw.level|0);
+      e.zone=raw.zone;e.lastSeen=now;
+    }
+    for(const id of remotePlayers.keys())if(!seen.has(id))remotePlayers.delete(id);
   },
 };
 document.dispatchEvent(new CustomEvent('enma-game-ready'));
