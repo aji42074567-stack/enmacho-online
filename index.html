@@ -87,6 +87,9 @@
   .skill .key{position:absolute;top:2px;left:4px;font-size:9px;color:var(--dim)}
   .skill .badge{position:absolute;bottom:2px;right:4px;font-size:10px;color:var(--gold);
     font-variant-numeric:tabular-nums}
+  .skill.page-switch{width:36px;color:var(--gold);gap:4px}
+  .skill.page-switch .icon{font-size:16px}
+  .skill.page-switch b{font-size:11px}
   .skill.on{border-color:var(--gold);color:var(--gold);
     background:linear-gradient(180deg,#3d3220,#241c11);box-shadow:0 0 8px rgba(201,162,74,.3)}
   .skill.disabled{opacity:.42;cursor:default}
@@ -261,6 +264,15 @@
   .skill .item-icon img{display:block;width:100%;height:100%;object-fit:contain;
     image-rendering:auto;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
   #slotItems{min-height:40px}
+  .quick-page-setup{display:flex;align-items:center;gap:6px;margin-bottom:8px;
+    padding:8px 2px 10px;border-bottom:1px solid #33291a;
+    font-family:var(--sans);font-size:11px;color:var(--dim);text-align:left}
+  .quick-page-setup span{margin-right:auto}
+  .quick-page-choice{width:34px;height:30px;border:1px solid var(--panel-edge);
+    border-radius:3px;background:linear-gradient(180deg,#2b2314,#1c160d);
+    color:var(--parchment);font-family:var(--sans);font-size:12px;cursor:pointer}
+  .quick-page-choice.on{border-color:var(--gold);color:var(--gold);
+    background:linear-gradient(180deg,#3d3220,#241c11)}
   .statline{display:flex;justify-content:space-between;font-family:var(--sans);
     font-size:12.5px;color:#cfc2a0;padding:5px 2px;border-bottom:1px solid #2a2115}
   .statline b{color:var(--parchment);font-variant-numeric:tabular-nums}
@@ -276,6 +288,7 @@
     #vitals{display:none}
     #skills{gap:5px}
     .skill{width:42px;height:46px}
+    .skill.page-switch{width:28px}
     .skill .icon{font-size:15px}
     #dock{bottom:max(8px,env(safe-area-inset-bottom));gap:0;padding:8px;
       max-width:calc(100vw - 12px)}
@@ -334,10 +347,14 @@
         <span class="lock hidden" id="lockFire">徳6</span>
         <span class="cdov hidden" id="cdFire"></span>
       </button>
-      <button class="skill" id="btnPotion" title="甘露水 (Q)">
-        <span class="key">Q</span><span class="icon item-icon"><img src="assets/items/potion_kanro.png" alt=""></span><span id="potLabel">回復S</span>
+      <button class="skill" id="btnPotion" title="選択中の道具 (Q)">
+        <span class="key">Q</span><span class="icon item-icon"><img id="quickItemIcon" src="assets/items/potion_kanro.png" alt=""></span><span id="potLabel">回復S</span>
         <span class="badge" id="potN">3</span>
         <span class="cdov hidden" id="cdPotion"></span>
+      </button>
+      <button class="skill page-switch" id="quickPageBtn" title="アイテムページを切り替える"
+        aria-label="アイテムページ1。押すと次のページ">
+        <span class="icon">▶</span><span>P<b id="quickPageNow">1</b>/3</span>
       </button>
       <button class="skill" id="btnEquip" title="メニュー (I)">
         <span class="key">I</span><span class="icon">🛡</span><span>メニュー</span>
@@ -367,7 +384,7 @@
         <li><b>地面をクリック / タップ</b> … 移動</li>
         <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
         <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 甘露水 / <b>I</b> 道具</li>
+        <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 選択中の道具 / <b>I</b> メニュー</li>
       </ul>
       <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
       <button class="btn" id="startBtn">入庁する</button>
@@ -586,6 +603,11 @@ const HEAL_POTIONS={
   m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:4},
   l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:6},
 };
+const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','crit'];
+const defaultQuickItems=tier=>[
+  QUICK_ITEM_IDS.includes(`heal_${tier}`)?`heal_${tier}`:'heal_s',
+  'haste','crit',
+];
 const HASTE_PRICE=300,CRIT_PRICE=300;
 
 /* ================= マップ生成 ================= */
@@ -961,6 +983,7 @@ const player={
   stats:{str:0,con:0,agi:0,int:0,luck:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
+  quickItems:['heal_s','haste','crit'],quickPage:0,
   name:'',quests:{trial:0},
   qb:{active:null,prog:0,done:{}},          // 高札クエスト
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
@@ -1011,8 +1034,9 @@ function save(){
   if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:6,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:7,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
+      quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
       items:player.items,eq:player.eq,kills,
       gender:player.gender,name:player.name,
@@ -1028,11 +1052,16 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6))return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6&&d.v!==7))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
     player.potionTier=HEAL_POTIONS[d.potionTier]?d.potionTier:'s';
+    const quickFallback=defaultQuickItems(player.potionTier);
+    player.quickItems=(d.v>=7&&Array.isArray(d.quickItems))
+      ?quickFallback.map((fallback,i)=>QUICK_ITEM_IDS.includes(d.quickItems[i])?d.quickItems[i]:fallback)
+      :quickFallback;
+    player.quickPage=clamp(d.quickPage|0,0,2);
     player.dragonBlood=Math.max(0,d.dragonBlood|0);
     player.items=Array.isArray(d.items)?d.items:['dagger','cloth'];
     if(d.v>=3&&d.eq){
@@ -1510,12 +1539,6 @@ function castFire(){
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
 }
-function selectPotion(tier){
-  if(!HEAL_POTIONS[tier])return;
-  player.potionTier=tier;
-  log(`${HEAL_POTIONS[tier].name}をQに設定した`,'sys');
-  sfx.click();save();
-}
 function drinkPotion(tier=player.potionTier){
   if(player.dead||!started)return;
   const p=HEAL_POTIONS[tier]||HEAL_POTIONS.s;
@@ -1548,6 +1571,44 @@ function drinkCrit(){
   burst(player.x,player.y,'#ffb46a',12);
   sfx.potion();save();
 }
+function quickItemInfo(id){
+  if(id&&id.startsWith('heal_')){
+    const tier=id.slice(5),p=HEAL_POTIONS[tier]||HEAL_POTIONS.s;
+    return{id:`heal_${tier}`,kind:'heal',tier,name:p.name,label:`回復${tier.toUpperCase()}`,
+      icon:'assets/items/potion_kanro.png',count:player[p.field],
+      disabled:player[p.field]<=0||player.cd.potion>0,
+      title:`${p.name} (Q) HP+${p.heal} / 使用後${p.delay}秒`};
+  }
+  if(id==='haste')return{id,kind:'haste',name:'韋駄天の水',label:'韋駄天',
+    icon:'assets/items/potion_idaten.png',count:player.hastePots,
+    disabled:player.hastePots<=0||player.hasteT>0,title:'韋駄天の水 (Q) 5分 高速化'};
+  return{id:'crit',kind:'crit',name:'修羅の酒',label:'修羅',
+    icon:'assets/items/potion_shura.png',count:player.critPots,
+    disabled:player.critPots<=0||player.critT>0,title:'修羅の酒 (Q) 5分 会心+25%'};
+}
+function useQuickItem(){
+  const q=quickItemInfo(player.quickItems[player.quickPage]);
+  if(q.kind==='heal')drinkPotion(q.tier);
+  else if(q.kind==='haste')drinkHaste();
+  else drinkCrit();
+}
+function setQuickItem(id,page=player.quickPage){
+  if(!QUICK_ITEM_IDS.includes(id))return;
+  page=clamp(page|0,0,2);
+  player.quickItems[page]=id;
+  const q=quickItemInfo(id);
+  if(q.kind==='heal')player.potionTier=q.tier;
+  log(`${q.name}をアイテムページ${page+1}のQに設定した`,'sys');
+  sfx.click();save();hud();
+}
+function setQuickPage(page,announce=false){
+  page=((page|0)%3+3)%3;
+  if(player.quickPage===page)return;
+  player.quickPage=page;
+  if(announce)log(`アイテムページ${page+1}へ切り替えた`,'sys');
+  sfx.click();save();hud();
+}
+function cycleQuickPage(){setQuickPage(player.quickPage+1,true);}
 function mobAttack(m){
   // 予備動作0.22秒 → mobStrikeで実ダメージ
   m.atkCd=m.def.atkCd;m.swing=m.def.boss?0.8:0.35;
@@ -1823,22 +1884,19 @@ function renderEquipTab(){
   }
 }
 function renderItemTab(){
-  let html='';
-  for(const [tier,p] of Object.entries(HEAL_POTIONS)){
-    const selected=player.potionTier===tier;
-    const unusable=selected&&(player[p.field]<=0||player.cd.potion>0);
-    html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
-      <span class="nm">${p.name} ×${player[p.field]} <span class="fx">HP+${p.heal} / 共有ディレイ${p.delay}秒</span></span>
-      <button class="buyb ${selected?'on':''}" data-potion="${tier}" ${unusable?'disabled':''}>${selected?'使う':'Q設定'}</button></div>`;
-  }
-  const CONS=[
-    ['hastePots','韋駄天の水','5分 高速化','haste','potion_idaten.png'],
-    ['critPots','修羅の酒','5分 会心+25%','crit','potion_shura.png'],
-  ];
-  for(const [f,nm,fx,act,icon] of CONS){
-    html+=`<div class="itemrow"><img class="icn" src="assets/items/${icon}" alt="">
-      <span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
-      <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
+  let html=`<div class="quick-page-setup"><span>Qアイテムの設定先</span>`;
+  for(let i=0;i<3;i++)html+=`<button class="quick-page-choice ${player.quickPage===i?'on':''}"
+    data-quick-page="${i}" aria-label="アイテムページ${i+1}">P${i+1}</button>`;
+  html+='</div>';
+  for(const id of QUICK_ITEM_IDS){
+    const q=quickItemInfo(id),selected=player.quickItems[player.quickPage]===id;
+    const fx=q.kind==='heal'
+      ?`HP+${HEAL_POTIONS[q.tier].heal} / 共有ディレイ${HEAL_POTIONS[q.tier].delay}秒`
+      :q.kind==='haste'?'5分 高速化':'5分 会心+25%';
+    html+=`<div class="itemrow"><img class="icn" src="${q.icon}" alt="">
+      <span class="nm">${q.name} ×${q.count} <span class="fx">${fx}</span></span>
+      <button class="buyb ${selected?'on':''}" data-quick-item="${id}"
+        ${selected&&q.disabled?'disabled':''}>${selected?'使う':`P${player.quickPage+1}設定`}</button></div>`;
   }
   if(player.wScrolls>0){
     html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
@@ -1857,20 +1915,17 @@ function renderItemTab(){
       <span class="nm">渡し守の古銭 <span class="fx">次の審査区へ渡る資格の証</span></span></div>`;
   }
   $('itemList').innerHTML=html;
-  for(const b of $('itemList').querySelectorAll('[data-use]')){
+  for(const b of $('itemList').querySelectorAll('[data-quick-page]')){
     b.addEventListener('click',()=>{
-      const a=b.getAttribute('data-use');
-      if(a==='drink')drinkPotion();
-      else if(a==='haste')drinkHaste();
-      else drinkCrit();
+      setQuickPage(+b.getAttribute('data-quick-page'));
       renderItemTab();
     });
   }
-  for(const b of $('itemList').querySelectorAll('[data-potion]')){
+  for(const b of $('itemList').querySelectorAll('[data-quick-item]')){
     b.addEventListener('click',()=>{
-      const tier=b.getAttribute('data-potion');
-      if(player.potionTier===tier)drinkPotion(tier);
-      else selectPotion(tier);
+      const id=b.getAttribute('data-quick-item');
+      if(player.quickItems[player.quickPage]===id)useQuickItem();
+      else setQuickItem(id);
       renderItemTab();
     });
   }
@@ -3788,10 +3843,15 @@ function hud(){
   el.mp.style.width=(player.mp/player.maxMp*100)+'%';
   el.hpn.textContent=`${Math.ceil(player.hp)} / ${player.maxHp}`;
   el.mpn.textContent=`${Math.floor(player.mp)} / ${player.maxMp}`;
-  const hpPotion=HEAL_POTIONS[player.potionTier]||HEAL_POTIONS.s;
-  el.pot.textContent=player[hpPotion.field];
-  el.potLabel.textContent='回復'+player.potionTier.toUpperCase();
-  $('btnPotion').title=`${hpPotion.name} (Q) HP+${hpPotion.heal} / 使用後${hpPotion.delay}秒`;
+  const quickItem=quickItemInfo(player.quickItems[player.quickPage]);
+  el.pot.textContent=quickItem.count;
+  el.potLabel.textContent=quickItem.label;
+  $('quickItemIcon').src=quickItem.icon;
+  $('btnPotion').title=quickItem.title;
+  $('quickPageNow').textContent=player.quickPage+1;
+  $('quickPageBtn').title=`アイテムページ${player.quickPage+1} / 3（押すと次へ）`;
+  $('quickPageBtn').setAttribute('aria-label',
+    `アイテムページ${player.quickPage+1}。押すとページ${(player.quickPage+1)%3+1}`);
   el.pt.textContent=player.statPts>0?player.statPts:'';
   if(player.qb.active){
     const q=questById(player.qb.active);
@@ -3814,11 +3874,10 @@ function hud(){
   el.bolt.classList.toggle('disabled',player.mp<8||player.cd.bolt>0);
   el.heal.classList.toggle('disabled',player.lv<3||player.mp<12||player.cd.heal>0);
   el.fire.classList.toggle('disabled',player.lv<6||player.mp<20||player.cd.fire>0);
-  const potionLocked=player[hpPotion.field]<=0||player.cd.potion>0;
-  $('btnPotion').classList.toggle('disabled',potionLocked);
-  $('btnPotion').disabled=potionLocked;
+  $('btnPotion').classList.toggle('disabled',quickItem.disabled);
+  $('btnPotion').disabled=quickItem.disabled;
   const cdShow=(elm,v)=>{elm.classList.toggle('hidden',v<=0);if(v>0)elm.textContent=Math.ceil(v);};
-  cdShow(el.cdPotion,player.cd.potion);
+  cdShow(el.cdPotion,quickItem.kind==='heal'?player.cd.potion:0);
   cdShow(el.cdBolt,player.cd.bolt);
   cdShow(el.cdHeal,player.lv>=3?player.cd.heal:0);
   cdShow(el.cdFire,player.lv>=6?player.cd.fire:0);
@@ -3919,7 +3978,7 @@ window.addEventListener('keydown',ev=>{
   if(k==='e')castBolt();
   if(k==='r')castHeal();
   if(k==='f')castFire();
-  if(k==='q')drinkPotion();
+  if(k==='q')useQuickItem();
   if(k==='w')drinkHaste();
   if(k==='c')drinkCrit();
   if(k==='i')toggleEquip();
@@ -3936,7 +3995,8 @@ function toggleAuto(){
 $('btnBolt').addEventListener('click',castBolt);
 $('btnHeal').addEventListener('click',castHeal);
 $('btnFire').addEventListener('click',castFire);
-$('btnPotion').addEventListener('click',()=>drinkPotion());
+$('btnPotion').addEventListener('click',useQuickItem);
+$('quickPageBtn').addEventListener('click',cycleQuickPage);
 $('btnEquip').addEventListener('click',toggleEquip);
 $('btnAuto').addEventListener('click',toggleAuto);
 function renderSettings(){
