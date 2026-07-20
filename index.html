@@ -258,12 +258,16 @@
   .hidden{display:none !important}
 
   @media (max-width:640px){
-    #plate{min-width:150px;padding:8px 10px}
+    #plate{min-width:126px;padding:8px 10px}
+    #plate .name{display:none}
+    #plate .lv{margin-left:0}
     #log{bottom:132px;font-size:10.5px}
-    #vitals{width:34vw;min-width:110px}
-    .skill{width:46px;height:46px}
+    #vitals{display:none}
+    #skills{gap:5px}
+    .skill{width:42px;height:46px}
     .skill .icon{font-size:15px}
-    #dock{gap:8px;padding:8px 10px}
+    #dock{bottom:max(8px,env(safe-area-inset-bottom));gap:0;padding:8px;
+      max-width:calc(100vw - 12px)}
     .scroll{padding:22px 20px}
     .scroll h1{font-size:24px}
     .reset-paper{padding:26px 18px}
@@ -486,6 +490,9 @@
 const TW=64, TH=32, MAP=72;   // 島の周囲に海の余白を確保
 const RANGE=1.4;
 const AUTO_RANGE=8;
+const COMBAT_HOLD_SECONDS=4;
+const MOB_RESPAWN_SECONDS=20;
+const BOSS_RESPAWN_SECONDS=120;
 const SAVE_KEY='aden_save_v1';
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
@@ -927,6 +934,7 @@ const player={
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
   cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
+  combatT:0,
   autoMode:false,
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
@@ -1079,11 +1087,11 @@ function spawnMob(type,x,y){
       spawnMob(type,Math.round(cx+Math.cos(a)*d),Math.round(cy+Math.sin(a)*d));
     }
   };
-  ring(31,33,5,8,'goblin');   // 町の柵(y39)の外側
-  ring(38,35,4,3,'goblin_red');
-  ring(41,30,5,5,'wolf');  ring(22,34,5,5,'wolf');
-  ring(42,16,4,4,'orc');   ring(16,24,4,4,'orc');
-  ring(16,11,4,4,'skeleton');
+  ring(31,33,5,6,'goblin');   // 町の柵(y39)の外側
+  ring(38,35,4,2,'goblin_red');
+  ring(41,30,5,4,'wolf');  ring(22,34,5,4,'wolf');
+  ring(42,16,4,3,'orc');   ring(16,24,4,3,'orc');
+  ring(16,11,4,3,'skeleton');
 })();
 
 /* ================= 演出・ログ ================= */
@@ -1292,6 +1300,7 @@ function questProgress(type,tag){
 /* ================= 戦闘 ================= */
 function damageMob(m,dmg,crit){
   if(m.dead)return;
+  player.combatT=COMBAT_HOLD_SECONDS;
   m.hp-=dmg;m.flash=0.14;
   addFloat(m.x,m.y,String(dmg),crit?'#ffb347':'#fff',crit);
   burst(m.x,m.y,'#e8d090',crit?12:6);
@@ -1299,7 +1308,7 @@ function damageMob(m,dmg,crit){
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
 }
 function killMob(m){
-  m.dead=true;m.hp=0;m.respawn=m.def.boss?90:12;
+  m.dead=true;m.hp=0;m.respawn=m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS;
   corpses.push({x:m.x,y:m.y,type:m.type,face:m.face,age:0});  // 死体をその場に残す
   if(player.target===m)player.target=null;
   kills++;
@@ -1473,13 +1482,14 @@ function mobAttack(m){
   m.windup=m.def.boss?0.4:0.22;
 }
 function mobStrike(m){
+  player.combatT=COMBAT_HOLD_SECONDS;
   if(Math.random()<0.06){addFloat(player.x,player.y,'Miss','#b8b8b8');return;}
   const dmg=Math.max(1,rndi(m.def.dmg[0],m.def.dmg[1])-defTotal());
   player.hp-=dmg;player.hitT=0.3;
   addFloat(player.x,player.y,String(dmg),'#ff7a6a');
   sfx.hurt();
   if(player.hp<=0){
-    player.hp=0;player.dead=true;player.path=[];player.target=null;
+    player.hp=0;player.dead=true;player.path=[];player.target=null;player.combatT=0;
     player.autoMode=false;$('btnAuto').classList.remove('on');
     player.attackDur=0;player.pendingHit=null;
     log('魂がほどけて散った…','sys');
@@ -1987,6 +1997,7 @@ function moveAlong(e,dt,speed){
 }
 function update(dt){
   time+=dt;
+  if(player.combatT>0)player.combatT=Math.max(0,player.combatT-dt);
   if(!player.dead){
     player.atkCd-=dt;player.swing-=dt;
     if(player.hitT>0)player.hitT-=dt;
@@ -2038,6 +2049,7 @@ function update(dt){
       const m=player.target;
       if(m.dead){player.target=null;}
       else{
+        player.combatT=COMBAT_HOLD_SECONDS;
         const d=dist(player,m);
         if(d<=RANGE){player.path=[];if(player.atkCd<=0)playerAttack();}
         else{
@@ -2098,9 +2110,10 @@ function update(dt){
         }
       }
     }else if(m.state==='chase'){
-      if(player.dead||dh>12||(zone==='field'&&dist(player,SPAWN)<6)){m.state='return';m.path=[];}
+      if(player.dead){m.state='return';m.path=[];}
       else if(dp<=RANGE){m.path=[];if(m.atkCd<=0)mobAttack(m);}
       else{
+        player.combatT=COMBAT_HOLD_SECONDS;
         m.repath-=dt;
         if(m.repath<=0){m.repath=0.5;m.path=findPath(m.x,m.y,player.x,player.y);}
       }
@@ -2458,7 +2471,7 @@ function buildCave(){
   props.push({x:CAVE_EXIT.x-0.6,y:CAVE_EXIT.y,kind:'cavexit'});
   props.push({x:CAVE_LINKS[0].at.x,y:CAVE_LINKS[0].at.y,kind:'stairdown'});
   spawnMob('skeleton',30,27);spawnMob('skeleton',33,33);spawnMob('skeleton',28,31);
-  spawnMob('skeleton',43,26);spawnMob('skeleton',44,35);
+  spawnMob('skeleton',43,26);
   spawnMob('oni_blue',49,30);   // 洞窟の主
   ground=document.createElement('canvas');
   CAVE={blocked,tileKind,props,npcs,mobs,ground};
@@ -2480,8 +2493,8 @@ function buildCave2(){
   }
   props.push({x:CAVE_LINKS[1].at.x,y:CAVE_LINKS[1].at.y,kind:'stairup'});
   props.push({x:CAVE_LINKS[2].at.x,y:CAVE_LINKS[2].at.y,kind:'stairdown'});
-  spawnMob('dark_dog',28,27);spawnMob('dark_dog',33,33);spawnMob('dark_dog',30,31);spawnMob('dark_dog',44,33);
-  spawnMob('oni_bone',43,27);spawnMob('oni_bone',47,31);spawnMob('oni_bone',48,20);
+  spawnMob('dark_dog',28,27);spawnMob('dark_dog',33,33);spawnMob('dark_dog',44,33);
+  spawnMob('oni_bone',43,27);spawnMob('oni_bone',48,20);
   ground=document.createElement('canvas');
   CAVE2={blocked,tileKind,props,npcs,mobs,ground};
   renderGroundCave(CAVE2);
@@ -2500,8 +2513,8 @@ function buildCave3(){
     props.push({x:tx,y:ty,kind:'torch'});
   }
   props.push({x:CAVE_LINKS[3].at.x,y:CAVE_LINKS[3].at.y,kind:'stairup'});
-  spawnMob('gozu',30,27);spawnMob('gozu',36,35);spawnMob('gozu',33,31);spawnMob('gozu',45,25);
-  spawnMob('oni_bone',31,35);spawnMob('oni_bone',37,26);
+  spawnMob('gozu',30,27);spawnMob('gozu',33,31);spawnMob('gozu',45,25);
+  spawnMob('oni_bone',37,26);
   spawnMob('oni_king',51,30);   // 最深部の主
   ground=document.createElement('canvas');
   CAVE3={blocked,tileKind,props,npcs,mobs,ground};
@@ -2511,13 +2524,13 @@ function buildCave3(){
 let DGW=[];   // dg1〜dg5 のワールド
 const DG_DEFS=[
   {rooms:[[11,27,17,33],[17,29,33,31],[33,25,39,37],[39,30,53,32],[47,22,55,28],[49,26,51,30]],
-   mobs:[['skeleton',22,30],['skeleton',35,28],['dark_dog',36,34],['dark_dog',45,31],['skeleton',50,25]]},
+   mobs:[['skeleton',22,30],['skeleton',35,28],['dark_dog',36,34],['dark_dog',45,31]]},
   {rooms:[[11,27,17,33],[17,30,25,32],[25,20,31,40],[31,28,45,32],[45,24,53,36]],
-   mobs:[['oni_bone',27,24],['oni_bone',28,36],['dark_dog',37,30],['gozu',48,27],['oni_bone',49,33]]},
+   mobs:[['oni_bone',27,24],['oni_bone',28,36],['dark_dog',37,30],['gozu',48,27]]},
   {rooms:[[11,27,17,33],[17,29,27,31],[27,21,33,39],[33,23,41,25],[33,35,41,37],[41,21,49,39]],
-   mobs:[['gozu',30,24],['gozu',30,36],['oni_bone',37,24],['oni_bone',37,36],['gozu',45,30],['dark_dog',44,23]]},
+   mobs:[['gozu',30,24],['gozu',30,36],['oni_bone',37,24],['gozu',45,30],['dark_dog',44,23]]},
   {rooms:[[11,27,17,33],[17,29,23,31],[23,21,29,39],[29,29,43,31],[43,19,51,41]],
-   mobs:[['gozu',26,24],['gozu',26,36],['gozu',36,30],['oni_bone',46,22],['oni_bone',46,38],['gozu',48,30]]},
+   mobs:[['gozu',26,24],['gozu',26,36],['gozu',36,30],['oni_bone',46,22],['gozu',48,30]]},
   {rooms:[[11,28,17,34],[17,30,25,32],[25,20,55,40]],
    mobs:[['gozu',30,25],['gozu',30,35]]},
 ];
@@ -2558,13 +2571,15 @@ function checkDrake(){
   if(started)log('地の底から咆哮が響いた…ゴウリュウが現れた','sys');
 }
 function switchZone(z,px,py){
+  // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
+  for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
   zone=z;
   const W2={field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]||DGW[+z.slice(2)-1];
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
   corpses.length=0;bolts.length=0;
   player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
-  player.attackDur=0;player.attackT=0;
+  player.attackDur=0;player.attackT=0;player.combatT=0;
   player.x=px;player.y=py;camInit=false;
   if(z.startsWith('dg')&&!player.story.dragonCaveReached){
     player.story.dragonCaveReached=true;
@@ -2757,6 +2772,23 @@ function drawPlayerCorpse(sx,sy,e){
   const img=SPRITES['player_'+(e.gender||'m')+'_death'];
   drawShadow(sx,sy+2,12);
   if(img)ctx.drawImage(img,0,0,128,128,sx-24,sy-45,48,48);
+}
+function drawPlayerMobileHud(sx,sy){
+  if(W>640||!started||player.dead)return;
+  const fighting=player.combatT>0;
+  const nameY=fighting?sy-70:sy-52;
+  ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3;
+  ctx.strokeText(player.name||'ナナシ',sx,nameY);
+  ctx.fillStyle='#f2e4c7';ctx.fillText(player.name||'ナナシ',sx,nameY);
+  if(!fighting)return;
+  const bw=62;
+  const meter=(y,ratio,color)=>{
+    ctx.fillStyle='rgba(0,0,0,.78)';ctx.fillRect(sx-bw/2,y,bw,5);
+    ctx.fillStyle=color;ctx.fillRect(sx-bw/2+1,y+1,(bw-2)*clamp(ratio,0,1),3);
+  };
+  meter(sy-65,player.hp/player.maxHp,'#c64637');
+  meter(sy-58,player.mp/player.maxMp,'#3979bd');
 }
 function drawCorpse(sx,sy,c){
   const fade=c.age>4.5?Math.max(0,1-(c.age-4.5)/1.5):1;
@@ -3572,6 +3604,10 @@ function render(){
       ctx.fillText(`${m.name} Lv${m.def.lv}`,sx,top-3);
     }
   }
+  drawPlayerMobileHud(
+    SX(player.x,player.y),
+    SY(player.x,player.y)-(zone==='field'?ELEV_PX*elevF(player.x,player.y):0)
+  );
   for(const b of bolts){
     const sx=SX(b.x,b.y),sy=SY(b.x,b.y);
     const fire=b.kind==='fire';
@@ -3909,7 +3945,7 @@ $('reviveBtn').addEventListener('click',()=>{
   if(zone!=='field')switchZone('field',SPAWN.x,SPAWN.y);
   player.x=SPAWN.x;player.y=SPAWN.y;
   player.hp=player.maxHp;player.mp=player.maxMp;
-  player.path=[];player.target=null;player.talkTarget=null;
+  player.path=[];player.target=null;player.talkTarget=null;player.combatT=0;
   player.hitT=0;player.attackDur=0;player.attackT=0;player.pendingHit=null;
   player.hasteT=0;player.critT=0;
   $('death').classList.add('hidden');
