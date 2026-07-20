@@ -1,0 +1,3 @@
+[functions.sync-resend-contact]
+verify_jwt = true
+

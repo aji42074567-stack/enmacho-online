@@ -44,10 +44,18 @@
   #quest .goal{font-family:var(--serif);font-size:12px;color:var(--parchment);letter-spacing:.08em}
   #quest .n{font-family:var(--sans);font-size:11px;color:var(--dim);margin-top:4px;
     font-variant-numeric:tabular-nums}
-  #sndBtn{position:absolute;top:82px;right:12px;width:38px;height:38px;
+  #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
-    color:var(--parchment);font-size:19px;cursor:pointer;padding:0;line-height:1}
-  #sndBtn:hover{border-color:#6b5730}
+    color:var(--parchment);cursor:pointer;padding:0;line-height:1}
+  #sndBtn{top:82px;font-size:19px}
+  #accountBtn{top:126px;width:46px;font-family:var(--serif);font-size:11px;
+    letter-spacing:.05em}
+  #sndBtn:hover,#accountBtn:hover{border-color:#6b5730}
+  #accountBtn .status-dot{display:inline-block;width:6px;height:6px;margin-right:3px;
+    border-radius:50%;background:#645b4b;box-shadow:0 0 0 1px #1a150f}
+  #accountBtn.online{border-color:#6f9b65;color:#d6efcf}
+  #accountBtn.online .status-dot{background:#75c36c;box-shadow:0 0 6px rgba(117,195,108,.7)}
+  #accountBtn.pending .status-dot{background:var(--gold)}
 
   /* ---- message log ---- */
   #log{position:absolute;left:12px;bottom:122px;pointer-events:none;
@@ -235,6 +243,51 @@
   .setting-toggle input{width:20px;height:20px;accent-color:var(--gold)}
   .setting-note{font-family:var(--sans);font-size:10.5px;color:var(--dim);
     line-height:1.7;text-align:left;margin:14px 0 0}
+  .account-lead{font-family:var(--serif);font-size:13px;line-height:1.9;
+    color:#cfc2a0;margin:0 0 14px}
+  .account-seal{display:inline-block;margin:0 0 14px;padding:5px 12px;
+    border:1px solid #856c38;color:var(--gold);font-family:var(--serif);
+    font-size:11px;letter-spacing:.18em;transform:rotate(-2deg)}
+  .account-card,.account-code{padding:14px;border:1px solid #4a3b22;border-radius:5px;
+    background:#15110b;text-align:left}
+  .account-card b{display:block;color:var(--parchment);font-family:var(--serif);
+    font-size:14px;margin:5px 0}
+  .account-card p,.account-note,.account-cloud p{font-family:var(--sans);
+    font-size:10.5px;line-height:1.7;color:var(--dim);margin:6px 0 0}
+  .account-label,.account-code span{font-family:var(--sans);font-size:10px;
+    color:var(--gold);letter-spacing:.14em}
+  .account-form{display:flex;flex-direction:column;gap:11px;text-align:left}
+  .account-form.compact{gap:9px}
+  .account-form label{font-family:var(--sans);font-size:10.5px;color:var(--dim)}
+  .account-form input:not([type="checkbox"]){display:block;width:100%;box-sizing:border-box;
+    margin-top:5px;padding:9px 10px;color:var(--parchment);background:#110e09;
+    border:1px solid var(--panel-edge);border-radius:3px;font:13px var(--sans);outline:none}
+  .account-form input:focus{border-color:var(--gold)}
+  .account-check{display:flex;align-items:flex-start;gap:8px;line-height:1.5;cursor:pointer}
+  .account-check input{width:17px;height:17px;flex:none;margin:1px 0 0;accent-color:var(--gold)}
+  .account-primary{min-height:40px;margin-top:2px}
+  .account-divider{display:flex;align-items:center;gap:10px;margin:18px 0 14px;
+    color:var(--dim);font:10px var(--sans);letter-spacing:.15em}
+  .account-divider::before,.account-divider::after{content:"";height:1px;flex:1;background:#3a2e1d}
+  .account-reset,.account-logout{margin-top:2px;align-self:center}
+  .account-feedback{padding:8px 10px;margin:0 0 12px;border:1px solid #49633c;
+    border-radius:3px;background:#172015;color:#a8d49a;font:11px/1.6 var(--sans)}
+  .account-feedback.error{border-color:#733c35;background:#281513;color:#e4a49c}
+  .account-code{text-align:center;margin-bottom:12px}
+  .account-code strong{display:block;margin:7px 0 3px;color:#f0d37b;
+    font:600 22px/1.2 var(--serif);letter-spacing:.13em}
+  .account-code small{color:var(--dim);font:9.5px var(--sans)}
+  .account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;
+    margin-bottom:14px;text-align:left}
+  .account-grid div{padding:9px 10px;border:1px solid #33291a;background:#14100a}
+  .account-grid span{display:block;color:var(--dim);font:9px var(--sans);margin-bottom:3px}
+  .account-grid b{display:block;overflow:hidden;text-overflow:ellipsis;color:var(--parchment);
+    font:12px var(--sans);white-space:nowrap}
+  .account-grid .account-email{font-size:9.5px}
+  .account-profile-form{padding-top:3px}
+  .account-cloud{text-align:left}
+  .account-actions{display:flex;gap:7px;margin-top:10px}
+  .account-actions .buyb{flex:1;padding-inline:7px}
 
   /* ---- 行嚢メニュー(装備/道具/ステータス) ---- */
   #menuTabs{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
@@ -322,6 +375,9 @@
   </div>
 
   <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
+  <button id="accountBtn" title="魂籍を開く" aria-label="魂籍を開く">
+    <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
+  </button>
 
   <div id="log" aria-live="polite"></div>
 
@@ -536,6 +592,18 @@
       </div>
       <p class="setting-note">音量を0%にすると消音になります。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
       <button class="btn small" id="settingsClose">設定を閉じる</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="accountPanel" role="dialog" aria-modal="true"
+    aria-labelledby="accountTitle">
+    <div class="scroll">
+      <h2 id="accountTitle">魂籍</h2>
+      <div class="sub">転生を越えて残る魂の記録</div>
+      <div id="accountContent">
+        <p class="account-lead">魂籍台帳を準備しています…</p>
+      </div>
+      <button class="btn small" id="accountClose">魂籍を閉じる</button>
     </div>
   </div>
 </div>
@@ -3963,6 +4031,11 @@ canvas.addEventListener('pointerdown',ev=>{
   clickMark={x:t.x,y:t.y,age:0};
 });
 window.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
+    ev.preventDefault();
+    closeAccount();
+    return;
+  }
   if(ev.key==='Escape'&&!$('settingsPanel').classList.contains('hidden')){
     ev.preventDefault();
     closeSettings();
@@ -4008,6 +4081,7 @@ function renderSettings(){
 }
 function openSettings(){
   renderSettings();
+  $('accountPanel').classList.add('hidden');
   $('settingsPanel').classList.remove('hidden');
   sfx.click();
 }
@@ -4038,6 +4112,18 @@ $('screenShakeSetting').addEventListener('change',ev=>{
 });
 $('sndBtn').addEventListener('click',openSettings);
 $('settingsClose').addEventListener('click',closeSettings);
+function openAccount(){
+  $('settingsPanel').classList.add('hidden');
+  $('accountPanel').classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('enma-account-open'));
+  sfx.click();
+}
+function closeAccount(){
+  $('accountPanel').classList.add('hidden');
+  sfx.click();
+}
+$('accountBtn').addEventListener('click',openAccount);
+$('accountClose').addEventListener('click',closeAccount);
 function setGender(g){
   player.gender=g;
   $('pickM').classList.toggle('on',g==='m');
@@ -4146,6 +4232,32 @@ switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
 applyVisualSettings();
 renderSettings();
+window.EnmaGameBridge={
+  exportSave(){
+    try{
+      const raw=localStorage.getItem(SAVE_KEY);
+      return raw?JSON.parse(raw):null;
+    }catch(e){return null;}
+  },
+  importSave(payload){
+    if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
+      payload.v<1||payload.v>7)throw new Error('対応していない記録です');
+    localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+    location.reload();
+  },
+  getProfile(){
+    return{
+      displayName:player.name||$('nameIn').value.trim()||'ナナシ',
+      soulStage:player.story.dragonCleared?'rebirth_candidate':'deceased',
+      gender:player.gender,
+      level:player.lv,
+      zone,
+      x:player.x,
+      y:player.y,
+    };
+  },
+};
+document.dispatchEvent(new CustomEvent('enma-game-ready'));
 checkDrake();
 if(hasSaveData){
   $('nameIn').value=player.name;
@@ -4169,5 +4281,7 @@ function frame(t){
 resize();
 requestAnimationFrame(frame);
 </script>
+<script src="online/config.js"></script>
+<script type="module" src="online/account.js"></script>
 </body>
 </html>
