@@ -2380,6 +2380,16 @@ function updateRemotePlayers(dt){
     e.moving=!e.dead&&e.attackDur<=0&&(e.remoteMoving||d>=0.015);
   }
 }
+function playRemoteAttackPose(e,kind){
+  e.moving=false;
+  if(kind==='cast'){
+    e.attackT=0;e.attackDur=0;
+    e.swing=0.32;e.swingKind='cast';
+  }else{
+    e.swing=0;
+    e.attackT=0;e.attackDur=0.7;e.swingKind='melee';
+  }
+}
 function update(dt){
   time+=dt;
   updateRemotePlayers(dt);
@@ -4675,18 +4685,14 @@ window.EnmaGameBridge={
       if(!e||(sessionId&&e.sessionId!==sessionId)){
         e={x:raw.x,y:raw.y,targetX:raw.x,targetY:raw.y,walkT:0,
           attackDur:0,attackT:0,hitT:0,swing:0,swingKind:'melee',
-          lastAttackSeq:Math.max(0,raw.attackSeq|0),sessionId,
+          lastAttackSeq:Math.max(0,raw.attackSeq|0),lastActionEventSeq:-1,sessionId,
           face:1,dir:'down',moving:false};
         remotePlayers.set(id,e);
       }else{
         const attackSeq=Math.max(0,raw.attackSeq|0);
         if(attackSeq!==e.lastAttackSeq){
           e.lastAttackSeq=attackSeq;
-          if(raw.attackKind==='cast'){
-            e.swing=0.25;e.swingKind='cast';
-          }else{
-            e.attackT=0;e.attackDur=0.62;e.swingKind='melee';
-          }
+          playRemoteAttackPose(e,raw.attackKind);
         }
       }
       const dx=raw.x-e.targetX;
@@ -4700,6 +4706,19 @@ window.EnmaGameBridge={
       e.zone=raw.zone;e.lastSeen=now;
     }
     for(const id of remotePlayers.keys())if(!seen.has(id))remotePlayers.delete(id);
+  },
+  playRemoteAttack(raw){
+    const id=String(raw?.userId||''),sessionId=String(raw?.sessionId||'');
+    const e=remotePlayers.get(id);
+    if(!e||(sessionId&&e.sessionId!==sessionId)||e.dead)return;
+    const attackSeq=Math.max(0,raw.attackSeq|0);
+    if(attackSeq===e.lastActionEventSeq)return;
+    e.lastActionEventSeq=attackSeq;
+    e.lastAttackSeq=attackSeq;
+    e.dir=['up','down','left','right'].includes(raw.dir)?raw.dir:e.dir;
+    if(e.dir==='left')e.face=-1;else if(e.dir==='right')e.face=1;
+    e.lastSeen=performance.now();
+    playRemoteAttackPose(e,raw.attackKind);
   },
 };
 document.dispatchEvent(new CustomEvent('enma-game-ready'));

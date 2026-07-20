@@ -202,6 +202,23 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           upsertRemote(payload);
           publishRemotes();
         })
+        .on('broadcast', { event: 'attack' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          const action = normalizeRemote(
+            payload,
+            channelZone,
+            session?.user?.id || '',
+            sessionId,
+          );
+          if (!action) return;
+          const previous = remotes.get(action.sessionId);
+          if (!previous || !action.seq || !previous.seq || action.seq >= previous.seq) {
+            remotes.set(action.sessionId, { ...previous, ...action });
+          }
+          // 位置更新とは別経路で、受信した瞬間に一度だけ攻撃姿勢を始める。
+          publishRemotes();
+          bridge?.playRemoteAttack?.(action);
+        })
         .subscribe(async status => {
           if (activeChannel !== channel) return;
           if (status === 'SUBSCRIBED') {
@@ -212,6 +229,10 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
             } catch {}
             lastSentAt = 0;
             lastSentKey = '';
+            lastSentAttackSeq = Math.max(
+              0,
+              Math.trunc(cleanNumber(current?.attackSeq, 0)),
+            );
             publishRemotes();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             subscribed = false;
@@ -249,10 +270,18 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     lastSentAt = now;
     lastSentKey = key;
     lastSentAttackSeq = attackSeq;
+    const payload = payloadFor(snapshot);
+    if (attackChanged) {
+      channel.send({
+        type: 'broadcast',
+        event: 'attack',
+        payload,
+      }).catch(() => {});
+    }
     channel.send({
       type: 'broadcast',
       event: 'position',
-      payload: payloadFor(snapshot),
+      payload,
     }).catch(() => {});
   }
 
