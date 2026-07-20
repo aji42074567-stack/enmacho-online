@@ -96,6 +96,10 @@
   /* ---- overlays / panels ---- */
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(5,6,9,.82);z-index:10}
+  .portrait{width:112px;height:112px;margin:0 auto 10px;
+    background-repeat:no-repeat;background-position:center bottom;background-size:contain;
+    image-rendering:pixelated;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
+  .portrait.hidden{display:none}
   .scroll{max-width:420px;width:calc(100vw - 48px);box-sizing:border-box;
     background:var(--panel);border:1px solid var(--panel-edge);
     border-radius:6px;padding:30px 32px;text-align:center;max-height:82vh;overflow:auto}
@@ -375,6 +379,7 @@
 
   <div class="overlay hidden" id="shop">
     <div class="scroll">
+      <div id="shopPortrait" class="portrait" style="background-image:url(assets/npc_obaba.png)"></div>
       <h2>オババの売店</h2>
       <div class="sub">「銭は貯めるもんじゃない、使うもんだよ」</div>
       <div id="shopList"></div>
@@ -395,6 +400,7 @@
 
   <div class="overlay hidden" id="talk">
     <div class="scroll">
+      <div id="talkPortrait" class="portrait"></div>
       <h2 id="talkTitle">オキナ</h2>
       <div class="sub" id="talkSub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
@@ -404,6 +410,7 @@
 
   <div class="overlay hidden" id="tavern">
     <div class="scroll">
+      <div id="tavernPortrait" class="portrait" style="background-image:url(assets/npc_einer.png)"></div>
       <h2>酒場 千本亭</h2>
       <div class="sub">「死んでからも、飯と噂話は残るのさ」</div>
       <div id="tavernList"></div>
@@ -1514,6 +1521,7 @@ function renderTavern(){
   const r=$('tavernList').querySelector('[data-rumor]');
   if(r)r.addEventListener('click',()=>{
     $('tavern').classList.add('hidden');
+    setTalkPortrait('einer');
     $('talkTitle').textContent='エイネル';$('talkSub').textContent='千本亭の主人';
     $('talkText').textContent=OKAMI_LINES[okamiIdx++%OKAMI_LINES.length];
     $('talk').classList.remove('hidden');
@@ -1673,11 +1681,19 @@ for(const b of document.querySelectorAll('.mtab')){
   b.addEventListener('click',()=>{menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();});
 }
 let okamiIdx=0,guestIdx=0;
+function setTalkPortrait(kind){
+  const key=NPC_SPRITE[kind];
+  const img=key&&SPRITES[key];
+  const p=$('talkPortrait');
+  if(img){p.style.backgroundImage=`url(assets/${key}.png)`;p.classList.remove('hidden');}
+  else p.classList.add('hidden');
+}
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
   else if(npc.kind==='smith'){
     if(!player.smithIntro){
       player.smithIntro=true;player.wScrolls++;player.aScrolls++;save();
+      setTalkPortrait('smith');
       $('talkTitle').textContent='カナヤマ';$('talkSub').textContent='鍛冶屋';
       $('talkText').textContent='「よう、亡者さん。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは失敗すりゃ+0に戻る博打だ。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
       $('talk').classList.remove('hidden');
@@ -1687,12 +1703,14 @@ function openNpc(npc){
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='guest'){
+    setTalkPortrait('guest');
     $('talkTitle').textContent='カズー';$('talkSub').textContent='千本亭の常連客';
     $('talkText').textContent=GUEST_LINES[guestIdx++%GUEST_LINES.length];
     $('talk').classList.remove('hidden');
     questProgress('talk','guest');
   }
   else{
+    setTalkPortrait('elder');
     $('talkTitle').textContent='オキナ';$('talkSub').textContent='三途の川の番人';
     let line;
     if(player.quests.trial===0){
