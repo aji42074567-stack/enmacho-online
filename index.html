@@ -507,7 +507,22 @@ const CAVE_LINKS=[
   {from:'cave2',at:{x:51,y:19.5}, to:'cave3',entry:{x:14.5,y:31},  kind:'stairdown'},
   {from:'cave3',at:{x:12.5,y:31}, to:'cave2',entry:{x:49.5,y:21},  kind:'stairup'},
 ];
-const CAVE_DEPTH={cave:1,cave2:2,cave3:3};
+/* ---- 竜の洞窟(地下5階・北西の森の奥) ---- */
+const DCAVE_DOOR={x:10,y:6.2};
+const DCAVE_TRIG={x:10,y:7.6};
+CAVE_LINKS.push(
+  {from:'field',at:DCAVE_TRIG,        to:'dg1',entry:{x:14.5,y:30},kind:null},
+  {from:'dg1',at:{x:12.5,y:30},to:'field',entry:{x:DCAVE_TRIG.x,y:DCAVE_TRIG.y+1.4},kind:'cavexit'},
+  {from:'dg1',at:{x:52,y:24},  to:'dg2',entry:{x:14.5,y:30},kind:'stairdown'},
+  {from:'dg2',at:{x:12.5,y:30},to:'dg1',entry:{x:50.3,y:24.8},kind:'stairup'},
+  {from:'dg2',at:{x:51,y:34},  to:'dg3',entry:{x:14.5,y:30},kind:'stairdown'},
+  {from:'dg3',at:{x:12.5,y:30},to:'dg2',entry:{x:49.3,y:32.8},kind:'stairup'},
+  {from:'dg3',at:{x:47,y:23},  to:'dg4',entry:{x:14.5,y:30},kind:'stairdown'},
+  {from:'dg4',at:{x:12.5,y:30},to:'dg3',entry:{x:45.5,y:24.4},kind:'stairup'},
+  {from:'dg4',at:{x:49,y:39},  to:'dg5',entry:{x:14.5,y:31},kind:'stairdown'},
+  {from:'dg5',at:{x:12.5,y:31},to:'dg4',entry:{x:47.5,y:38},kind:'stairup'},
+);
+const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
@@ -770,6 +785,7 @@ for(let x=MT.x0;x<=MT.x1;x++)for(let y=MT.y0;y<=MT.y1;y++){
 }
 for(const [bx,by] of [[50,21],[51,21],[50,22],[51,22]])blocked[by*MAP+bx]=1;
 props.push({x:CAVE_DOOR.x,y:CAVE_DOOR.y,kind:'cave'});
+props.push({x:DCAVE_DOOR.x,y:DCAVE_DOOR.y,kind:'dcave'});   // 竜の洞窟の入口(北西の森の奥)
 
 /* ================= 経路探索 (A*) ================= */
 function nearestWalkable(tx,ty){
@@ -831,12 +847,13 @@ const player={
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
   plus:{},                                  // 装備の強化値 {装備id:+n}
   wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
+  smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
   cd:{bolt:0,heal:0,fire:0},                // 印のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
 };
-let kills=0,time=0,started=false,hasSaveData=false,hitstop=0;
+let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
@@ -847,7 +864,7 @@ const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'
 const ENH_MAX=9;
 const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
 const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の血が必要
-const W_SCROLL_PRICE=120,A_SCROLL_PRICE=100;
+const SCROLL_DROP_RATE=0.07;   // 中ボス・竜からの強化巻物ドロップ率
 const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
 const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
 const spellMul=()=>1+0.06*ST().int;
@@ -871,7 +888,8 @@ function save(){
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
       quests:player.quests,qb:player.qb,plus:player.plus,
-      wScrolls:player.wScrolls,aScrolls:player.aScrolls
+      wScrolls:player.wScrolls,aScrolls:player.aScrolls,
+      smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt
     }));
   }catch(e){}
 }
@@ -912,6 +930,7 @@ function load(){
       :{active:null,prog:0,done:{}};
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
+    player.smithIntro=!!d.smithIntro;player.drakeKilledAt=d.drakeKilledAt||0;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -959,7 +978,6 @@ function spawnMob(type,x,y){
   ring(41,30,5,5,'wolf');  ring(22,34,5,5,'wolf');
   ring(42,16,4,4,'orc');   ring(16,24,4,4,'orc');
   ring(16,11,4,4,'skeleton');
-  spawnMob('drake',BOSS_HOME.x,BOSS_HOME.y);
 })();
 
 /* ================= 演出・ログ ================= */
@@ -1187,10 +1205,17 @@ function killMob(m){
     addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
     log('希少素材「竜の血」を手に入れた！','gain');
   }
+  if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<SCROLL_DROP_RATE){
+    const wpn=Math.random()<0.5;
+    if(wpn)player.wScrolls++;else player.aScrolls++;
+    addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
+    log(`超激レア！ ${wpn?'武器':'防具'}強化の巻物を手に入れた！`,'gain');
+  }
+  if(m.type==='drake'){player.drakeKilledAt=drakeWindow();}
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
   if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};
-    log(m.type==='drake'?'賽の森が静まりかえった…(90秒後にまた迷い出る)':'洞窟の最深部が静まりかえった…(90秒後にまた迷い出る)','sys');}
+    log(m.type==='drake'?'竜の巣が静まりかえった…(次の竜は偶数時0分に現れる)':'洞窟の最深部が静まりかえった…(90秒後にまた迷い出る)','sys');}
   questProgress('kill',m.type);
   if(m.type==='oni_blue'&&player.quests.trial<2){
     player.quests.trial=2;
@@ -1366,13 +1391,10 @@ function renderSmith(){
   const list=$('smithList');
   let html='';
   html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
-    <span class="nm">武器強化の巻物 ×${player.wScrolls} <span class="fx">装備中の武器を+1</span></span>
-    <span class="pr">${W_SCROLL_PRICE} モン</span>
-    <button class="buyb" data-sbuy="w" ${player.gold<W_SCROLL_PRICE?'disabled':''}>買う</button></div>`;
+    <span class="nm">武器強化の巻物 ×${player.wScrolls} <span class="fx">装備中の武器を+1</span></span></div>`;
   html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
-    <span class="nm">防具強化の巻物 ×${player.aScrolls} <span class="fx">装備中の胴を+1</span></span>
-    <span class="pr">${A_SCROLL_PRICE} モン</span>
-    <button class="buyb" data-sbuy="a" ${player.gold<A_SCROLL_PRICE?'disabled':''}>買う</button></div>`;
+    <span class="nm">防具強化の巻物 ×${player.aScrolls} <span class="fx">装備中の胴を+1</span></span></div>`;
+  html+=`<div class="sub">巻物は売り物じゃない。洞窟の主や竜みてぇな大物が稀に持ってるやつだ</div>`;
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 鍛冶(巻物1枚を消費) ─</span></div>`;
   const rows=[
     {k:'w',id:player.eq.weapon,scr:player.wScrolls,label:'武器'},
@@ -1396,17 +1418,6 @@ function renderSmith(){
   html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個(武器の+7以降で使う)</div>`;
   list.innerHTML=html;
   $('smithGold').textContent=player.gold;
-  for(const b of list.querySelectorAll('[data-sbuy]')){
-    b.addEventListener('click',()=>{
-      const k=b.getAttribute('data-sbuy');
-      const price=k==='w'?W_SCROLL_PRICE:A_SCROLL_PRICE;
-      if(player.gold<price)return;
-      player.gold-=price;
-      if(k==='w')player.wScrolls++;else player.aScrolls++;
-      log(k==='w'?'武器強化の巻物を買った':'防具強化の巻物を買った','gain');
-      sfx.coin();save();renderSmith();
-    });
-  }
   for(const b of list.querySelectorAll('[data-senh]')){
     b.addEventListener('click',()=>enhance(b.getAttribute('data-senh')));
   }
@@ -1650,7 +1661,15 @@ for(const b of document.querySelectorAll('.mtab')){
 let okamiIdx=0,guestIdx=0;
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
-  else if(npc.kind==='smith'){renderSmith();$('smith').classList.remove('hidden');}
+  else if(npc.kind==='smith'){
+    if(!player.smithIntro){
+      player.smithIntro=true;player.wScrolls++;player.aScrolls++;save();
+      $('talkTitle').textContent='カナヤマ';$('talkSub').textContent='鍛冶屋';
+      $('talkText').textContent='「よう、亡者さん。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは失敗すりゃ+0に戻る博打だ。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
+      $('talk').classList.remove('hidden');
+      log('武器強化の巻物と防具強化の巻物を1枚ずつもらった！','gain');
+    }else{renderSmith();$('smith').classList.remove('hidden');}
+  }
   else if(npc.kind==='okami'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='guest'){
@@ -1823,8 +1842,11 @@ function update(dt){
     if(inVillage||!player.moving)
       player.hp=Math.min(player.maxHp,player.hp+dt*(inVillage?6:1.5));
   }
+  drakeChkT-=dt;
+  if(drakeChkT<=0){drakeChkT=5;checkDrake();}
   for(const m of mobs){
     if(m.dead){
+      if(m.type==='drake')continue;   // 竜の再出現は偶数時0分の窓で管理
       m.respawn-=dt;
       if(m.respawn<=0){
         m.dead=false;m.hp=m.maxHp;m.x=m.home.x;m.y=m.home.y;
@@ -1927,7 +1949,7 @@ function loadCaveTile(key,src){
   img.onload=()=>{
     groundTiles[key]=img;
     renderGround();               // 岩山の崖・高台にも使うのでフィールドも再描画
-    for(const w of [CAVE,CAVE2,CAVE3])if(w)renderGroundCave(w);
+    for(const w of [CAVE,CAVE2,CAVE3,...DGW])if(w)renderGroundCave(w);
   };
   img.src=src;
 }
@@ -2261,9 +2283,59 @@ function buildCave3(){
   CAVE3={blocked,tileKind,props,npcs,mobs,ground};
   renderGroundCave(CAVE3);
 }
+/* ---- 竜の洞窟(地下5階) ---- */
+let DGW=[];   // dg1〜dg5 のワールド
+const DG_DEFS=[
+  {rooms:[[11,27,17,33],[17,29,33,31],[33,25,39,37],[39,30,53,32],[47,22,55,28]],
+   mobs:[['skeleton',22,30],['skeleton',35,28],['dark_dog',36,34],['dark_dog',45,31],['skeleton',50,25]]},
+  {rooms:[[11,27,17,33],[17,30,25,32],[25,20,31,40],[31,28,45,32],[45,24,53,36]],
+   mobs:[['oni_bone',27,24],['oni_bone',28,36],['dark_dog',37,30],['gozu',48,27],['oni_bone',49,33]]},
+  {rooms:[[11,27,17,33],[17,29,27,31],[27,21,33,39],[33,23,41,25],[33,35,41,37],[41,21,49,39]],
+   mobs:[['gozu',30,24],['gozu',30,36],['oni_bone',37,24],['oni_bone',37,36],['gozu',45,30],['dark_dog',44,23]]},
+  {rooms:[[11,27,17,33],[17,29,23,31],[23,21,29,39],[29,29,43,31],[43,19,51,41]],
+   mobs:[['gozu',26,24],['gozu',26,36],['gozu',36,30],['oni_bone',46,22],['oni_bone',46,38],['gozu',48,30]]},
+  {rooms:[[11,28,17,34],[17,30,25,32],[25,20,55,40]],
+   mobs:[['gozu',30,25],['gozu',30,35]]},
+];
+function buildDragonCaves(){
+  DGW=[];
+  for(let f=0;f<5;f++){
+    const zn='dg'+(f+1),def=DG_DEFS[f];
+    blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+    tileKind=new Uint8Array(MAP*MAP);
+    props=[];npcs=[];mobs=[];
+    const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*MAP+x]=0;tileKind[y*MAP+x]=5;}};
+    for(const r of def.rooms){
+      carve(...r);
+      props.push({x:r[0],y:r[1],kind:'torch'});
+      props.push({x:r[2],y:r[3],kind:'torch'});
+    }
+    for(const L of CAVE_LINKS)if(L.from===zn&&L.kind)props.push({x:L.at.x,y:L.at.y,kind:L.kind});
+    for(const m of def.mobs)spawnMob(...m);
+    if(f===4){
+      spawnMob('drake',44,30);   // 最深部の主。出現は偶数時0分の窓で管理
+      const dk=mobs.find(m=>m.type==='drake');
+      if(dk)dk.dead=true;
+    }
+    ground=document.createElement('canvas');
+    const w={blocked,tileKind,props,npcs,mobs,ground};
+    renderGroundCave(w);
+    DGW.push(w);
+  }
+}
+/* ---- ゴウリュウの出現管理(偶数時0分の窓・同時に1体まで) ---- */
+const drakeWindow=()=>{const d=new Date();d.setMinutes(0,0,0);if(d.getHours()%2)d.setHours(d.getHours()-1);return d.getTime();};
+function checkDrake(){
+  const w=DGW[4];if(!w)return;
+  const m=w.mobs.find(x=>x.type==='drake');
+  if(!m||!m.dead)return;
+  if(player.drakeKilledAt===drakeWindow())return;   // この出現枠では討伐済み
+  m.dead=false;m.hp=m.maxHp;m.x=m.home.x;m.y=m.home.y;m.state='idle';m.path=[];
+  if(started)log('地の底から咆哮が響いた…ゴウリュウが現れた','sys');
+}
 function switchZone(z,px,py){
   zone=z;
-  const W2={field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z];
+  const W2={field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]||DGW[+z.slice(2)-1];
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
   corpses.length=0;bolts.length=0;
@@ -2275,6 +2347,11 @@ function switchZone(z,px,py){
     cave:'試練の洞窟に足を踏み入れた…',
     cave2:'地下二層へ降りた。空気が冷たく、重い…',
     cave3:'地下三層——最深部。奥で何かが待っている…',
+    dg1:'竜の洞窟に足を踏み入れた。硫黄のにおいがする…',
+    dg2:'竜の洞窟 地下二層。壁が焦げている…',
+    dg3:'竜の洞窟 地下三層。地鳴りが近い…',
+    dg4:'竜の洞窟 地下四層。骨が散らばっている…',
+    dg5:'竜の洞窟 最深部——竜の巣だ',
   };
   if(started)log(ZMSG[z],'sys');
 }
@@ -2856,7 +2933,7 @@ function drawShoal(sx,sy,p){
   ctx.drawImage(img,-w/2,-h+6,w,h);
   ctx.restore();
 }
-function drawCaveEntrance(sx,sy){
+function drawCaveEntrance(sx,sy,label='試練の洞窟'){
   const img=SPRITES.map_cave_entrance;
   if(img){
     const w=170,h=w*img.height/img.width;
@@ -2866,7 +2943,7 @@ function drawCaveEntrance(sx,sy){
     g3.addColorStop(0,`rgba(255,150,60,${0.18*fl})`);g3.addColorStop(1,'rgba(255,150,60,0)');
     ctx.fillStyle=g3;ctx.fillRect(sx-34,sy-58,60,50);
     ctx.fillStyle='#cfc2a0';ctx.font='9px sans-serif';ctx.textAlign='center';
-    ctx.fillText('試練の洞窟',sx,sy+34);
+    ctx.fillText(label,sx,sy+34);
     return;
   }
   drawShadow(sx,sy+4,34);
@@ -2885,7 +2962,7 @@ function drawCaveEntrance(sx,sy){
   g3.addColorStop(0,`rgba(255,150,60,${0.25*fl})`);g3.addColorStop(1,'rgba(255,150,60,0)');
   ctx.fillStyle=g3;ctx.fillRect(-26,-30,52,40);
   ctx.fillStyle='#cfc2a0';ctx.font='9px sans-serif';ctx.textAlign='center';
-  ctx.fillText('試練の洞窟',0,18);
+  ctx.fillText(label,0,18);
   ctx.restore();
 }
 function drawTorch(sx,sy){
@@ -3170,6 +3247,7 @@ function render(){
       case 'rock':drawRock(sx,sy,it.o);break;
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
+      case 'dcave':drawCaveEntrance(sx,sy,'竜の洞窟');break;
       case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'palm':drawPalm(sx,sy,it.o);break;
       case 'sundry':drawSundry(sx,sy,it.o);break;
@@ -3283,7 +3361,7 @@ function render(){
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   if(CAVE_DEPTH[zone]){  // 洞窟はさらに暗く(深いほど濃く)
     const cv=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.22,W/2,H/2,Math.max(W,H)*0.7);
-    cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${0.38+CAVE_DEPTH[zone]*0.12})`);
+    cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${Math.min(0.78,0.35+CAVE_DEPTH[zone]*0.09)})`);
     ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
   }
 }
@@ -3319,7 +3397,7 @@ function hud(){
   }else{
     el.goal.textContent=player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
-      :'賽の森のゴウリュウを鎮めよ';
+      :'北西の竜の洞窟 最深部のゴウリュウを鎮めよ';
   }
   let bf='';
   if(player.hasteT>0)bf+=`⚡韋駄天 ${Math.ceil(player.hasteT)}秒　`;
@@ -3544,8 +3622,10 @@ FIELD={blocked,tileKind,props,npcs,mobs,ground};
 buildCave();
 buildCave2();
 buildCave3();
+buildDragonCaves();
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
+checkDrake();
 if(hasSaveData){
   $('nameIn').value=player.name;
   $('pname').textContent='亡者'+player.name;
