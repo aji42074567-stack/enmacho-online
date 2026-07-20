@@ -3,9 +3,20 @@
 閻魔庁ONLINEの公開ページには、公開可能なSupabase情報だけを置く。
 Secret key、service role key、Resend API keyはGitHubへ保存しない。
 
+## 現在の接続状態
+
+- Supabaseプロジェクト: `enmacho-online`
+- リージョン: Northeast Asia (Tokyo)
+- 魂籍DB・RLS・Auth URL: 設定済み
+- Edge Function `sync-resend-contact`: デプロイ済み
+- Resend Segment `閻魔庁ONLINE 更新情報`: 作成・接続済み
+- Resendの送信ドメインとSupabase Custom SMTP: 閻魔庁用ドメイン決定後に設定
+
+送信ドメイン決定までは、魂籍の確認メールにSupabase標準メールを使用する。
+
 ## 1. Supabaseプロジェクト
 
-1. Supabaseでプロジェクトを作成する。
+1. Supabaseで東京リージョンのプロジェクトを作成する。
 2. SQL Editorで
    `supabase/migrations/202607200001_soul_accounts.sql` を実行する。
 3. AuthenticationのURL設定へ以下を追加する。
@@ -24,7 +35,7 @@ window.ENMA_ONLINE_CONFIG = {
 
 ## 2. Resend
 
-1. 送信ドメインをResendで認証する。
+1. 閻魔庁用の送信ドメインをResendで認証する。
 2. Supabase IntegrationsからResendを接続し、AuthのCustom SMTPを有効にする。
 3. Resendで「閻魔庁ONLINE 更新情報」用Segmentを作る。
 4. Edge Functionの秘密情報を設定する。

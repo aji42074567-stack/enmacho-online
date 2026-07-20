@@ -1,3 +1,4 @@
 [functions.sync-resend-contact]
-verify_jwt = true
-
+# The function validates the caller with supabase.auth.getUser().
+# Legacy JWT verification would reject newer publishable-key auth flows.
+verify_jwt = false
