@@ -2827,13 +2827,14 @@ function drawStone(sx,sy){
   const img=SPRITES.map_respawn_statue;
   if(img){
     const h=80,w=h*img.width/img.height;
-    drawShadow(sx,sy+2,w*0.32);
+    const baseY=sy+7;   // 台座の下端を井戸などと同じ地面基準へ合わせる
+    drawShadow(sx,baseY-1,w*0.32);
     const pulse=0.45+Math.sin(time*2)*0.15;
-    const glow=ctx.createRadialGradient(sx,sy-h*0.55,0,sx,sy-h*0.55,26);
+    const glow=ctx.createRadialGradient(sx,baseY-h*0.55,0,sx,baseY-h*0.55,26);
     glow.addColorStop(0,`rgba(120,205,255,${pulse*0.28})`);
     glow.addColorStop(1,'rgba(80,160,255,0)');
-    ctx.fillStyle=glow;ctx.fillRect(sx-28,sy-h*0.55-28,56,56);
-    ctx.drawImage(img,sx-w/2,sy-h+3,w,h);
+    ctx.fillStyle=glow;ctx.fillRect(sx-28,baseY-h*0.55-28,56,56);
+    ctx.drawImage(img,sx-w/2,baseY-h,w,h);
     return;
   }
   drawShadow(sx,sy+2,12);
