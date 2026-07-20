@@ -1,5 +1,5 @@
-const LOOP_INTERVAL_MS = 200;
-const POSITION_INTERVAL_MS = 400;
+const LOOP_INTERVAL_MS = 100;
+const POSITION_INTERVAL_MS = 150;
 const IDLE_HEARTBEAT_MS = 2_000;
 const PROTOCOL = 'enma-world-v1';
 
@@ -181,12 +181,15 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   function hit({ mobId, damage, crit = false, kind = 'melee' }) {
+    const snapshot = bridge?.getSharedWorldPlayer?.() || {};
     return send({
       type: 'hit',
       mobId: String(mobId || ''),
       damage: Math.max(1, Math.trunc(finite(damage, 1))),
       crit: Boolean(crit),
       kind,
+      x: finite(snapshot.x),
+      y: finite(snapshot.y),
     });
   }
 

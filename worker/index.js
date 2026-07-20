@@ -1,7 +1,8 @@
 const PROTOCOL = 'enma-world-v1';
 const ROOM_NAME = 'field-v1';
 const TICK_MS = 100;
-const SNAPSHOT_MS = 400;
+// 差分だけを送りつつ、移動は10fpsで届かせて補間の遅れを抑える。
+const SNAPSHOT_MS = 100;
 const RESPAWN_MS = 20_000;
 const WORLD_VERSION = 1;
 const PLAYER_LIMIT = 80;
@@ -272,6 +273,17 @@ export class WorldRoom {
     const monster = this.mobs.find(candidate => candidate.id === data.mobId);
     if (!monster || monster.dead) return;
 
+    // 通常の位置通知を待たず、攻撃した瞬間の座標で射程を判定する。
+    // 低速回線やスマホでも古い座標を理由に攻撃が消えないようにする。
+    const hitX = clamp(finite(data.x, player.x), 2, 69);
+    const hitY = clamp(finite(data.y, player.y), 2, 69);
+    if (onIsland(hitX, hitY)) {
+      player.x = hitX;
+      player.y = hitY;
+      player.lastSeenAt = Date.now();
+      socket.serializeAttachment(player);
+    }
+
     const now = Date.now();
     const hitWindow = (this.hitWindows.get(player.clientId) || [])
       .filter(timestamp => now - timestamp < 1_000);
@@ -280,7 +292,7 @@ export class WorldRoom {
     this.hitWindows.set(player.clientId, hitWindow);
 
     const kind = data.kind === 'melee' ? 'melee' : data.kind === 'fire' ? 'fire' : 'bolt';
-    const range = kind === 'melee' ? 2.5 : 9.5;
+    const range = kind === 'melee' ? 3.4 : 10;
     if (distance(player, monster) > range) return;
     const damage = clamp(Math.trunc(finite(data.damage)), 1, 500);
     monster.hp = Math.max(0, monster.hp - damage);
