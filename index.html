@@ -4508,10 +4508,15 @@ window.EnmaGameBridge={
     const wasConnected=sharedWorld.connected;
     sharedWorld.connected=Boolean(status?.connected);
     sharedWorld.zone=sharedWorld.connected&&status?.zone==='field'?'field':'';
+    if(wasConnected&&!sharedWorld.connected&&FIELD){
+      for(const mob of FIELD.mobs){
+        mob.serverMoving=false;
+        if(!mob.dead){mob.state='idle';mob.path=[];}
+      }
+    }
     if(started&&wasConnected!==sharedWorld.connected){
-      log(sharedWorld.connected
-        ? '賽の森の魔物が現世同期された'
-        : '現世同期が途切れたため、魔物は端末内の動きに戻った','sys');
+      if(sharedWorld.connected)log('賽の森の魔物が現世同期された','sys');
+      else if(zone==='field')log('現世同期が途切れたため、魔物は端末内の動きに戻った','sys');
     }
   },
   setSharedMonsters(monsters){

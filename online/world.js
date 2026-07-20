@@ -30,6 +30,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   let retryDelay = 1_000;
   let lastSentAt = 0;
   let lastSentKey = '';
+  let lastMessageAt = 0;
 
   function publishConnection(nextConnected) {
     if (connected === nextConnected) return;
@@ -57,6 +58,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   function onMessage(event) {
+    lastMessageAt = Date.now();
     let message;
     try {
       message = JSON.parse(event.data);
@@ -93,6 +95,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     nextSocket.addEventListener('open', () => {
       if (socket !== nextSocket) return;
       retryDelay = 1_000;
+      lastMessageAt = Date.now();
       lastSentAt = 0;
       lastSentKey = '';
       publishConnection(true);
@@ -159,6 +162,10 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       return;
     }
     if (!socket && Date.now() >= retryAt) connect();
+    if (connected && Date.now() - lastMessageAt > 10_000) {
+      closeSocket(true);
+      return;
+    }
     if (connected) sendPosition(snapshot);
   }
 
