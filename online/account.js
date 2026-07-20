@@ -385,8 +385,9 @@ async function initialize() {
     const { data, error } = await state.client.auth.getSession();
     if (error) throw error;
     state.session = data.session;
-    state.client.auth.onAuthStateChange((_event, session) => {
+    state.client.auth.onAuthStateChange((event, session) => {
       state.session = session;
+      if (event === 'TOKEN_REFRESHED') return;
       setTimeout(() => loadAccountData(), 0);
     });
     await loadAccountData();
