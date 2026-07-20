@@ -492,7 +492,7 @@ function itemFx(it){
   return p.join(' ');
 }
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
-const POTION_PRICE=30,HASTE_PRICE=60,CRIT_PRICE=80;
+const POTION_PRICE=30,HASTE_PRICE=300,CRIT_PRICE=300;
 
 /* ================= マップ生成 ================= */
 let blocked=new Uint8Array(MAP*MAP);
@@ -592,9 +592,9 @@ props.push({x:31,y:41,kind:'lamp'});
 let npcs=[
   {x:34,y:53,kind:'merchant',name:'オババ'},
   {x:30,y:48,kind:'elder',name:'オキナ'},
-  {x:28.2,y:55.8,kind:'okami',name:'オカミ'},     // 酒場の女将(店の前)
+  {x:29.4,y:54.6,kind:'okami',name:'オカミ'},     // 酒場の女将(店の右前)
   {x:31.5,y:45.5,kind:'smith',name:'カナヤマ'},   // 鍛冶屋(広場の北・家に隠れない位置)
-  {x:29.5,y:56.2,kind:'guest',name:'トックリ'},   // 酔客の亡者(酒場の前の通り)
+  {x:32.2,y:54.6,kind:'guest',name:'トックリ'},   // 酔客の亡者(井戸の右・通りの真ん中)
   {x:28.2,y:41.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
 ];
 
@@ -1317,7 +1317,7 @@ function drinkHaste(){
   if(player.dead||!started)return;
   if(player.hastePots<=0){log('韋駄天の水がない','sys');return;}
   if(player.hasteT>0){log('すでに韋駄天の加護がある','sys');return;}
-  player.hastePots--;player.hasteT=30;
+  player.hastePots--;player.hasteT=300;
   addFloat(player.x,player.y-0.6,'韋駄天！','#9fe0ff');
   burst(player.x,player.y,'#9fe0ff',12);
   sfx.potion();save();
@@ -1326,7 +1326,7 @@ function drinkCrit(){
   if(player.dead||!started)return;
   if(player.critPots<=0){log('修羅の酒がない','sys');return;}
   if(player.critT>0){log('すでに修羅の血が滾っている','sys');return;}
-  player.critPots--;player.critT=30;
+  player.critPots--;player.critT=300;
   addFloat(player.x,player.y-0.6,'修羅！','#ffb46a');
   burst(player.x,player.y,'#ffb46a',12);
   sfx.potion();save();
@@ -1358,27 +1358,33 @@ const $=id=>document.getElementById(id);
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 function renderShop(){
   const list=$('shopList');
+  const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
   let html='';
+  html+=sec('薬');
   html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
     <span class="nm">甘露水 <span class="fx">HP+65</span></span>
     <span class="pr">${POTION_PRICE} モン</span>
     <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
   html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_idaten.png" alt="">
-    <span class="nm">韋駄天の水 <span class="fx">30秒 移動と攻撃が速くなる</span></span>
+    <span class="nm">韋駄天の水 <span class="fx">5分 移動と攻撃が速くなる</span></span>
     <span class="pr">${HASTE_PRICE} モン</span>
     <button class="buyb" data-buy="haste" ${player.gold<HASTE_PRICE?'disabled':''}>買う</button></div>`;
   html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_shura.png" alt="">
-    <span class="nm">修羅の酒 <span class="fx">30秒 会心率+25%</span></span>
+    <span class="nm">修羅の酒 <span class="fx">5分 会心率+25%</span></span>
     <span class="pr">${CRIT_PRICE} モン</span>
     <button class="buyb" data-buy="crit" ${player.gold<CRIT_PRICE?'disabled':''}>買う</button></div>`;
-  for(const id of SHOP_STOCK){
-    const it=ITEMS[id];
-    const fx=`[${SLOT_NAME[it.slot]}] ${itemFx(it)}`;
-    const owned=player.items.includes(id);
-    const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn slotmark"></span>';
-    html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${fx}</span></span>
-      <span class="pr">${it.price} モン</span>
-      <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
+  for(const [slot,nm] of SLOTS){
+    const ids=SHOP_STOCK.filter(id=>ITEMS[id].slot===slot);
+    if(!ids.length)continue;
+    html+=sec(nm);
+    for(const id of ids){
+      const it=ITEMS[id];
+      const owned=player.items.includes(id);
+      const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn slotmark"></span>';
+      html+=`<div class="itemrow">${icn}<span class="nm">${esc(it.name)} <span class="fx">${itemFx(it)}</span></span>
+        <span class="pr">${it.price} モン</span>
+        <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
+    }
   }
   list.innerHTML=html;
   $('shopGold').textContent=player.gold;
@@ -1593,8 +1599,8 @@ function renderItemTab(){
   let html='';
   const CONS=[
     ['potions','甘露水','HP+65','drink','potion_kanro.png'],
-    ['hastePots','韋駄天の水','30秒 高速化','haste','potion_idaten.png'],
-    ['critPots','修羅の酒','30秒 会心+25%','crit','potion_shura.png'],
+    ['hastePots','韋駄天の水','5分 高速化','haste','potion_idaten.png'],
+    ['critPots','修羅の酒','5分 会心+25%','crit','potion_shura.png'],
   ];
   for(const [f,nm,fx,act,icon] of CONS){
     html+=`<div class="itemrow"><img class="icn" src="assets/items/${icon}" alt="">
@@ -3412,8 +3418,9 @@ function hud(){
       :'北西の竜の洞窟 最深部のゴウリュウを鎮めよ';
   }
   let bf='';
-  if(player.hasteT>0)bf+=`⚡韋駄天 ${Math.ceil(player.hasteT)}秒　`;
-  if(player.critT>0)bf+=`🔥修羅 ${Math.ceil(player.critT)}秒　`;
+  const fmtT=t=>{t=Math.ceil(t);return t>=60?`${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`:`${t}秒`;};
+  if(player.hasteT>0)bf+=`⚡韋駄天 ${fmtT(player.hasteT)}　`;
+  if(player.critT>0)bf+=`🔥修羅 ${fmtT(player.critT)}　`;
   if(player.foodAtkT>0)bf+=`🍙攻+4 ${Math.ceil(player.foodAtkT)}秒　`;
   if(player.foodDefT>0)bf+=`🍲防+4 ${Math.ceil(player.foodDefT)}秒　`;
   if(player.foodRegenT>0)bf+=`🍵回復 ${Math.ceil(player.foodRegenT)}秒`;
