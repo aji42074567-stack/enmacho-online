@@ -2432,6 +2432,7 @@ loadSprite('mob_drake_death','assets/mob_drake_death.png');
 loadSprite('fx_breath','assets/fx_breath.png');
 loadSprite('npc_obaba','assets/npc_obaba.png');
 loadSprite('npc_okina','assets/npc_okina.png');
+loadSprite('npc_kanayama','assets/npc_kanayama.png');
 loadSprite('mob_orc_blue','assets/mob_orc_blue.png');
 loadSprite('mob_orc_blue_attack','assets/mob_orc_blue_attack.png');
 loadSprite('shore_rock_1','assets/shore_rock_1.png');
@@ -3139,7 +3140,7 @@ function drawGate(sx,sy,p){
   ctx.font='10px sans-serif';ctx.textAlign='center';
   ctx.fillText(`${g.name}${g.open?'(開)':''}`,sx,sy+16);
 }
-const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',guest:'npc_kazu'};
+const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith:'npc_kanayama',guest:'npc_kazu'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
   const img=SPRITES[NPC_SPRITE[n.kind]];
