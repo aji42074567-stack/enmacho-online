@@ -737,9 +737,10 @@ const TW=64, TH=32, MAP=72;   // 島の周囲に海の余白を確保
 const RANGE=1.4;
 const AUTO_RANGE=8;
 const COMBAT_HOLD_SECONDS=4;
-const MOB_RESPAWN_SECONDS=20;
+const MOB_RESPAWN_SECONDS=45;
 const BOSS_RESPAWN_SECONDS=120;
 const SAVE_KEY='aden_save_v1';
+const MOBILE_VIEW_SCALE=0.74;
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 let W=0,H=0,DPR=1;
@@ -753,6 +754,7 @@ function resize(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
 }
 window.addEventListener('resize',resize);
+const worldViewScale=()=>MOBILE_RENDER?MOBILE_VIEW_SCALE:1;
 
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -1617,6 +1619,7 @@ function damageMob(m,dmg,crit,kind='melee'){
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
 }
 function markMobDead(m,respawn=m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS){
+  m.deadUntil=Math.max(m.deadUntil||0,performance.now()+respawn*1000);
   if(m.dead){m.respawn=respawn;return false;}
   m.dead=true;m.hp=0;m.respawn=respawn;
   corpses.push({x:m.x,y:m.y,type:m.type,face:m.face,age:0});  // 死体をその場に残す
@@ -2458,6 +2461,7 @@ function update(dt){
   drakeChkT-=dt;
   if(drakeChkT<=0){drakeChkT=5;checkDrake();}
   for(const m of mobs){
+    if(m.spawnT>0)m.spawnT=Math.max(0,m.spawnT-dt);
     if(sharedWorldActive()){
       if(m.flash)m.flash-=dt;
       if(m.swing>0)m.swing=Math.max(0,m.swing-dt);
@@ -2480,7 +2484,7 @@ function update(dt){
       m.respawn-=dt;
       if(m.respawn<=0){
         m.dead=false;m.hp=m.maxHp;m.x=m.home.x;m.y=m.home.y;
-        m.state='idle';m.path=[];
+        m.deadUntil=0;m.spawnT=0.8;m.state='idle';m.path=[];
       }
       continue;
     }
@@ -3953,6 +3957,12 @@ function render(){
 
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0b0d12';ctx.fillRect(0,0,W,H);
+  const viewScale=worldViewScale();
+  const viewExtraX=(W/viewScale-W)/2,viewExtraY=(H/viewScale-H)/2;
+  ctx.save();
+  ctx.translate(W/2,H/2);
+  ctx.scale(viewScale,viewScale);
+  ctx.translate(-W/2,-H/2);
   const groundW=ground._logicalWidth||ground.width;
   const groundH=ground._logicalHeight||ground.height;
   ctx.drawImage(ground,
@@ -3975,7 +3985,8 @@ function render(){
     ctx.lineCap='round';
     for(const fp of FOAM_PTS){
       const fsx=SX(fp.x,fp.y),fsy=SY(fp.x,fp.y);
-      if(fsx<-50||fsx>W+50||fsy<-50||fsy>H+50)continue;
+      if(fsx<-50-viewExtraX||fsx>W+50+viewExtraX
+        ||fsy<-50-viewExtraY||fsy>H+50+viewExtraY)continue;
       const ph=Math.sin(time*1.15+fp.ph*6.28);
       const a2=0.10+0.15*ph;
       if(a2<=0.03)continue;
@@ -4029,7 +4040,10 @@ function render(){
     const sidePad=giantDrake?Math.max(140,(112*0.46+175)*vs):140;
     const abovePad=giantDrake?Math.max(160,25*vs):160;
     const belowPad=giantDrake?Math.max(120,110*vs):120;
-    if(sx<-sidePad||sx>W+sidePad||sy<-abovePad||sy>H+belowPad)continue;
+    if(sx<-sidePad-viewExtraX||sx>W+sidePad+viewExtraX
+      ||sy<-abovePad-viewExtraY||sy>H+belowPad+viewExtraY)continue;
+    const spawnAlpha=it.o.def&&it.o.spawnT>0?clamp(1-it.o.spawnT/0.8,0,1):1;
+    if(spawnAlpha<1){ctx.save();ctx.globalAlpha*=spawnAlpha;}
     switch(it.k){
       case 'tree':drawTree(sx,sy,it.o);break;
       case 'rock':drawRock(sx,sy,it.o);break;
@@ -4058,6 +4072,7 @@ function render(){
       case 'skeleton':case 'oni_bone':drawSkeleton(sx,sy,it.o);break;
       case 'drake':drawDrake(sx,sy,it.o);break;
     }
+    if(spawnAlpha<1)ctx.restore();
     if(it.o.def&&it.o.flash>0&&it.k!=='corpse'){  // 被弾の白フラッシュ
       const fa=it.o.flash/0.14,drake=it.k==='drake';
       const r2=drake?112*(it.o.def.renderScale||1)*0.42:20*it.o.def.size;
@@ -4088,13 +4103,15 @@ function render(){
     if(e.zone!==zone)continue;
     const sx=SX(e.x,e.y);
     const sy=SY(e.x,e.y)-(zone==='field'?ELEV_PX*elevF(e.x,e.y):0);
-    if(sx<-140||sx>W+140||sy<-160||sy>H+120)continue;
+    if(sx<-140-viewExtraX||sx>W+140+viewExtraX
+      ||sy<-160-viewExtraY||sy>H+120+viewExtraY)continue;
     drawRemotePlayerLabel(sx,sy,e);
   }
-  drawPlayerMobileHud(
-    SX(player.x,player.y),
-    SY(player.x,player.y)-(zone==='field'?ELEV_PX*elevF(player.x,player.y):0)
-  );
+  const playerHudWorldX=SX(player.x,player.y);
+  const playerHudWorldY=SY(player.x,player.y)
+    -(zone==='field'?ELEV_PX*elevF(player.x,player.y):0);
+  const playerHudX=W/2+(playerHudWorldX-W/2)*viewScale;
+  const playerHudY=H/2+(playerHudWorldY-H/2)*viewScale;
   for(const b of bolts){
     const sx=SX(b.x,b.y),sy=SY(b.x,b.y);
     const fire=b.kind==='fire';
@@ -4125,7 +4142,8 @@ function render(){
   for(const w of wisps){
     if(!w.init)continue;
     const sx=SX(w.x,w.y),sy=SY(w.x,w.y)-20+Math.sin(time*1.6+w.ph)*5;
-    if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
+    if(sx<-40-viewExtraX||sx>W+40+viewExtraX
+      ||sy<-40-viewExtraY||sy>H+40+viewExtraY)continue;
     const r=7+Math.sin(time*2.2+w.ph)*1.5;
     const g2=ctx.createRadialGradient(sx,sy,0,sx,sy,r*2.4);
     g2.addColorStop(0,'rgba(190,240,220,0.5)');
@@ -4136,6 +4154,7 @@ function render(){
     ctx.fillStyle='rgba(230,255,245,0.8)';
     ctx.beginPath();ctx.arc(sx,sy,2.2,0,6.29);ctx.fill();
   }
+  ctx.restore();
   // 漂う霧
   for(let i=0;i<3;i++){
     const fx=W*0.5+Math.sin(time*0.05+i*2.1)*W*0.42;
@@ -4164,6 +4183,7 @@ function render(){
     cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${Math.min(0.78,0.35+CAVE_DEPTH[zone]*0.09)})`);
     ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
   }
+  drawPlayerMobileHud(playerHudX,playerHudY);
 }
 
 /* ================= HUD ================= */
@@ -4235,7 +4255,11 @@ function hud(){
 canvas.addEventListener('pointerdown',ev=>{
   if(!started||player.dead)return;
   const r=canvas.getBoundingClientRect();
-  const sx=ev.clientX-r.left,sy=ev.clientY-r.top;
+  const rawSx=ev.clientX-r.left,rawSy=ev.clientY-r.top;
+  const viewScale=worldViewScale();
+  // 引いたカメラで描画した座標を、従来のワールド画面座標へ戻して判定する。
+  const sx=W/2+(rawSx-W/2)/viewScale;
+  const sy=H/2+(rawSy-H/2)/viewScale;
   // NPCクリック
   for(const n of npcs){
     const nx=isoX(n.x,n.y)-camX+W/2;
@@ -4608,7 +4632,10 @@ window.EnmaGameBridge={
       if(raw.dead){
         markMobDead(mob,Math.max(0,Number(raw.respawn)||0));
       }else if(mob.dead){
+        // 討伐直前に送られた古い生存通知では復活させず、死亡猶予を必ず守る。
+        if((mob.deadUntil||0)>performance.now()+250)continue;
         mob.dead=false;mob.respawn=0;mob.path=[];
+        mob.deadUntil=0;mob.spawnT=0.8;
         mob.x=x;mob.y=y;
       }
     }

@@ -3,7 +3,10 @@ const ROOM_NAME = 'field-v1';
 const TICK_MS = 100;
 // 差分だけを送りつつ、移動は10fpsで届かせて補間の遅れを抑える。
 const SNAPSHOT_MS = 100;
-const RESPAWN_MS = 20_000;
+const RESPAWN_MS = 45_000;
+const RESPAWN_NEARBY_RADIUS = 5;
+const RESPAWN_RETRY_MS = 5_000;
+const RESPAWN_FORCE_MS = 90_000;
 const WORLD_VERSION = 1;
 const PLAYER_LIMIT = 80;
 
@@ -81,6 +84,7 @@ function initialMobs() {
       maxHp: definition.hp,
       dead: false,
       respawnAt: 0,
+      forceRespawnAt: 0,
       state: 'idle',
       targetId: '',
       nextAttackAt: 0,
@@ -152,7 +156,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
-      return Response.json({ ok: true, service: 'enmacho-world', version: WORLD_VERSION });
+      return Response.json({
+        ok: true,
+        service: 'enmacho-world',
+        version: WORLD_VERSION,
+        respawnSeconds: RESPAWN_MS / 1_000,
+      });
     }
     if (url.pathname !== '/world/field') return new Response('Not found', { status: 404 });
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
@@ -302,6 +311,7 @@ export class WorldRoom {
     if (monster.hp === 0) {
       monster.dead = true;
       monster.respawnAt = now + RESPAWN_MS;
+      monster.forceRespawnAt = now + RESPAWN_FORCE_MS;
       monster.targetId = '';
       monster.state = 'dead';
       monster.moving = false;
@@ -345,7 +355,17 @@ export class WorldRoom {
     for (const monster of this.mobs) {
       monster.moving = false;
       if (monster.dead) {
-        if (now >= monster.respawnAt) this.respawn(monster, now);
+        if (now >= monster.respawnAt) {
+          const home = { x: monster.homeX, y: monster.homeY };
+          const playerNearby = [...players.values()]
+            .some(player => !player.dead && distance(home, player) < RESPAWN_NEARBY_RADIUS);
+          const forceRespawnAt = finite(monster.forceRespawnAt, 0);
+          if (playerNearby && now < forceRespawnAt) {
+            monster.respawnAt = Math.min(forceRespawnAt, now + RESPAWN_RETRY_MS);
+          } else {
+            this.respawn(monster, now);
+          }
+        }
         continue;
       }
       const definition = DEFINITIONS[monster.type];
@@ -464,8 +484,11 @@ export class WorldRoom {
     monster.hp = monster.maxHp;
     monster.dead = false;
     monster.respawnAt = 0;
+    monster.forceRespawnAt = 0;
     monster.targetId = '';
     monster.state = 'idle';
+    monster.strikeAt = 0;
+    monster.swingUntil = 0;
     monster.wanderAt = now + randomInt(1_000, 4_000);
   }
 
