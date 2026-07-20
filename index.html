@@ -378,6 +378,16 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="smith">
+    <div class="scroll">
+      <h2>鍛冶屋 カナヤマ</h2>
+      <div class="sub">「+3までは腕の保証つき。その先は…業と相談だな」</div>
+      <div id="smithList"></div>
+      <div class="goldrow">所持金 <span id="smithGold">0</span> モン</div>
+      <button class="btn small" id="smithClose">店を出る</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="talk">
     <div class="scroll">
       <h2 id="talkTitle">オキナ</h2>
@@ -568,6 +578,7 @@ let npcs=[
   {x:34,y:56,kind:'merchant',name:'オババ'},
   {x:30,y:51,kind:'elder',name:'オキナ'},
   {x:28.2,y:58.8,kind:'okami',name:'オカミ'},     // 酒場の女将(店の前)
+  {x:33,y:47,kind:'smith',name:'カナヤマ'},       // 鍛冶屋(町の中央通り)
   {x:25.8,y:58.4,kind:'guest',name:'トックリ'},   // 酔客の亡者
   {x:28.2,y:44.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
 ];
@@ -818,7 +829,8 @@ const player={
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
-  plus:{},                                  // 武器の強化値 {武器id:+n}
+  plus:{},                                  // 装備の強化値 {装備id:+n}
+  wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
   cd:{bolt:0,heal:0,fire:0},                // 印のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
@@ -831,12 +843,12 @@ const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&
 const weaponPlus=id=>player.plus[id]||0;
 const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)+(player.foodAtkT>0?4:0);
 const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'');};
-/* ---- 武器強化 ---- */
+/* ---- 装備強化(鍛冶屋カナヤマ・巻物式) ---- */
 const ENH_MAX=9;
 const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
-const enhCost=n=>n*50;
-const enhNeedsBlood=n=>n>=7;
-const defTotal=()=>eqSum('def')+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
+const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の血が必要
+const W_SCROLL_PRICE=120,A_SCROLL_PRICE=100;
+const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
 const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
 const spellMul=()=>1+0.06*ST().int;
 const speedNow=()=>player.speed*(1+0.02*ST().agi)*(player.hasteT>0?1.3:1);
@@ -858,7 +870,8 @@ function save(){
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
-      quests:player.quests,qb:player.qb,plus:player.plus
+      quests:player.quests,qb:player.qb,plus:player.plus,
+      wScrolls:player.wScrolls,aScrolls:player.aScrolls
     }));
   }catch(e){}
 }
@@ -898,6 +911,7 @@ function load(){
         prog:d.qb.prog|0,done:d.qb.done&&typeof d.qb.done==='object'?d.qb.done:{}}
       :{active:null,prog:0,done:{}};
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
+    player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -1341,50 +1355,86 @@ function renderShop(){
       <span class="pr">${it.price} モン</span>
       <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
   }
-  // ---- 鍛冶(武器強化) ----
-  const wid=player.eq.weapon,wit=ITEMS[wid],cur=weaponPlus(wid);
-  html+=`<h2 style="margin-top:14px">オババの鍛冶場</h2>
-    <div class="sub">「+3までは腕の保証つき。その先は…業と相談だね」</div>`;
-  if(cur>=ENH_MAX){
-    html+=`<div class="itemrow"><span class="nm">${esc(dispName(wid))} <span class="fx">これ以上は強化できない</span></span></div>`;
-  }else{
-    const nx=cur+1,rate=ENH_RATE[nx-1],cost=enhCost(nx),blood=enhNeedsBlood(nx);
-    const lack=player.gold<cost||(blood&&player.dragonBlood<1);
-    html+=`<div class="itemrow"><img class="icn" src="assets/${wit.icon}" alt="">
-      <span class="nm">${esc(dispName(wid))} → +${nx} <span class="fx">成功${Math.round(rate*100)}%${rate<1?' / 失敗で+0に戻る':''}</span></span>
-      <span class="pr">${cost}モン${blood?' + 竜の血1':''}</span>
-      <button class="buyb" data-enh="1" ${lack?'disabled':''}>強化</button></div>`;
-    if(blood)html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個</div>`;
-  }
   list.innerHTML=html;
   $('shopGold').textContent=player.gold;
   for(const b of list.querySelectorAll('[data-buy]')){
     b.addEventListener('click',()=>buy(b.getAttribute('data-buy')));
   }
-  const eb=list.querySelector('[data-enh]');
-  if(eb)eb.addEventListener('click',enhance);
 }
-function enhance(){
-  const wid=player.eq.weapon,cur=weaponPlus(wid);
+/* ---- 鍛冶屋 カナヤマ ---- */
+function renderSmith(){
+  const list=$('smithList');
+  let html='';
+  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
+    <span class="nm">武器強化の巻物 ×${player.wScrolls} <span class="fx">装備中の武器を+1</span></span>
+    <span class="pr">${W_SCROLL_PRICE} モン</span>
+    <button class="buyb" data-sbuy="w" ${player.gold<W_SCROLL_PRICE?'disabled':''}>買う</button></div>`;
+  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
+    <span class="nm">防具強化の巻物 ×${player.aScrolls} <span class="fx">装備中の胴を+1</span></span>
+    <span class="pr">${A_SCROLL_PRICE} モン</span>
+    <button class="buyb" data-sbuy="a" ${player.gold<A_SCROLL_PRICE?'disabled':''}>買う</button></div>`;
+  html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 鍛冶(巻物1枚を消費) ─</span></div>`;
+  const rows=[
+    {k:'w',id:player.eq.weapon,scr:player.wScrolls,label:'武器'},
+    {k:'a',id:player.eq.body,  scr:player.aScrolls,label:'胴'},
+  ];
+  for(const r of rows){
+    const it=ITEMS[r.id];
+    if(!it){html+=`<div class="itemrow"><span class="nm">${r.label}: 装備なし</span></div>`;continue;}
+    const cur=weaponPlus(r.id);
+    if(cur>=ENH_MAX){
+      html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
+        <span class="nm">${esc(dispName(r.id))} <span class="fx">これ以上は強化できない</span></span></div>`;
+      continue;
+    }
+    const nx=cur+1,rate=ENH_RATE[nx-1],blood=r.k==='w'&&enhNeedsBlood(nx);
+    const lack=r.scr<1||(blood&&player.dragonBlood<1);
+    html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
+      <span class="nm">${esc(dispName(r.id))} → +${nx} <span class="fx">成功${Math.round(rate*100)}%${rate<1?' / 失敗で+0に戻る':''}${blood?' / 竜の血1が必要':''}</span></span>
+      <button class="buyb" data-senh="${r.k}" ${lack?'disabled':''}>強化</button></div>`;
+  }
+  html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個(武器の+7以降で使う)</div>`;
+  list.innerHTML=html;
+  $('smithGold').textContent=player.gold;
+  for(const b of list.querySelectorAll('[data-sbuy]')){
+    b.addEventListener('click',()=>{
+      const k=b.getAttribute('data-sbuy');
+      const price=k==='w'?W_SCROLL_PRICE:A_SCROLL_PRICE;
+      if(player.gold<price)return;
+      player.gold-=price;
+      if(k==='w')player.wScrolls++;else player.aScrolls++;
+      log(k==='w'?'武器強化の巻物を買った':'防具強化の巻物を買った','gain');
+      sfx.coin();save();renderSmith();
+    });
+  }
+  for(const b of list.querySelectorAll('[data-senh]')){
+    b.addEventListener('click',()=>enhance(b.getAttribute('data-senh')));
+  }
+}
+function enhance(kind){
+  const id=kind==='w'?player.eq.weapon:player.eq.body;
+  if(!ITEMS[id])return;
+  const cur=weaponPlus(id);
   if(cur>=ENH_MAX)return;
-  const nx=cur+1,rate=ENH_RATE[nx-1],cost=enhCost(nx),blood=enhNeedsBlood(nx);
-  if(player.gold<cost||(blood&&player.dragonBlood<1))return;
-  player.gold-=cost;
+  const nx=cur+1,rate=ENH_RATE[nx-1],blood=kind==='w'&&enhNeedsBlood(nx);
+  if(kind==='w'){if(player.wScrolls<1)return;}else{if(player.aScrolls<1)return;}
+  if(blood&&player.dragonBlood<1)return;
+  if(kind==='w')player.wScrolls--;else player.aScrolls--;
   if(blood)player.dragonBlood--;
   if(Math.random()<rate){
-    player.plus[wid]=nx;
-    log(`${dispName(wid)}に強化成功！ 攻撃+${nx}`,'gain');
+    player.plus[id]=nx;
+    log(`${dispName(id)}に強化成功！ ${kind==='w'?'攻撃':'防御'}+${nx}`,'gain');
     addFloat(player.x,player.y-0.8,`+${nx} 成功！`,'#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',16);
     sfx.coin();
   }else{
-    delete player.plus[wid];
-    log(`強化失敗… ${ITEMS[wid].name}の強化値が失われた`,'sys');
+    delete player.plus[id];
+    log(`強化失敗… ${ITEMS[id].name}の強化値が失われた`,'sys');
     addFloat(player.x,player.y-0.8,'失敗…','#ff7a6a',true);
     burst(player.x,player.y,'#8a4a3a',14);
     sfx.hit();
   }
-  save();renderShop();
+  save();renderSmith();
 }
 function buy(id){
   if(id==='potion'){
@@ -1540,6 +1590,14 @@ function renderItemTab(){
       <span class="nm">${nm} ×${player[f]} <span class="fx">${fx}</span></span>
       <button class="buyb" data-use="${act}" ${player[f]<=0?'disabled':''}>使う</button></div>`;
   }
+  if(player.wScrolls>0){
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
+      <span class="nm">武器強化の巻物 ×${player.wScrolls} <span class="fx">鍛冶屋カナヤマで使う</span></span></div>`;
+  }
+  if(player.aScrolls>0){
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
+      <span class="nm">防具強化の巻物 ×${player.aScrolls} <span class="fx">鍛冶屋カナヤマで使う</span></span></div>`;
+  }
   if(player.dragonBlood>0){
     html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
@@ -1592,6 +1650,7 @@ for(const b of document.querySelectorAll('.mtab')){
 let okamiIdx=0,guestIdx=0;
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
+  else if(npc.kind==='smith'){renderSmith();$('smith').classList.remove('hidden');}
   else if(npc.kind==='okami'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='guest'){
@@ -1617,6 +1676,7 @@ function openNpc(npc){
   sfx.click();
 }
 $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
+$('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>$('talk').classList.add('hidden'));
@@ -2999,6 +3059,20 @@ function drawNpc(sx,sy,n){
     ctx.beginPath();ctx.ellipse(9,-12,2.6,3.6,0.2,0,6.29);ctx.fill();   // 徳利
     ctx.fillStyle='rgba(255,150,150,0.5)';
     ctx.beginPath();ctx.arc(-2,-19,1.2,0,6.29);ctx.fill();ctx.beginPath();ctx.arc(2,-19,1.2,0,6.29);ctx.fill();   // ほろ酔いの頬
+    ctx.restore();
+  }else if(n.kind==='smith'){
+    // 鍛冶屋: 鉄色の胴着+革前掛け+槌。ときどき打ち下ろす
+    ctx.fillStyle='#4a4e58';
+    ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-6,-17);ctx.lineTo(6,-17);ctx.lineTo(8,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#6d4a2a';
+    ctx.beginPath();ctx.moveTo(-5,0);ctx.lineTo(-4,-12);ctx.lineTo(4,-12);ctx.lineTo(5,0);ctx.closePath();ctx.fill();   // 前掛け
+    ctx.fillStyle='#d8a888';ctx.beginPath();ctx.arc(0,-22,5,0,6.29);ctx.fill();
+    ctx.fillStyle='#e8e2d2';ctx.fillRect(-5,-24,10,2.4);   // ねじり鉢巻
+    const sw=Math.max(0,Math.sin(time*2.2));   // 槌の振り
+    ctx.save();ctx.translate(8,-14);ctx.rotate(-0.6+sw*1.1);
+    ctx.strokeStyle='#7a5a34';ctx.lineWidth=2.2;
+    ctx.beginPath();ctx.moveTo(0,2);ctx.lineTo(0,-11);ctx.stroke();
+    ctx.fillStyle='#8a8e9a';ctx.fillRect(-4,-15,8,5);   // 槌頭
     ctx.restore();
   }else{
     ctx.fillStyle='#7d8290';
