@@ -320,8 +320,9 @@
         <span class="cdov hidden" id="cdFire"></span>
       </button>
       <button class="skill" id="btnPotion" title="甘露水 (Q)">
-        <span class="key">Q</span><span class="icon item-icon"><img src="assets/items/potion_kanro.png" alt=""></span><span>回復</span>
+        <span class="key">Q</span><span class="icon item-icon"><img src="assets/items/potion_kanro.png" alt=""></span><span id="potLabel">回復S</span>
         <span class="badge" id="potN">3</span>
+        <span class="cdov hidden" id="cdPotion"></span>
       </button>
       <button class="skill" id="btnEquip" title="メニュー (I)">
         <span class="key">I</span><span class="icon">🛡</span><span>メニュー</span>
@@ -534,7 +535,12 @@ function itemFx(it){
   return p.join(' ');
 }
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
-const POTION_PRICE=30,HASTE_PRICE=300,CRIT_PRICE=300;
+const HEAL_POTIONS={
+  s:{name:'甘露水 S',field:'potions', heal:65, price:30, delay:2.5},
+  m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:4},
+  l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:6},
+};
+const HASTE_PRICE=300,CRIT_PRICE=300;
 
 /* ================= マップ生成 ================= */
 let blocked=new Uint8Array(MAP*MAP);
@@ -907,7 +913,7 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
   stats:{str:0,con:0,agi:0,int:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
-  xp:0,gold:0,potions:3,dragonBlood:0,
+  xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   name:'',quests:{trial:0},
   qb:{active:null,prog:0,done:{}},          // 高札クエスト
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
@@ -919,7 +925,7 @@ const player={
   plus:{},                                  // 装備の強化値 {装備id:+n}
   wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
-  cd:{bolt:0,heal:0,fire:0},                // 印のクールタイム(秒)
+  cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingKind:'melee',
   autoMode:false,
   hitT:0,attackT:0,attackDur:0,pendingHit:null,
@@ -930,30 +936,31 @@ const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
 const weaponPlus=id=>player.plus[id]||0;
-const atkTotal=()=>6+2*ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)+(player.foodAtkT>0?4:0);
+const atkTotal=()=>6+ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)+(player.foodAtkT>0?4:0);
 const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'');};
 /* ---- 装備強化(鍛冶屋カナヤマ・巻物式) ---- */
 const ENH_MAX=9;
 const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
 const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の血が必要
 const SCROLL_DROP_RATE=0.07;   // 中ボス・竜からの強化巻物ドロップ率
-const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/2)+(player.foodDefT>0?4:0);
-const critRate=()=>0.1+0.02*ST().agi+(player.critT>0?0.25:0);
-const spellMul=()=>1+0.06*ST().int;
-const speedNow=()=>player.speed*(1+0.02*ST().agi)*(player.hasteT>0?1.3:1);
+const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/4)+(player.foodDefT>0?4:0);
+const critRate=()=>Math.min(0.75,Math.min(0.5,0.1+0.01*ST().agi)+(player.critT>0?0.25:0));
+const spellMul=()=>Math.min(2.5,1+0.03*ST().int);
+const speedNow=()=>player.speed*Math.min(1.35,1+0.007*ST().agi)*(player.hasteT>0?1.3:1);
 function recalcMax(){
-  player.maxHp=80+12*(player.lv-1)+16*ST().con+eqSum('hpb');
-  player.maxMp=30+6*(player.lv-1)+12*ST().int+eqSum('mpb');
+  player.maxHp=80+12*(player.lv-1)+10*ST().con+eqSum('hpb');
+  player.maxMp=30+6*(player.lv-1)+8*ST().int+eqSum('mpb');
   player.hp=Math.min(player.hp,player.maxHp);
   player.mp=Math.min(player.mp,player.maxMp);
 }
 
-let resetting=false;  // 転生リセット中は自動セーブを止める
+let resetting=false,migrationStatGrant=0;  // 転生リセット中は自動セーブを止める
 function save(){
   if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:4,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:5,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       dragonBlood:player.dragonBlood,
       items:player.items,eq:player.eq,kills,
       gender:player.gender,name:player.name,
@@ -969,8 +976,11 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4))return false;
-    player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5))return false;
+    player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
+    player.potions=Math.max(0,d.potions|0);
+    player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
+    player.potionTier=HEAL_POTIONS[d.potionTier]?d.potionTier:'s';
     player.dragonBlood=Math.max(0,d.dragonBlood|0);
     player.items=Array.isArray(d.items)?d.items:['dagger','cloth'];
     if(d.v>=3&&d.eq){
@@ -995,6 +1005,13 @@ function load(){
       // 旧セーブ: 初期5pt+10レベルごとの分をまとめて付与
       player.stats={str:0,con:0,agi:0,int:0};
       player.statPts=5+Math.floor(player.lv/10);
+    }
+    if(d.v<5){
+      // 旧「10徳位ごとに+1」と新「徳位上昇ごとに+1」の差額を一度だけ補填する。
+      const oldLevelPts=Math.floor(player.lv/10);
+      const newLevelPts=Math.max(0,player.lv-1);
+      migrationStatGrant=Math.max(0,newLevelPts-oldLevelPts);
+      player.statPts+=migrationStatGrant;
     }
     player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
     player.qb=(d.qb&&typeof d.qb==='object')
@@ -1339,9 +1356,10 @@ function gainXp(n){
   while(player.xp>=xpNext(player.lv)){
     player.xp-=xpNext(player.lv);
     player.lv++;
+    player.statPts++;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
-    if(player.lv%10===0){player.statPts++;log('魂の資質ポイント+1！ メニュー(I)のステータスで割り振ろう','gain');}
+    log('魂の資質ポイント+1！ メニュー(I)のステータスで割り振ろう','gain');
     addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
     log(`徳が高まり、徳位${player.lv}になった`,'gain');
@@ -1410,13 +1428,23 @@ function castFire(){
   bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'fire'});
   sfx.fire();
 }
-function drinkPotion(){
+function selectPotion(tier){
+  if(!HEAL_POTIONS[tier])return;
+  player.potionTier=tier;
+  log(`${HEAL_POTIONS[tier].name}をQに設定した`,'sys');
+  sfx.click();save();
+}
+function drinkPotion(tier=player.potionTier){
   if(player.dead||!started)return;
-  if(player.potions<=0){log('甘露水がない','sys');return;}
+  const p=HEAL_POTIONS[tier]||HEAL_POTIONS.s;
+  if(player.cd.potion>0){log(`回復薬はあと${player.cd.potion.toFixed(1)}秒使えない`,'sys');return;}
+  if(player[p.field]<=0){log(`${p.name}がない`,'sys');return;}
   if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
-  player.potions--;
-  player.hp=Math.min(player.maxHp,player.hp+65);
-  addFloat(player.x,player.y-0.6,'+65','#7fe07f');
+  const healed=Math.min(p.heal,player.maxHp-player.hp);
+  player[p.field]--;
+  player.hp+=healed;
+  player.cd.potion=p.delay;
+  addFloat(player.x,player.y-0.6,'+'+Math.ceil(healed),'#7fe07f');
   burst(player.x,player.y,'#7fe07f',10);
   sfx.potion();save();
 }
@@ -1469,10 +1497,12 @@ function renderShop(){
   const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
   let html='';
   html+=sec('薬');
-  html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
-    <span class="nm">甘露水 <span class="fx">HP+65</span></span>
-    <span class="pr">${POTION_PRICE} モン</span>
-    <button class="buyb" data-buy="potion" ${player.gold<POTION_PRICE?'disabled':''}>買う</button></div>`;
+  for(const [tier,p] of Object.entries(HEAL_POTIONS)){
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
+      <span class="nm">${p.name} <span class="fx">HP+${p.heal} / 使用後${p.delay}秒</span></span>
+      <span class="pr">${p.price} モン</span>
+      <button class="buyb" data-buy="potion-${tier}" ${player.gold<p.price?'disabled':''}>買う</button></div>`;
+  }
   html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_idaten.png" alt="">
     <span class="nm">韋駄天の水 <span class="fx">5分 移動と攻撃が速くなる</span></span>
     <span class="pr">${HASTE_PRICE} モン</span>
@@ -1562,10 +1592,11 @@ function enhance(kind){
   save();renderSmith();
 }
 function buy(id){
-  if(id==='potion'){
-    if(player.gold<POTION_PRICE)return;
-    player.gold-=POTION_PRICE;player.potions++;
-    log('甘露水を買った','gain');
+  if(id.startsWith('potion-')){
+    const p=HEAL_POTIONS[id.slice(-1)];
+    if(!p||player.gold<p.price)return;
+    player.gold-=p.price;player[p.field]++;
+    log(`${p.name}を買った`,'gain');
   }else if(id==='haste'){
     if(player.gold<HASTE_PRICE)return;
     player.gold-=HASTE_PRICE;player.hastePots++;
@@ -1707,8 +1738,14 @@ function renderEquipTab(){
 }
 function renderItemTab(){
   let html='';
+  for(const [tier,p] of Object.entries(HEAL_POTIONS)){
+    const selected=player.potionTier===tier;
+    const unusable=selected&&(player[p.field]<=0||player.cd.potion>0);
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
+      <span class="nm">${p.name} ×${player[p.field]} <span class="fx">HP+${p.heal} / 共有ディレイ${p.delay}秒</span></span>
+      <button class="buyb ${selected?'on':''}" data-potion="${tier}" ${unusable?'disabled':''}>${selected?'使う':'Q設定'}</button></div>`;
+  }
   const CONS=[
-    ['potions','甘露水','HP+65','drink','potion_kanro.png'],
     ['hastePots','韋駄天の水','5分 高速化','haste','potion_idaten.png'],
     ['critPots','修羅の酒','5分 会心+25%','crit','potion_shura.png'],
   ];
@@ -1743,16 +1780,24 @@ function renderItemTab(){
       renderItemTab();
     });
   }
+  for(const b of $('itemList').querySelectorAll('[data-potion]')){
+    b.addEventListener('click',()=>{
+      const tier=b.getAttribute('data-potion');
+      if(player.potionTier===tier)drinkPotion(tier);
+      else selectPotion(tier);
+      renderItemTab();
+    });
+  }
 }
 function renderStatTab(){
   const st=player.stats;
   let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px">
-    <span class="fx">─ 魂の資質 ─${player.statPts>0?` 残り${player.statPts}ポイント`:''}</span></div>`;
+    <span class="fx">─ 魂の資質（徳位上昇ごとに+1）─${player.statPts>0?` 残り${player.statPts}ポイント`:''}</span></div>`;
   const STATS=[
-    ['str','力','物理攻撃 +2'],
-    ['con','体','最大HP +16 / 2ごとに防御+1'],
-    ['agi','速','会心 +2% / 移動 +2%'],
-    ['int','知','最大MP +12 / 印の威力 +6%'],
+    ['str','力','物理攻撃 +1'],
+    ['con','体','最大HP +10 / 4ごとに防御+1'],
+    ['agi','速','会心 +1% / 移動 +0.7%（上限あり）'],
+    ['int','知','最大MP +8 / 印の威力 +3%（上限2.5倍）'],
   ];
   for(const [k,nm,fx] of STATS){
     html+=`<div class="itemrow"><span class="nm">${nm} <b>${st[k]}</b> <span class="fx">${fx}</span></span>`+
@@ -3604,8 +3649,8 @@ const el={
   xp:document.querySelector('#xpbar i'),
   hp:document.querySelector('#hpbar i'),mp:document.querySelector('#mpbar i'),
   hpn:$('hpnum'),mpn:$('mpnum'),
-  pot:$('potN'),bolt:$('btnBolt'),heal:$('btnHeal'),fire:$('btnFire'),
-  cdBolt:$('cdBolt'),cdHeal:$('cdHeal'),cdFire:$('cdFire'),
+  pot:$('potN'),potLabel:$('potLabel'),bolt:$('btnBolt'),heal:$('btnHeal'),fire:$('btnFire'),
+  cdPotion:$('cdPotion'),cdBolt:$('cdBolt'),cdHeal:$('cdHeal'),cdFire:$('cdFire'),
   lockHeal:$('lockHeal'),lockFire:$('lockFire'),
   buffs:$('buffs'),pt:$('ptN'),
   goal:document.querySelector('#quest .goal')
@@ -3621,7 +3666,10 @@ function hud(){
   el.mp.style.width=(player.mp/player.maxMp*100)+'%';
   el.hpn.textContent=`${Math.ceil(player.hp)} / ${player.maxHp}`;
   el.mpn.textContent=`${Math.floor(player.mp)} / ${player.maxMp}`;
-  el.pot.textContent=player.potions;
+  const hpPotion=HEAL_POTIONS[player.potionTier]||HEAL_POTIONS.s;
+  el.pot.textContent=player[hpPotion.field];
+  el.potLabel.textContent='回復'+player.potionTier.toUpperCase();
+  $('btnPotion').title=`${hpPotion.name} (Q) HP+${hpPotion.heal} / 使用後${hpPotion.delay}秒`;
   el.pt.textContent=player.statPts>0?player.statPts:'';
   if(player.qb.active){
     const q=questById(player.qb.active);
@@ -3644,7 +3692,11 @@ function hud(){
   el.bolt.classList.toggle('disabled',player.mp<8||player.cd.bolt>0);
   el.heal.classList.toggle('disabled',player.lv<3||player.mp<12||player.cd.heal>0);
   el.fire.classList.toggle('disabled',player.lv<6||player.mp<20||player.cd.fire>0);
+  const potionLocked=player[hpPotion.field]<=0||player.cd.potion>0;
+  $('btnPotion').classList.toggle('disabled',potionLocked);
+  $('btnPotion').disabled=potionLocked;
   const cdShow=(elm,v)=>{elm.classList.toggle('hidden',v<=0);if(v>0)elm.textContent=Math.ceil(v);};
+  cdShow(el.cdPotion,player.cd.potion);
   cdShow(el.cdBolt,player.cd.bolt);
   cdShow(el.cdHeal,player.lv>=3?player.cd.heal:0);
   cdShow(el.cdFire,player.lv>=6?player.cd.fire:0);
@@ -3757,7 +3809,7 @@ function toggleAuto(){
 $('btnBolt').addEventListener('click',castBolt);
 $('btnHeal').addEventListener('click',castHeal);
 $('btnFire').addEventListener('click',castFire);
-$('btnPotion').addEventListener('click',drinkPotion);
+$('btnPotion').addEventListener('click',()=>drinkPotion());
 $('btnEquip').addEventListener('click',toggleEquip);
 $('btnAuto').addEventListener('click',toggleAuto);
 $('sndBtn').addEventListener('click',()=>{
@@ -3786,6 +3838,8 @@ $('startBtn').addEventListener('click',()=>{
   started=true;audio();startBgm();
   if(hasSaveData){
     log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
+    if(migrationStatGrant>0)
+      log(`毎徳位の新制度により、魂の資質ポイントを${migrationStatGrant}補填した`,'gain');
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
     log('川辺のオババとオキナに話しかけてみよう','sys');
