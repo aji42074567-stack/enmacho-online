@@ -41,7 +41,21 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 }[char]));
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const withTimeout = (promise, milliseconds, message) => Promise.race([
+  promise,
+  new Promise((_, reject) => window.setTimeout(
+    () => reject(new Error(message)),
+    milliseconds,
+  )),
+]);
 const isJwtClockSkew = error => /JWT issued at future/i.test(error?.message || '');
+
+function syncOnlineControllers(session, profile) {
+  Promise.allSettled([
+    presenceController?.setAccount(session, profile),
+    worldController?.setAccount(session, profile),
+  ]).catch(() => {});
+}
 
 const setFeedback = (message = '', error = '') => {
   state.message = message;
@@ -206,13 +220,28 @@ async function loadAccountData() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
-    await presenceController?.setAccount(null, null);
-    await worldController?.setAccount(null, null);
+    syncOnlineControllers(null, null);
     render();
     return;
   }
   const userId = state.session.user.id;
-  let results = await fetchAccountData(userId);
+  let results;
+  try {
+    results = await withTimeout(
+      fetchAccountData(userId),
+      12_000,
+      '魂籍台帳からの応答に時間がかかっています',
+    );
+  } catch (error) {
+    if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
+    state.profile = null;
+    state.preferences = null;
+    state.cloudSave = null;
+    setFeedback('', `${error.message}。ゲームはそのまま開始できます`);
+    syncOnlineControllers(state.session, null);
+    render();
+    return;
+  }
   const firstErrors = [
     results.profileResult.error,
     results.preferencesResult.error,
@@ -224,7 +253,19 @@ async function loadAccountData() {
     if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
     const { data, error } = await state.client.auth.refreshSession();
     if (!error && data.session) state.session = data.session;
-    results = await fetchAccountData(userId);
+    try {
+      results = await withTimeout(
+        fetchAccountData(userId),
+        12_000,
+        '魂籍台帳からの応答に時間がかかっています',
+      );
+    } catch (retryError) {
+      if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
+      setFeedback('', `${retryError.message}。ゲームはそのまま開始できます`);
+      syncOnlineControllers(state.session, state.profile);
+      render();
+      return;
+    }
   }
 
   if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
@@ -252,8 +293,7 @@ async function loadAccountData() {
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;
-  await presenceController?.setAccount(state.session, state.profile);
-  await worldController?.setAccount(state.session, state.profile);
+  syncOnlineControllers(state.session, state.profile);
   render();
 }
 
@@ -353,8 +393,7 @@ async function updateProfile(event) {
     if (preferencesError) throw preferencesError;
     state.profile = data;
     state.preferences = preferences;
-    await presenceController?.setAccount(state.session, state.profile);
-    await worldController?.setAccount(state.session, state.profile);
+    syncOnlineControllers(state.session, state.profile);
     if (config.resendSyncFunction) {
       const { error: syncError } = await state.client.functions.invoke(
         config.resendSyncFunction,
@@ -404,19 +443,19 @@ async function signOut() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
-    await presenceController?.setAccount(null, null);
-    await worldController?.setAccount(null, null);
+    syncOnlineControllers(null, null);
     setFeedback('ログアウトしました');
   });
 }
 
-async function initialize() {
+let initializeRevision = 0;
+async function initialize(attempt = 0) {
+  const revision = ++initializeRevision;
   render();
   if (!state.configured) return;
   try {
-    const { createClient } = await import(
-      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-    );
+    const createClient = window.supabase?.createClient;
+    if (!createClient) throw new Error('認証ライブラリを読み込めませんでした');
     state.client = createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
@@ -433,14 +472,32 @@ async function initialize() {
         void worldController?.setAccount(session, state.profile);
         return;
       }
-      setTimeout(() => loadAccountData(), 0);
+      setTimeout(() => {
+        loadAccountData().catch(loadError => {
+          setFeedback('', `魂籍情報を更新できません：${loadError?.message || '通信エラー'}`);
+          render();
+        });
+      }, 0);
     });
     await loadAccountData();
   } catch (error) {
+    if (revision !== initializeRevision) return;
+    try { await presenceController?.stop?.(); } catch {}
+    try { worldController?.stop?.(); } catch {}
+    presenceController = null;
+    worldController = null;
+    window.EnmaWorldClient = null;
     state.client = null;
     setFeedback('', `魂籍台帳へ接続できません：${error?.message || '通信エラー'}`);
     content.innerHTML = `<p class="account-lead">魂籍台帳へ接続できませんでした。</p>${feedbackHtml()}
-      <p class="account-note">未ログインのままゲームを続けられます。</p>`;
+      <button class="buyb account-primary" id="accountRetry" type="button">もう一度接続する</button>
+      <p class="account-note">接続できなくても、端末の記録でゲームを続けられます。</p>`;
+    document.getElementById('accountRetry')?.addEventListener('click', () => initialize(0));
+    if (attempt < 2) {
+      window.setTimeout(() => {
+        if (revision === initializeRevision && !state.client) void initialize(attempt + 1);
+      }, 1_500 * (attempt + 1));
+    }
   }
 }
 

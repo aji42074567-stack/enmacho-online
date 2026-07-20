@@ -742,9 +742,11 @@ const BOSS_RESPAWN_SECONDS=120;
 const SAVE_KEY='aden_save_v1';
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
-let W=0,H=0,DPR=1;
+let W=0,H=0,DPR=1,MOBILE_RENDER=false;
 function resize(){
-  DPR=Math.min(2,window.devicePixelRatio||1);
+  // スマホは高DPI Canvasの塗りつぶし量が大きいため、見た目を保てる1.5倍で抑える。
+  MOBILE_RENDER=window.matchMedia('(max-width:600px)').matches;
+  DPR=Math.min(MOBILE_RENDER?1.5:2,window.devicePixelRatio||1);
   W=canvas.clientWidth; H=canvas.clientHeight;
   canvas.width=W*DPR; canvas.height=H*DPR;
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -4591,20 +4593,24 @@ if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');
 }
-let last=0;
+let last=0,lastFrameAt=0;
 function frame(t){
+  requestAnimationFrame(frame);
+  // 通信・描画が同時に走る実機では30fpsに抑え、入力と認証UIの応答余力を残す。
+  if(MOBILE_RENDER&&t-lastFrameAt<32)return;
+  lastFrameAt=t;
   let dt=Math.min(0.05,(t-last)/1000||0.016);
   last=t;
   if(hitstop>0){hitstop-=dt;dt*=0.15;}  // ヒットの瞬間だけ時間が止まる
   if(started)update(dt);
   render();
   hud();
-  requestAnimationFrame(frame);
 }
 resize();
 requestAnimationFrame(frame);
 </script>
 <script src="online/config.js"></script>
+<script src="online/vendor/supabase.min.js"></script>
 <script type="module" src="online/account.js"></script>
 </body>
 </html>

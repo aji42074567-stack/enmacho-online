@@ -1,7 +1,7 @@
 const PROTOCOL = 'enma-world-v1';
 const ROOM_NAME = 'field-v1';
 const TICK_MS = 100;
-const SNAPSHOT_MS = 200;
+const SNAPSHOT_MS = 400;
 const RESPAWN_MS = 20_000;
 const WORLD_VERSION = 1;
 const PLAYER_LIMIT = 80;
@@ -98,8 +98,8 @@ function publicMonster(monster, now) {
   return {
     id: monster.id,
     type: monster.type,
-    x: Math.round(monster.x * 1_000) / 1_000,
-    y: Math.round(monster.y * 1_000) / 1_000,
+    x: Math.round(monster.x * 100) / 100,
+    y: Math.round(monster.y * 100) / 100,
     hp: monster.hp,
     maxHp: monster.maxHp,
     dead: monster.dead,
@@ -181,6 +181,7 @@ export class WorldRoom {
     this.lastSnapshotAt = 0;
     this.lastPersistAt = 0;
     this.hitWindows = new Map();
+    this.lastBroadcastState = new Map();
     this.ready = state.blockConcurrencyWhile(async () => {
       const saved = await state.storage.get('world');
       if (saved?.version === WORLD_VERSION && Array.isArray(saved.mobs)
@@ -213,7 +214,7 @@ export class WorldRoom {
       lastSeenAt: Date.now(),
     });
     this.state.acceptWebSocket(server);
-    this.send(server, this.snapshot());
+    this.send(server, this.snapshot(Date.now(), true));
     this.startTicking();
     return new Response(null, {
       status: 101,
@@ -462,12 +463,31 @@ export class WorldRoom {
     }
   }
 
-  snapshot(now = Date.now()) {
+  snapshot(now = Date.now(), full = false) {
+    const monsters = [];
+    for (const monster of this.mobs) {
+      const stateKey = [
+        Math.round(monster.x * 100),
+        Math.round(monster.y * 100),
+        monster.hp,
+        monster.dead ? 1 : 0,
+        monster.dead ? Math.ceil(Math.max(0, monster.respawnAt - now) / 1_000) : 0,
+        monster.state,
+        monster.moving ? 1 : 0,
+        monster.face,
+        monster.swingUntil > now ? 1 : 0,
+      ].join('|');
+      if (full || this.lastBroadcastState.get(monster.id) !== stateKey) {
+        monsters.push(publicMonster(monster, now));
+        this.lastBroadcastState.set(monster.id, stateKey);
+      }
+    }
     return {
       type: 'snapshot',
       zone: 'field',
       serverTime: now,
-      monsters: this.mobs.map(monster => publicMonster(monster, now)),
+      full,
+      monsters,
     };
   }
 

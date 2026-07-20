@@ -1,5 +1,5 @@
-const LOOP_INTERVAL_MS = 100;
-const POSITION_INTERVAL_MS = 250;
+const LOOP_INTERVAL_MS = 200;
+const POSITION_INTERVAL_MS = 400;
 const IDLE_HEARTBEAT_MS = 2_000;
 const PROTOCOL = 'enma-world-v1';
 
@@ -66,7 +66,9 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       return;
     }
     if (message?.type === 'snapshot' && message.zone === 'field') {
-      bridge?.setSharedMonsters?.(message.monsters);
+      if (Array.isArray(message.monsters) && message.monsters.length) {
+        bridge?.setSharedMonsters?.(message.monsters);
+      }
       return;
     }
     if (message?.type === 'reward') {
