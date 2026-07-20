@@ -2828,7 +2828,6 @@ function drawStone(sx,sy){
   if(img){
     const h=80,w=h*img.width/img.height;
     const baseY=sy+7;   // 台座の下端を井戸などと同じ地面基準へ合わせる
-    drawShadow(sx,baseY-1,w*0.32);
     const pulse=0.45+Math.sin(time*2)*0.15;
     const glow=ctx.createRadialGradient(sx,baseY-h*0.55,0,sx,baseY-h*0.55,26);
     glow.addColorStop(0,`rgba(120,205,255,${pulse*0.28})`);
@@ -2928,8 +2927,8 @@ function drawHouse(sx,sy,p){
 }
 function drawKosatsu(sx,sy){
   const img=SPRITES.map_kosatsu;
+  const w=84,h=img?w*img.height/img.width:0;
   if(img){
-    const w=84,h=w*img.height/img.width;
     ctx.drawImage(img,sx-w/2,sy-h+10,w,h);
   }else{
     drawShadow(sx,sy+3,20);
@@ -2951,7 +2950,7 @@ function drawKosatsu(sx,sy){
     const puls=0.6+Math.sin(time*3)*0.4;
     ctx.fillStyle=`rgba(255,225,120,${puls})`;
     ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-    ctx.fillText('!',sx,sy-58);
+    ctx.fillText('!',sx,img?sy-h+4:sy-58);
   }
   ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
   ctx.fillText('高札',sx,sy+14);
