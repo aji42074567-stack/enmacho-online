@@ -113,6 +113,7 @@ enmacho-online/
 - `map_smithy.png` — 鍛冶屋(旧・青屋根の家を置換)
 - `map_respawn_statue.png` — 死亡後に戻る「賽の石像」
 - `map_kosatsu.png` — 高札クエストの掲示板
+- `map_ferry.png` — 第一章クリア後に桟橋へ現れる渡し船
 - `map_pine_*.png` / `map_rock_*.png` — 森の樹木と岩
 - `map_lamp_post.png` / `map_stone_well.png` — 灯籠と井戸
 - 画像の読み込み前または失敗時は、従来のコード描画へフォールバックする

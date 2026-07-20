@@ -115,6 +115,13 @@
   .scroll ul b{color:var(--parchment);font-weight:600}
   .scroll .goal{font-family:var(--serif);color:var(--gold);font-size:14px;
     letter-spacing:.12em;margin-top:14px}
+  .chapter-kicker{font-family:var(--sans);font-size:10px;color:var(--gold);
+    letter-spacing:.34em;margin-bottom:8px}
+  .chapter-jobs{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:16px}
+  .chapter-jobs span{font-family:var(--serif);font-size:12px;color:#cfc2a0;
+    border:1px solid #4a3b22;border-radius:3px;padding:8px 4px;background:#17120d}
+  .chapter-note{font-family:var(--sans);font-size:10.5px;color:var(--dim);
+    letter-spacing:.08em;margin-top:12px}
   .btn{margin-top:20px;font-family:var(--serif);font-size:15px;letter-spacing:.2em;
     color:var(--parchment);background:linear-gradient(180deg,#3d3220,#241c11);
     border:1px solid #6b5730;border-radius:4px;padding:12px 32px;cursor:pointer}
@@ -179,6 +186,10 @@
     border-radius:70% 16% 70% 70%;transform:rotate(45deg);
     background:radial-gradient(circle at 35% 30%,#ff9a9a 0 9%,#b81736 28%,#560414 76%);
     border:1px solid #e45468;box-shadow:inset -3px -3px 5px rgba(20,0,5,.65)}
+  .itemrow .ferryman-coin-icon{display:grid;place-items:center;font-family:var(--serif);
+    color:#3b2913;font-size:13px;font-weight:700;width:28px;height:28px;margin:3px;
+    border-radius:50%;background:radial-gradient(circle at 35% 30%,#e4c36a,#8f6828 72%);
+    border:2px ridge #c79a42;box-shadow:0 0 7px rgba(214,169,70,.3)}
   .itemrow img.icn[src*="assets/items/"],
   .slotbox img[src*="assets/items/"]{image-rendering:auto;object-fit:contain;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
@@ -406,6 +417,23 @@
       <div class="sub" id="talkSub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
       <button class="btn small" id="talkClose">別れる</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="chapterEnd">
+    <div class="scroll">
+      <div class="chapter-kicker">第一章</div>
+      <h1>賽の森　完</h1>
+      <div class="sub">因果の島を越えて</div>
+      <div class="rule"></div>
+      <div class="say">ゴウリュウの咆哮が止み、島を閉ざしていた海霧が晴れた。<br>
+        千本亭のカズーから渡し守の古銭を託されたあなたを、桟橋の渡し船が待っている。<br><br>
+        次の転生では魂の役目を選び、海の向こうの広大な審査区へ進むことになる。</div>
+      <div class="chapter-jobs" aria-label="次章で選べる四つの職">
+        <span>羅刹</span><span>影法師</span><span>呪禁師</span><span>護法僧</span>
+      </div>
+      <div class="chapter-note">— 第二章・転生編へ続く —</div>
+      <button class="btn" id="chapterClose">賽の森に残る</button>
     </div>
   </div>
 
@@ -664,16 +692,42 @@ const OKAMI_LINES=[
   '「オキナの旦那は長生きだな。おれがこの店を開いた時にはもう、あの姿だった」',
   '「たまにな、客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどな」',
 ];
-const GUEST_LINES=[
+const GUEST_AMBIENT_LINES=[
   '「ひっく……なあ、兄さんも飲むかい。死んでから酒の味が薄いんだ。誰かが手を抜いてやがる」',
   '「雨の音、聞いたことあるか。……全部同じ間隔なんだよ。数えてみな。おれは三晩数えた」',
   '「海の向こうに行こうとしたやつがいてな。桟橋の先でぷっつり、いなくなった。……転生ってやつかね」',
   '「この町の夜空、星の数がいっつも同じなんだ。ひっく……増えも減りもしねえ。きっちり同じ」',
 ];
+const KAZU_STORY=[
+  {
+    unlock:()=>true,
+    line:'「ここにいる化け物どもはな、生前の強欲や怒り、執着に魂の形を食われた成れの果てだ。だが悪人だけじゃねえ。悲しみや孤独を抱えきれなかった奴もいる」',
+  },
+  {
+    unlock:()=>player.quests.trial>=2,
+    wait:'「まず東の試練を越えてこい。人の姿を失った魂を鎮めりゃ、俺の話もただの酔言じゃないと分かる」',
+    line:'「お前が斬っているのは魂じゃない。まとわりついた業だ。浄化された魂は人の姿を取り戻し、もう一度、輪廻転生の機会を与えられる」',
+  },
+  {
+    unlock:()=>player.story.oniKingCleared,
+    wait:'「試練の洞窟は青鬼で終わりじゃねえ。地下三層の奥まで行き、オニオウを鎮めてみな」',
+    line:'「因果応報ってのは罰の札じゃねえ。蒔いた種を刈り取ることだ。刈り終えれば、また新しい種を選べる。閻魔庁の仕事は、その機会を残すことさ」',
+  },
+  {
+    unlock:()=>player.story.dragonCaveReached,
+    wait:'「北西の森の奥に、もうひとつ洞窟がある。地の底まで降りてみな。島が何を閉じ込めているか分かる」',
+    line:'「ゴウリュウも元は人だ。失ったものを許せず、怒りを手放せなかった。あいつは島を閉じ込める竜じゃない。海の向こうへ進める魂かを量る、最後の門番だ」',
+  },
+  {
+    unlock:()=>player.story.dragonCleared,
+    wait:'「あとはゴウリュウを鎮めるだけだ。倒すんじゃねえぞ。怒りに食われたあいつへ、輪廻の機会を返してやるんだ」',
+    line:'「ゴウリュウが鎮まって海霧が晴れた。じき渡し船が来る。次の生では魂の役目を四つから選ぶことになる。……俺も昔、一度あの船に乗った。だが戻された。今度こそ、お前は先へ行け」',
+  },
+];
 /* ================= クエスト(高札) ================= */
 const QUESTS=[
   {id:'q_gaki',   name:'ガキ退治',        desc:'村の周りのガキを5体成仏させる',    type:'kill', mob:['goblin','goblin_red'], n:5, rw:{gold:80, xp:40}},
-  {id:'q_tokkuri',name:'酔客の戯言',      desc:'千本亭のカズーの話を聞いてやる',    type:'talk', n:1, rw:{gold:50, xp:30}},
+  {id:'q_tokkuri',name:'酔客の因果話',    desc:'カズーの話をすべて聞く',            type:'story',n:5, rw:{gold:300,xp:220,key:'ferrymanCoin'}},
   {id:'q_inugami',name:'イヌガミの群れ',  desc:'森のイヌガミを5体成仏させる',      type:'kill', mob:['wolf'], n:5, rw:{gold:150,xp:90}},
   {id:'q_akki',   name:'アッキ討伐',      desc:'森の奥のアッキを3体成仏させる',    type:'kill', mob:['orc'], n:3, rw:{gold:220,xp:160}},
 ];
@@ -856,6 +910,9 @@ const player={
   xp:0,gold:0,potions:3,dragonBlood:0,
   name:'',quests:{trial:0},
   qb:{active:null,prog:0,done:{}},          // 高札クエスト
+  story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
+    dragonCleared:false,chapter1Seen:false},
+  ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
@@ -896,7 +953,7 @@ function save(){
   if(resetting)return;
   try{
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      v:3,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:4,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       dragonBlood:player.dragonBlood,
       items:player.items,eq:player.eq,kills,
       gender:player.gender,name:player.name,
@@ -904,18 +961,19 @@ function save(){
       hastePots:player.hastePots,critPots:player.critPots,
       quests:player.quests,qb:player.qb,plus:player.plus,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
-      smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt
+      smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
+      story:player.story,ferrymanCoin:player.ferrymanCoin
     }));
   }catch(e){}
 }
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3))return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;player.potions=d.potions;
     player.dragonBlood=Math.max(0,d.dragonBlood|0);
-    player.items=d.items;
-    if(d.v===3&&d.eq){
+    player.items=Array.isArray(d.items)?d.items:['dagger','cloth'];
+    if(d.v>=3&&d.eq){
       // 各部位のidが正しいものだけ採用
       for(const [k] of SLOTS){
         const id=d.eq[k];
@@ -929,7 +987,7 @@ function load(){
     player.gender=d.gender==='f'?'f':'m';
     player.name=(typeof d.name==='string'&&d.name.trim())?d.name.trim().slice(0,8):'アジ';
     kills=d.kills||0;
-    if(d.v===2&&d.stats){
+    if(d.v>=2&&d.stats){
       player.stats={str:d.stats.str|0,con:d.stats.con|0,agi:d.stats.agi|0,int:d.stats.int|0};
       player.statPts=d.statPts|0;
       player.hastePots=d.hastePots|0;player.critPots=d.critPots|0;
@@ -943,6 +1001,22 @@ function load(){
       ?{active:(d.qb.active&&questById(d.qb.active))?d.qb.active:null,
         prog:d.qb.prog|0,done:d.qb.done&&typeof d.qb.done==='object'?d.qb.done:{}}
       :{active:null,prog:0,done:{}};
+    const oldKazuDone=d.v<4&&!!player.qb.done.q_tokkuri;
+    const st=d.story&&typeof d.story==='object'?d.story:{};
+    player.story={
+      kazuStage:clamp(st.kazuStage|0,0,KAZU_STORY.length),
+      oniKingCleared:!!st.oniKingCleared,
+      dragonCaveReached:!!st.dragonCaveReached,
+      dragonCleared:!!st.dragonCleared||!!d.drakeKilledAt,
+      chapter1Seen:!!st.chapter1Seen,
+    };
+    // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
+    if(oldKazuDone){
+      player.story.kazuStage=Math.max(1,player.story.kazuStage);
+      delete player.qb.done.q_tokkuri;
+    }
+    if(player.qb.active==='q_tokkuri')player.qb.prog=player.story.kazuStage;
+    player.ferrymanCoin=!!d.ferrymanCoin||!!player.qb.done.q_tokkuri;
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     player.smithIntro=!!d.smithIntro;player.drakeKilledAt=d.drakeKilledAt||0;
@@ -1172,6 +1246,18 @@ function gainItem(id){
 }
 
 /* ================= 高札クエスト進行 ================= */
+function completeQuest(q){
+  player.qb.done[q.id]=true;
+  player.qb.active=null;player.qb.prog=0;
+  player.gold+=q.rw.gold;gainXp(q.rw.xp);
+  if(q.rw.key==='ferrymanCoin'&&!player.ferrymanCoin){
+    player.ferrymanCoin=true;
+    log('カズーから鍵物「渡し守の古銭」を託された','gain');
+  }
+  banner={txt:`頼み事「${q.name}」達成！`,age:0};
+  log(`高札の頼み事「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
+  sfx.coin();
+}
 function questProgress(type,tag){
   if(!player.qb.active)return;
   const q=questById(player.qb.active);
@@ -1179,12 +1265,7 @@ function questProgress(type,tag){
   if(type==='kill'&&!q.mob.includes(tag))return;
   player.qb.prog++;
   if(player.qb.prog>=q.n){
-    player.qb.done[q.id]=true;
-    player.qb.active=null;player.qb.prog=0;
-    player.gold+=q.rw.gold;gainXp(q.rw.xp);
-    banner={txt:`頼み事「${q.name}」達成！`,age:0};
-    log(`高札の頼み事「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
-    sfx.coin();
+    completeQuest(q);
   }else{
     addFloat(player.x,player.y-1.0,`${q.name} ${player.qb.prog}/${q.n}`,'#ffe27a');
   }
@@ -1226,7 +1307,18 @@ function killMob(m){
     addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
     log(`超激レア！ ${wpn?'武器':'防具'}強化の巻物を手に入れた！`,'gain');
   }
-  if(m.type==='drake'){player.drakeKilledAt=drakeWindow();}
+  if(m.type==='oni_king'&&!player.story.oniKingCleared){
+    player.story.oniKingCleared=true;
+    log('カズーが話していた因果の続きが聞けそうだ','sys');
+  }
+  if(m.type==='drake'){
+    player.drakeKilledAt=drakeWindow();
+    if(!player.story.dragonCleared){
+      player.story.dragonCleared=true;
+      log('島を閉ざしていた海霧が晴れ、桟橋に渡し船が現れた','gain');
+      log('千本亭のカズーにゴウリュウの鎮魂を伝えよう','sys');
+    }
+  }
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
   if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};
@@ -1541,13 +1633,14 @@ function renderBoard(){
     if(done)btn=`<button class="buyb" disabled>済</button>`;
     else if(active)btn=`<button class="buyb on" data-qcancel="${q.id}">やめる</button>`;
     else btn=`<button class="buyb" data-qtake="${q.id}" ${player.qb.active?'disabled':''}>受ける</button>`;
-    const prog=active&&q.type==='kill'?` <b>${player.qb.prog}/${q.n}</b>`:'';
+    const prog=active&&q.n>1?` <b>${player.qb.prog}/${q.n}</b>`:'';
     html+=`<div class="itemrow"><span class="nm">${q.name}${prog} <span class="fx">${q.desc} — 礼: ${rw}</span></span>${btn}</div>`;
   }
   $('boardList').innerHTML=html;
   for(const b of $('boardList').querySelectorAll('[data-qtake]')){
     b.addEventListener('click',()=>{
-      player.qb.active=b.getAttribute('data-qtake');player.qb.prog=0;
+      player.qb.active=b.getAttribute('data-qtake');
+      player.qb.prog=player.qb.active==='q_tokkuri'?player.story.kazuStage:0;
       const q=questById(player.qb.active);
       log(`高札の頼み事「${q.name}」を受けた`,'sys');
       sfx.click();save();renderBoard();
@@ -1636,6 +1729,10 @@ function renderItemTab(){
     html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
   }
+  if(player.ferrymanCoin){
+    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">渡</span>
+      <span class="nm">渡し守の古銭 <span class="fx">次の審査区へ渡る資格の証</span></span></div>`;
+  }
   $('itemList').innerHTML=html;
   for(const b of $('itemList').querySelectorAll('[data-use]')){
     b.addEventListener('click',()=>{
@@ -1681,12 +1778,45 @@ function renderStatTab(){
 for(const b of document.querySelectorAll('.mtab')){
   b.addEventListener('click',()=>{menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();});
 }
-let okamiIdx=0,guestIdx=0;
+let okamiIdx=0,guestIdx=0,pendingChapterEnd=false;
 function setTalkPortrait(kind){
   const key=NPC_SPRITE[kind];
   const p=$('talkPortrait');
   if(key){p.style.backgroundImage=`url(assets/${key}.png)`;p.classList.remove('hidden');}
   else p.classList.add('hidden');
+}
+function kazuDialogue(){
+  const q=questById('q_tokkuri');
+  if(player.qb.done.q_tokkuri){
+    if(!player.story.chapter1Seen)pendingChapterEnd=true;
+    return '「渡し船は桟橋に着いてる。古銭はなくすなよ。次に会う時、お前がどんな役目を選んだか聞かせてくれ」';
+  }
+  if(player.qb.active!=='q_tokkuri'){
+    return '「俺の昔話を聞く気なら、高札の『酔客の因果話』を受けてきな。酔言かどうかは、お前が歩いた道で確かめりゃいい」';
+  }
+  const idx=clamp(player.story.kazuStage|0,0,KAZU_STORY.length);
+  if(idx>=KAZU_STORY.length){
+    completeQuest(q);pendingChapterEnd=!player.story.chapter1Seen;save();
+    return '「話は全部した。渡し守の古銭を持っていけ。あとは桟橋の船が、お前を次の審査区へ運ぶ」';
+  }
+  const beat=KAZU_STORY[idx];
+  if(!beat.unlock())return beat.wait;
+  player.story.kazuStage=idx+1;
+  player.qb.prog=player.story.kazuStage;
+  if(player.qb.prog>=q.n){
+    completeQuest(q);
+    pendingChapterEnd=!player.story.chapter1Seen;
+  }else{
+    addFloat(player.x,player.y-1.0,`${q.name} ${player.qb.prog}/${q.n}`,'#ffe27a');
+    log(`カズーの因果話 ${player.qb.prog}/${q.n}`,'sys');
+  }
+  save();
+  return beat.line;
+}
+function showChapterEnd(){
+  if(player.story.chapter1Seen)return;
+  player.story.chapter1Seen=true;pendingChapterEnd=false;save();
+  $('chapterEnd').classList.remove('hidden');
 }
 function openNpc(npc){
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
@@ -1704,10 +1834,14 @@ function openNpc(npc){
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='guest'){
     setTalkPortrait('guest');
-    $('talkTitle').textContent='カズー';$('talkSub').textContent='千本亭の常連客';
-    $('talkText').textContent=GUEST_LINES[guestIdx++%GUEST_LINES.length];
+    $('talkTitle').textContent='カズー';
+    $('talkSub').textContent=player.qb.active==='q_tokkuri'
+      ?`千本亭の常連客・因果話 ${Math.min(player.story.kazuStage+1,KAZU_STORY.length)}/${KAZU_STORY.length}`
+      :'千本亭の常連客';
+    $('talkText').textContent=player.qb.active==='q_tokkuri'||player.qb.done.q_tokkuri
+      ?kazuDialogue()
+      :GUEST_AMBIENT_LINES[guestIdx++%GUEST_AMBIENT_LINES.length]+'　高札に、俺の話を聞けって頼みが出てるぜ。';
     $('talk').classList.remove('hidden');
-    questProgress('talk','guest');
   }
   else{
     setTalkPortrait('elder');
@@ -1730,7 +1864,11 @@ $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
 $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
-$('talkClose').addEventListener('click',()=>$('talk').classList.add('hidden'));
+$('talkClose').addEventListener('click',()=>{
+  $('talk').classList.add('hidden');
+  if(pendingChapterEnd)showChapterEnd();
+});
+$('chapterClose').addEventListener('click',()=>$('chapterEnd').classList.add('hidden'));
 $('equipClose').addEventListener('click',()=>$('equip').classList.add('hidden'));
 function toggleEquip(){
   if(!started)return;
@@ -2383,6 +2521,13 @@ function switchZone(z,px,py){
   player.target=null;player.talkTarget=null;player.pendingHit=null;player.path=[];
   player.attackDur=0;player.attackT=0;
   player.x=px;player.y=py;camInit=false;
+  if(z.startsWith('dg')&&!player.story.dragonCaveReached){
+    player.story.dragonCaveReached=true;
+    if(started){
+      log('カズーが話していた島の秘密に近づいた','sys');
+      save();
+    }
+  }
   const ZMSG={
     field:'賽の森へ戻ってきた',
     cave:'試練の洞窟に足を踏み入れた…',
@@ -2445,6 +2590,7 @@ loadSprite('beach_2','assets/beach_2.png');
 loadSprite('beach_3','assets/beach_3.png');
 loadSprite('beach_4','assets/beach_4.png');
 loadSprite('pier','assets/pier.png');
+loadSprite('ferry','assets/map_ferry.png');
 loadSprite('map_cave_entrance','assets/map_cave_entrance.png');
 loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_house_red','assets/map_house_red.png');
@@ -2982,6 +3128,19 @@ function drawPierBase(sx,sy){
   // 提供された元素材から抜いた完成形の桟橋を1枚だけ描く
   ctx.drawImage(b.img,b.x,b.y,b.w,b.h);
 }
+function drawFerry(sx,sy){
+  const img=SPRITES.ferry;if(!img)return;
+  const w=210,h=w*img.height/img.width;
+  const bob=Math.sin(time*1.1)*1.4;
+  const x=sx-w/2,y=sy-h*0.72+bob;
+  ctx.drawImage(img,x,y,w,h);
+  const pulse=0.65+Math.sin(time*2.4)*0.12;
+  const lx=sx-w*0.11,ly=sy-h*0.16+bob;
+  const glow=ctx.createRadialGradient(lx,ly,0,lx,ly,18);
+  glow.addColorStop(0,`rgba(255,190,95,${0.22*pulse})`);
+  glow.addColorStop(1,'rgba(255,170,70,0)');
+  ctx.fillStyle=glow;ctx.fillRect(lx-20,ly-20,40,40);
+}
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
   if(!img){drawRock(sx,sy,{s:p.s});return;}
@@ -3284,6 +3443,11 @@ function render(){
       }
     }
   }
+  // ゴウリュウ鎮魂後、海霧の向こうから渡し船が桟橋へ着く
+  if(zone==='field'&&PIER&&player.story.dragonCleared){
+    const fx=PIER.x+5.9,fy=PIER.y+2.7;
+    drawFerry(SX(fx,fy),SY(fx,fy));
+  }
   // 完成形の桟橋を1枚だけ背景側に描き、人物をその上へ重ねる
   if(zone==='field'&&PIER)drawPierBase(SX(PIER.x,PIER.y),SY(PIER.x,PIER.y));
   if(player.target&&!player.target.dead){
@@ -3461,9 +3625,11 @@ function hud(){
   el.pt.textContent=player.statPts>0?player.statPts:'';
   if(player.qb.active){
     const q=questById(player.qb.active);
-    el.goal.textContent=q.type==='kill'?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
+    el.goal.textContent=q.n>1?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
   }else{
-    el.goal.textContent=player.quests.trial===0?'まずはオキナの話を聞こう'
+    el.goal.textContent=player.story.chapter1Seen?'第一章「賽の森」完 — 第二章へ続く'
+      :player.story.dragonCleared?'高札の頼みを受け、カズーの因果話を聞こう'
+      :player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
       :'北西の竜の洞窟 最深部のゴウリュウを鎮めよ';
   }
