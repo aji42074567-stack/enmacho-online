@@ -5,6 +5,7 @@ const CONNECT_FAILURE_REPORT_THRESHOLD = 3;
 const PROTOCOL = 'enma-world-v1';
 const SHARED_ZONES = new Set([
   'field', 'cave', 'cave2', 'cave3', 'dg1', 'dg2', 'dg3', 'dg4', 'dg5',
+  'muen1', 'muen2', 'muen3',
 ]);
 
 const newSessionId = () => {

@@ -1132,6 +1132,11 @@ const ITEMS={
   kusarifuji:  {slot:'arms',  name:'鎖封じの鉄籠手',def:5, price:0,  icon:'items/arms_kusarifuji_kote.png'},
   juzu:        {slot:'acc',   name:'六道の数珠',  hpb:30,price:200,icon:'items/acc_rokudo_juzu.png'},
   magatama:    {slot:'acc',   name:'蒼の勾玉',    mpb:20,price:200,icon:'items/acc_ao_magatama.png'},
+  saso_tabi:   {slot:'feet',  name:'砂葬の数珠足袋',def:5, price:0,  icon:'items/feet_saso_juzu_tabi.png'},
+  jukotsu_kote:{slot:'arms',  name:'獣骨の呪籠手',def:6, price:0,  icon:'items/arms_jukotsu_noroi.png'},
+  gaimen_hood: {slot:'head',  name:'骸面の頭巾',  def:8, price:0,  icon:'items/head_gaimen_hood.png'},
+  shion_mofuku:{slot:'body',  name:'紫怨の喪衣',  def:11,price:0,rare:true,icon:'items/armor_shion_mourning.png'},
+  kiyome_bukuro:{slot:'acc',  name:'浄めの匂袋',  hpb:35,mpb:15,price:0,rare:true,icon:'items/acc_kiyome_nioibukuro.png'},
 };
 const SLOTS=[['weapon','武器'],['head','頭'],['body','胴'],['arms','腕'],['feet','足'],['acc','飾り']];
 const SLOT_NAME=Object.fromEntries(SLOTS);
@@ -1184,6 +1189,17 @@ CAVE_LINKS.push(
   {from:'dg4',at:{x:49,y:39},  to:'dg5',entry:{x:14.5,y:31},kind:'stairdown'},
   {from:'dg5',at:{x:12.5,y:31},to:'dg4',entry:{x:47.5,y:38},kind:'stairup'},
 );
+/* ---- 無縁塚(地下3階・南西の森はずれ) ---- */
+const MUEN_DOOR={x:12,y:47.2};
+const MUEN_TRIG={x:12,y:48.6};
+CAVE_LINKS.push(
+  {from:'field',at:MUEN_TRIG,        to:'muen1',entry:{x:14.5,y:30},kind:null},
+  {from:'muen1',at:{x:12.5,y:30},to:'field',entry:{x:MUEN_TRIG.x,y:MUEN_TRIG.y+1.4},kind:'cavexit'},
+  {from:'muen1',at:{x:52,y:24},  to:'muen2',entry:{x:14.5,y:30},kind:'stairdown'},
+  {from:'muen2',at:{x:12.5,y:30},to:'muen1',entry:{x:50.3,y:24.8},kind:'stairup'},
+  {from:'muen2',at:{x:49,y:35},  to:'muen3',entry:{x:14.5,y:30},kind:'stairdown'},
+  {from:'muen3',at:{x:12.5,y:30},to:'muen2',entry:{x:47.5,y:34},kind:'stairup'},
+);
 /* ---- 閻魔庁(地上3階) ---- */
 const ENMA_ENTRY={x:28,y:46};
 const ENMA_LINKS=[
@@ -1195,7 +1211,7 @@ const ENMA_LINKS=[
   {from:'enma3',at:{x:40,y:43},   to:'enma2',entry:{x:22,y:21},label:'二階へ',tone:'down'},
 ];
 const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
-const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5};
+const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
@@ -1379,6 +1395,11 @@ const KAZU_STORY=[
     line:'「因果応報ってのは罰の札じゃねえ。蒔いた種を刈り取ることだ。刈り終えれば、また新しい種を選べる。閻魔庁の仕事は、その機会を残すことさ」',
   },
   {
+    unlock:()=>player.story.gashaoCleared||player.story.dragonCleared,
+    wait:'「南西の浜はずれに無縁塚がある。誰にも弔われず、忘れられた骨の吹き溜まりだ。地の底で骨の王ガシャオウが唸ってる。竜に挑む前に、あいつらを鎮めてやってくれ」',
+    line:'「人はな、二度死ぬんだ。体が滅んだ時と、みんなから忘れられた時だ。無縁塚の連中は二度目の死に飲まれかけて化けた。鎮めるってのはな、覚えていてやるってことだ」',
+  },
+  {
     unlock:()=>player.story.dragonCaveReached,
     wait:'「北西の森の奥に、もうひとつ洞窟がある。地の底まで降りてみな。島が何を閉じ込めているか分かる」',
     line:'「ゴウリュウも元は人だ。失ったものを許せず、怒りを手放せなかった。あいつは島を閉じ込める竜じゃない。海の向こうへ進める魂かを量る、最後の門番だ」',
@@ -1392,9 +1413,11 @@ const KAZU_STORY=[
 /* ================= クエスト(高札) ================= */
 const QUESTS=[
   {id:'q_gaki',   name:'ガキ退治',        desc:'村の周りのガキを5体成仏させる',    type:'kill', mob:['goblin','goblin_red'], n:5, rw:{gold:80, xp:40}},
-  {id:'q_tokkuri',name:'酔客の因果話',    desc:'カズーの話をすべて聞く',            type:'story',n:5, rw:{gold:300,xp:220,key:'ferrymanCoin'}},
+  {id:'q_tokkuri',name:'酔客の因果話',    desc:'カズーの話をすべて聞く',            type:'story',n:6, rw:{gold:300,xp:220,key:'ferrymanCoin'}},
   {id:'q_inugami',name:'イヌガミの群れ',  desc:'森のイヌガミを5体成仏させる',      type:'kill', mob:['wolf'], n:5, rw:{gold:150,xp:90}},
   {id:'q_akki',   name:'アッキ討伐',      desc:'森の奥のアッキを3体成仏させる',    type:'kill', mob:['orc'], n:3, rw:{gold:220,xp:160}},
+  {id:'q_muen',   name:'無縁塚の骨鎮め',  desc:'南西の無縁塚でシラホネを5体成仏させる',type:'kill', mob:['shira_bone'], n:5, rw:{gold:400,xp:600}},
+  {id:'q_gashao', name:'骨の王の鎮魂',    desc:'無縁塚の最深部で骨の王ガシャオウを鎮める',type:'kill', mob:['gashao'], n:1, rw:{gold:1200,xp:2000,item:'kiyome_bukuro'}},
 ];
 const questById=id=>QUESTS.find(q=>q.id===id);
 const JUDGE_COMMENTS=[
@@ -1407,7 +1430,7 @@ const JUDGE_COMMENTS=[
 let elderIdx=0;
 
 (function genProps(){
-  const clear=(x,y)=>(x>=TOWN.x0-1&&x<=TOWN.x1+1&&y>=TOWN.y0-1&&y<=TOWN.y1+1)||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||(x>=43&&x<=56&&y>=17&&y<=27);
+  const clear=(x,y)=>(x>=TOWN.x0-1&&x<=TOWN.x1+1&&y>=TOWN.y0-1&&y<=TOWN.y1+1)||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||Math.hypot(x-MUEN_DOOR.x,y-MUEN_DOOR.y)<5||(x>=43&&x<=56&&y>=17&&y<=27);
   let n=0,tries=0;
   while(n<240&&tries++<8000){
     const x=rndi(2,MAP-3),y=rndi(2,MAP-3);
@@ -1519,6 +1542,7 @@ for(let x=MT.x0;x<=MT.x1;x++)for(let y=MT.y0;y<=MT.y1;y++){
 for(const [bx,by] of [[50,21],[51,21],[50,22],[51,22]])blocked[by*MAP+bx]=1;
 props.push({x:CAVE_DOOR.x,y:CAVE_DOOR.y,kind:'cave'});
 props.push({x:DCAVE_DOOR.x,y:DCAVE_DOOR.y,kind:'dcave'});   // 竜の洞窟の入口(北西の森の奥)
+props.push({x:MUEN_DOOR.x,y:MUEN_DOOR.y,kind:'muen'});      // 無縁塚の入口(南西の森はずれ)
 
 /* ================= 経路探索 (A*) ================= */
 function nearestWalkable(tx,ty){
@@ -1578,7 +1602,7 @@ const player={
   name:'',quests:{trial:0},
   qb:{active:null,prog:0,done:{}},          // 高札クエスト
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
-    dragonCleared:false,chapter1Seen:false},
+    dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
@@ -1600,9 +1624,10 @@ const player={
 };
 const remotePlayers=new Map();
 const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
-const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5']);
+const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5','muen1','muen2','muen3']);
 const worldByZone=z=>({field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
-  ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]:null));
+  ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]
+  :z&&z.startsWith('muen')?MUENW[+z.slice(4)-1]:null));
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
 let shakeT=0,shakeDur=0,shakePower=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
@@ -1714,6 +1739,8 @@ function load(){
       dragonCaveReached:!!st.dragonCaveReached,
       dragonCleared:!!st.dragonCleared||!!d.drakeKilledAt,
       chapter1Seen:!!st.chapter1Seen,
+      gashaoCleared:!!st.gashaoCleared,
+      muenSeen:!!st.muenSeen,
     };
     // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
     if(oldKazuDone){
@@ -1758,10 +1785,15 @@ const MOBS={
   oni_bone:{name:'オニビドクロ',lv:11,hp:290,dmg:[21,32],xp:260,gold:[50,90], speed:1.7,aggro:4.5,atkCd:1.8,size:1.1,tint:'hue-rotate(150deg) brightness(0.85)'},
   gozu:    {name:'ゴズ',        lv:13,hp:420,dmg:[26,40],xp:380,gold:[70,120],speed:1.9,aggro:4.8,atkCd:1.9,size:1.15,tint:'hue-rotate(315deg) saturate(1.4) brightness(0.8)'},
   oni_king:{name:'オニオウ',    lv:16,hp:2600,dmg:[34,52],xp:1400,gold:[300,450],speed:2.0,aggro:6.0,atkCd:1.8,size:1.55,bar:96,boss:true},
+  shira_bone:{name:'シラホネ',  lv:18,hp:520,dmg:[30,46],xp:430,gold:[60,110], speed:1.7,aggro:4.5,atkCd:1.8,size:1.05,tint:'saturate(0.25) brightness(1.32)'},
+  kyokotsu:{name:'キョウコツ',  lv:22,hp:680,dmg:[37,56],xp:580,gold:[80,135], speed:2.0,aggro:5.0,atkCd:1.7,size:1.1, tint:'hue-rotate(185deg) saturate(1.5) brightness(0.95)'},
+  oo_dokuro:{name:'オオドクロ', lv:26,hp:900,dmg:[45,68],xp:780,gold:[100,165],speed:1.8,aggro:5.2,atkCd:1.9,size:1.28,tint:'hue-rotate(320deg) saturate(1.3) brightness(0.8)'},
+  gashao:  {name:'ガシャオウ',  lv:30,hp:6800,dmg:[52,92],xp:2000,gold:[450,650],speed:2.0,aggro:6.0,atkCd:1.9,size:2.6,bar:220,boss:true},
   drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[80,180],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
 const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1],
-  dark_dog:['kagenui',0.08],oni_bone:['gokusotsu',0.07],gozu:['kusarifuji',0.08],oni_king:['jukotsu_crown',0.35]};
+  dark_dog:['kagenui',0.08],oni_bone:['gokusotsu',0.07],gozu:['kusarifuji',0.08],oni_king:['jukotsu_crown',0.35],
+  shira_bone:['saso_tabi',0.07],kyokotsu:['jukotsu_kote',0.07],oo_dokuro:['gaimen_hood',0.07],gashao:['shion_mofuku',0.35]};
 const DRAGON_BLOOD_DROP_RATE=0.07;
 let mobs=[];
 function spawnMob(type,x,y){
@@ -2075,6 +2107,7 @@ function completeQuest(q){
     player.ferrymanCoin=true;
     log('カズーから鍵物「渡し守の古銭」を託された','gain');
   }
+  if(q.rw.item)gainItem(q.rw.item);
   banner={txt:`頼み事「${q.name}」達成！`,age:0};
   log(`高札の頼み事「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
   sfx.coin();
@@ -2159,7 +2192,7 @@ function grantMobReward(m){
       announceRareDrop(m.name,'竜の血');
     }
   }
-  if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
+  if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='gashao'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
     const wpn=Math.random()<0.5;
     const to=lootTo();
     if(to){netOutbox.push({type:'party_loot',partyId:party.id,toUserId:to.userId,
@@ -2178,6 +2211,12 @@ function grantMobReward(m){
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
     log('カズーが話していた因果の続きが聞けそうだ','sys');
+  }
+  if(m.type==='gashao'&&!player.story.gashaoCleared){
+    player.story.gashaoCleared=true;
+    log('無数の魂が白い光の粒になって、静かに昇っていった…','gain');
+    log('[系統] 無縁データ群 保全完了…参照回復…転生キューへ再接続','glitch');
+    log('北西の竜の洞窟を塞いでいた骨が、音を立てて崩れたようだ','sys');
   }
   if(m.type==='drake'){
     player.drakeKilledAt=Date.now();
@@ -3227,6 +3266,7 @@ function update(dt){
     }else{
       for(const L of ZONE_LINKS){
         if(zone===L.from&&dist(player,L.at)<0.9){
+          if(L.to==='dg1'&&!canEnterDragonCave()){blockDragonGate();break;}
           switchZone(L.to,L.entry.x,L.entry.y);break;
         }
       }
@@ -3841,6 +3881,36 @@ function buildDragonCaves(){
     DGW.push(w);
   }
 }
+/* ---- 無縁塚(地下3階・骨の王ガシャオウ) ---- */
+let MUENW=[];
+const MUEN_DEFS=[
+  {rooms:[[11,27,17,33],[17,29,29,31],[29,23,37,39],[37,26,45,28],[45,20,53,32]],
+   mobs:[['shira_bone',32,26],['shira_bone',33,36],['oni_bone',31,31],['shira_bone',41,27],['oni_bone',48,23],['shira_bone',49,29]]},
+  {rooms:[[11,27,17,33],[17,30,25,32],[25,22,33,40],[33,29,41,31],[41,25,51,37]],
+   mobs:[['shira_bone',28,26],['kyokotsu',29,37],['kyokotsu',37,30],['shira_bone',44,28],['kyokotsu',46,34],['kyokotsu',49,29]]},
+  {rooms:[[11,27,17,33],[17,29,27,31],[27,21,35,41],[35,29,43,31],[43,20,57,40]],
+   mobs:[['kyokotsu',30,25],['kyokotsu',30,37],['oo_dokuro',32,31],['oo_dokuro',39,30],['oo_dokuro',46,24],['oo_dokuro',47,36]]},
+];
+function buildBoneCaves(){
+  MUENW=[];
+  for(let f=0;f<3;f++){
+    const zn='muen'+(f+1),def=MUEN_DEFS[f];
+    blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+    tileKind=new Uint8Array(MAP*MAP);
+    props=[];npcs=[];mobs=[];
+    const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*MAP+x]=0;tileKind[y*MAP+x]=5;}};
+    for(const r of def.rooms){
+      carve(...r);
+      props.push({x:r[0],y:r[1],kind:'torch'});
+      props.push({x:r[2],y:r[3],kind:'torch'});
+    }
+    for(const L of CAVE_LINKS)if(L.from===zn&&L.kind)props.push({x:L.at.x,y:L.at.y,kind:L.kind});
+    for(const m of def.mobs)spawnMob(...m);
+    if(f===2)spawnMob('gashao',51,30);   // 最深部の主・骨の王
+    ground=document.createElement('canvas');
+    MUENW.push({blocked,tileKind,props,npcs,mobs,ground});
+  }
+}
 /* ---- ゴウリュウの出現管理(討伐から30分・同時に1体まで) ---- */
 function checkDrake(){
   if(sharedWorld.connected&&sharedWorld.zone==='dg5')return;  // 竜の巣は現世同期中サーバー管理
@@ -3854,6 +3924,19 @@ function checkDrake(){
   m.deadUntil=0;m.respawn=0;m.spawnT=0.8;
   if(started)log('地の底から咆哮が響いた…ゴウリュウが現れた','sys');
 }
+/* ---- 竜の洞窟の封鎖(ガシャオウ討伐まで。到達済みプレイヤーはそのまま通れる) ---- */
+const canEnterDragonCave=()=>player.story.gashaoCleared||player.story.dragonCaveReached
+  ||player.story.dragonCleared||player.drakeKilledAt>0;
+let dragonGateMsgT=0;
+function blockDragonGate(){
+  player.path=[];player.moveHold=false;player.gateTarget=null;
+  player.x=DCAVE_TRIG.x;player.y=DCAVE_TRIG.y+1.6;
+  if(time>dragonGateMsgT){
+    dragonGateMsgT=time+4;
+    log('洞窟の入口は、うずたかく積もった白い骨に塞がれている…','sys');
+    log('骨の奥から声がする——「先に、南西の無縁塚の主を鎮めよ」','sys');
+  }
+}
 function switchZone(z,px,py){
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
@@ -3862,7 +3945,7 @@ function switchZone(z,px,py){
   const W2={
     field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3,
     enma1:ENMA1,enma2:ENMA2,enma3:ENMA3,
-  }[z]||DGW[+z.slice(2)-1];
+  }[z]||(z.startsWith('muen')?MUENW[+z.slice(4)-1]:DGW[+z.slice(2)-1]);
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
   // スマホでは離れたエリアの巨大Canvasを保持せず、戻ったときに再生成する。
@@ -3883,6 +3966,13 @@ function switchZone(z,px,py){
       save();
     }
   }
+  if(z.startsWith('muen')&&!player.story.muenSeen){
+    player.story.muenSeen=true;
+    if(started){
+      log('[系統] 警告: 無縁データ群…参照元なし…削除保留のまま滞留中','glitch');
+      save();
+    }
+  }
   const ZMSG={
     field:'賽の森へ戻ってきた',
     cave:'試練の洞窟に足を踏み入れた…',
@@ -3891,6 +3981,9 @@ function switchZone(z,px,py){
     enma1:'閻魔庁 一階——魂籍受付と記録の間',
     enma2:'閻魔庁 二階——審査と文書の間',
     enma3:'閻魔庁 三階——大法廷。最奥に閻魔が鎮座している',
+    muen1:'無縁塚の地下墓所——弔う者のない骨が、静かに積もっている…',
+    muen2:'地下二層。青白い燐光が骨の間を漂っている…',
+    muen3:'最深部——無数の骨が寄り集まり、一つの大きな影になっている…',
     dg1:'竜の洞窟に足を踏み入れた。硫黄のにおいがする…',
     dg2:'竜の洞窟 地下二層。壁が焦げている…',
     dg3:'竜の洞窟 地下三層。地鳴りが近い…',
@@ -4339,7 +4432,8 @@ function drawCorpse(sx,sy,c){
     case 'goblin':case 'goblin_red':drawGoblin(0,0,fake);break;
     case 'wolf':case 'dark_dog':drawWolf(0,0,fake);break;
     case 'orc':case 'oni_blue':case 'gozu':case 'oni_king':drawOrc(0,0,fake);break;
-    case 'skeleton':case 'oni_bone':drawSkeleton(0,0,fake);break;
+    case 'skeleton':case 'oni_bone':case 'shira_bone':case 'kyokotsu':
+    case 'oo_dokuro':case 'gashao':drawSkeleton(0,0,fake);break;
     case 'drake':drawDrake(0,0,fake);break;
   }
   ctx.restore();
@@ -5156,6 +5250,7 @@ function render(){
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
       case 'dcave':drawCaveEntrance(sx,sy,'竜の洞窟');break;
+      case 'muen':drawCaveEntrance(sx,sy,'無縁塚');break;
       case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'palm':drawPalm(sx,sy,it.o);break;
       case 'sundry':drawSundry(sx,sy,it.o);break;
@@ -5177,7 +5272,8 @@ function render(){
       case 'goblin':case 'goblin_red':drawGoblin(sx,sy,it.o);break;
       case 'wolf':case 'dark_dog':drawWolf(sx,sy,it.o);break;
       case 'orc':case 'oni_blue':case 'gozu':case 'oni_king':drawOrc(sx,sy,it.o);break;
-      case 'skeleton':case 'oni_bone':drawSkeleton(sx,sy,it.o);break;
+      case 'skeleton':case 'oni_bone':case 'shira_bone':case 'kyokotsu':
+      case 'oo_dokuro':case 'gashao':drawSkeleton(sx,sy,it.o);break;
       case 'drake':drawDrake(sx,sy,it.o);break;
     }
     if(spawnAlpha<1)ctx.restore();
@@ -6233,9 +6329,11 @@ buildCave2();
 buildCave3();
 buildEnmaHall();
 buildDragonCaves();
+buildBoneCaves();
 // 共有ワールド用のID(workerはスポーン順でid付与するため、順序を揃える)
 for(const [zn,w] of [['cave',CAVE],['cave2',CAVE2],['cave3',CAVE3],
-  ['dg1',DGW[0]],['dg2',DGW[1]],['dg3',DGW[2]],['dg4',DGW[3]],['dg5',DGW[4]]])
+  ['dg1',DGW[0]],['dg2',DGW[1]],['dg3',DGW[2]],['dg4',DGW[3]],['dg5',DGW[4]],
+  ['muen1',MUENW[0]],['muen2',MUENW[1]],['muen3',MUENW[2]]])
   w?.mobs?.forEach((mob,i)=>{mob.id=`${zn}-${i}`;});
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
@@ -6751,6 +6849,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721o"></script>
+<script type="module" src="online/account.js?v=20260721p"></script>
 </body>
 </html>

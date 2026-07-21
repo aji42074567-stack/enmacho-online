@@ -11,7 +11,7 @@ const WORLD_VERSION = 2;
 const PLAYER_LIMIT = 80;
 const MAP = 72;
 // field以外のゾーンは、最初に入ったクライアントが敵配置・壁データを渡す(zone_init)。
-const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5])$/;
+const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 
 const ALLOWED_ORIGINS = new Set([
   'https://enmacho.com',

@@ -1,6 +1,6 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
 import { createPresenceController } from './presence.js?v=20260721n';
-import { createWorldController } from './world.js?v=20260721o';
+import { createWorldController } from './world.js?v=20260721p';
 import { createSocialController } from './social.js?v=20260721n';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
