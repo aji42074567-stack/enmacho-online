@@ -1426,7 +1426,7 @@ let npcs=[
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
   {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
   {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
-  {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・重複レア装備の焚き上げ所
+  {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・レア装備の焚き上げ所
   {x:42.3,y:49.2,kind:'repose_keeper',name:'シズメ'}, // 供養所の案内・供養・交換を担う供養守
 ];
 
@@ -1942,14 +1942,17 @@ const MOBS={
   gashao:  {name:'ガシャオウ',  lv:30,hp:6800,dmg:[52,92],xp:2000,gold:[450,650],speed:2.0,aggro:6.0,atkCd:1.9,size:2.6,bar:220,boss:true},
   drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[80,180],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
-// 装備ドロップは徳位15以上の魔物だけ。各枠を独立抽選するため、中ボス・竜は複数同時に落とせる。
+// レア装備は運込みでも1抽選3%まで。雑魚は1体につき1回だけ、中ボス・王・竜は各候補を独立抽選する。
+const MAX_RARE_EQUIPMENT_DROP_RATE=0.03;
+const RARE_EQUIPMENT_BASE_RATE=MAX_RARE_EQUIPMENT_DROP_RATE/2; // 運の最大倍率×2で上限3%
+const SINGLE_RARE_DROP_TYPES=new Set(['shira_bone','kyokotsu']);
 const RARE_DROPS={
-  oni_king:[['kurogane_babi',0.22],['rokumon_black',0.20],['shunawa_kote',0.20],['gokusotsu',0.16],['kusarifuji',0.16]],
-  shira_bone:[['kuchinuno_mask',0.045],['kuchinuno_kote',0.045],['kawa_boots',0.045],['kifuda_gofu',0.035],['fuju_eboshi',0.035]],
-  kyokotsu:[['jukotsu_crown',0.05],['jukotsu_kote',0.05],['saso_tabi',0.05],['setsuju_boots',0.04]],
-  oo_dokuro:[['kagenui',0.045],['gaimen_hood',0.04],['kagegoku_ninja',0.035],['kagegoku_kote',0.035],['kagegoku_tabi',0.035]],
-  gashao:[['shion_mofuku',0.24],['shion_kote',0.22],['shion_tabi',0.22],['higan_shuin',0.18],['higan_tekko',0.18],['hakkin_gusoku',0.18]],
-  drake:[['drake_slayer',1],['sogetsu_kabuto',0.35],['seirin_musha',0.35],['kurogane_tsutsugote',0.35],['seirin_gusoku',0.35]],
+  oni_king:[['kurogane_babi',RARE_EQUIPMENT_BASE_RATE],['rokumon_black',RARE_EQUIPMENT_BASE_RATE],['shunawa_kote',RARE_EQUIPMENT_BASE_RATE],['gokusotsu',RARE_EQUIPMENT_BASE_RATE],['kusarifuji',RARE_EQUIPMENT_BASE_RATE]],
+  shira_bone:[['kuchinuno_mask',RARE_EQUIPMENT_BASE_RATE],['kuchinuno_kote',RARE_EQUIPMENT_BASE_RATE],['kawa_boots',RARE_EQUIPMENT_BASE_RATE],['kifuda_gofu',RARE_EQUIPMENT_BASE_RATE],['fuju_eboshi',RARE_EQUIPMENT_BASE_RATE]],
+  kyokotsu:[['jukotsu_crown',RARE_EQUIPMENT_BASE_RATE],['jukotsu_kote',RARE_EQUIPMENT_BASE_RATE],['saso_tabi',RARE_EQUIPMENT_BASE_RATE],['setsuju_boots',RARE_EQUIPMENT_BASE_RATE]],
+  oo_dokuro:[['kagenui',RARE_EQUIPMENT_BASE_RATE],['gaimen_hood',RARE_EQUIPMENT_BASE_RATE],['kagegoku_ninja',RARE_EQUIPMENT_BASE_RATE],['kagegoku_kote',RARE_EQUIPMENT_BASE_RATE],['kagegoku_tabi',RARE_EQUIPMENT_BASE_RATE]],
+  gashao:[['shion_mofuku',RARE_EQUIPMENT_BASE_RATE],['shion_kote',RARE_EQUIPMENT_BASE_RATE],['shion_tabi',RARE_EQUIPMENT_BASE_RATE],['higan_shuin',RARE_EQUIPMENT_BASE_RATE],['higan_tekko',RARE_EQUIPMENT_BASE_RATE],['hakkin_gusoku',RARE_EQUIPMENT_BASE_RATE]],
+  drake:[['drake_slayer',RARE_EQUIPMENT_BASE_RATE],['sogetsu_kabuto',RARE_EQUIPMENT_BASE_RATE],['seirin_musha',RARE_EQUIPMENT_BASE_RATE],['kurogane_tsutsugote',RARE_EQUIPMENT_BASE_RATE],['seirin_gusoku',RARE_EQUIPMENT_BASE_RATE]],
 };
 const RARE_DROP_GUIDE=[
   {type:'oni_king',area:'試練の洞窟 最深部'},
@@ -2347,13 +2350,23 @@ function grantMobReward(m){
   };
   let equipmentDropped=false;
   // 二重防止: 徳位15未満・店売り・非レア装備はテーブルに紛れ込んでも抽選しない。
-  const rareTable=m.def.lv>=15?(RARE_DROPS[m.type]||[]):[];
-  for(const [itemId,rate] of rareTable){
+  const rareTable=(m.def.lv>=15?(RARE_DROPS[m.type]||[]):[])
+    .filter(([itemId])=>ITEMS[itemId]?.rare&&!SHOP_STOCK.includes(itemId));
+  const rareChance=rate=>Math.min(MAX_RARE_EQUIPMENT_DROP_RATE,dropChance(rate));
+  const grantRareEquipment=itemId=>{
     const it=ITEMS[itemId];
-    if(!it?.rare||SHOP_STOCK.includes(itemId)||Math.random()>=dropChance(rate))continue;
     equipmentDropped=true;
     gainItem(itemId);
     announceRareDrop(m.name,it.name);
+  };
+  if(SINGLE_RARE_DROP_TYPES.has(m.type)){
+    // 雑魚はテーブル全体で1回だけ抽選し、当選しても候補から1個だけ落とす。
+    if(rareTable.length&&Math.random()<rareChance(RARE_EQUIPMENT_BASE_RATE))
+      grantRareEquipment(rareTable[rndi(0,rareTable.length-1)][0]);
+  }else{
+    // 中ボス・骨王・鬼王・竜は候補ごとの独立抽選なので、複数同時ドロップを許す。
+    for(const [itemId,rate] of rareTable)
+      if(Math.random()<rareChance(rate))grantRareEquipment(itemId);
   }
   if(!equipmentDropped&&Math.random()<dropChance(0.28)){
     const to=lootTo();
@@ -2893,26 +2906,49 @@ function renderSuggest(){
   });
 }
 const REPOSE_SCROLL_COST=15;
+function rareEquipmentCount(id){
+  return (player.items.includes(id)?1:0)+(player.rareCopies[id]||0);
+}
+function consumeRareEquipmentForRepose(id){
+  if(!ITEMS[id]?.rare)return false;
+  if((player.rareCopies[id]||0)>0){
+    player.rareCopies[id]--;
+    if(player.rareCopies[id]<=0)delete player.rareCopies[id];
+    return true;
+  }
+  const ownedAt=player.items.indexOf(id);
+  if(ownedAt<0)return false;
+  player.items.splice(ownedAt,1);
+  for(const [slot,equippedId] of Object.entries(player.eq)){
+    if(equippedId!==id)continue;
+    player.eq[slot]=slot==='weapon'?'dagger':'';
+  }
+  delete player.plus[id];
+  recalcMax();
+  return true;
+}
 function renderRepose(){
   const host=$('reposeBody');
-  const copies=Object.entries(player.rareCopies)
+  const offerings=Object.keys(ITEMS)
+    .map(id=>[id,rareEquipmentCount(id)])
     .filter(([id,n])=>ITEMS[id]?.rare&&n>0)
     .sort((a,b)=>(ITEMS[b[0]].repose||0)-(ITEMS[a[0]].repose||0));
   const enemyGuide=RARE_DROP_GUIDE.map(({type,area})=>{
     const mob=MOBS[type];
     return `<div class="repose-enemy"><span><b>${esc(mob.name)}</b><small>${esc(area)}</small></span><span>徳位 ${mob.lv}</span></div>`;
   }).join('');
-  let html='<div class="repose-speech">「私は供養守のシズメ。魔物の執着が結んだ魂具を見定め、重なった品だけを魂火へ返します。一品目は縁として手元に残りますよ」</div>'
+  let html='<div class="repose-speech">「私は供養守のシズメ。魔物の執着が結んだ魂具を見定めます。魂火へ返すかは、あなた自身が決めること。ひとつしかない品も、望むなら供養いたします」</div>'
     +'<div class="repose-guide"><h3>レア魂具を残す魔物</h3>'+enemyGuide+'</div>'
-    +'<div class="repose-rule">徳位15以上の魔物が対象です。中ボスや竜などの大物は、一度に複数のレア魂具を残すことがあります。店で買える装備は対象外です。</div>'
+    +'<div class="repose-rule">徳位15以上の魔物が対象です。雑魚は1体につき抽選1回・最大1個。中ボス・骨王・鬼王・竜は候補ごとに抽選され、複数のレア魂具を残すことがあります。運を含めても各抽選は最大3%です。所持1個目や装備中の品も供養できますが、強化値を含めて失われます。店で買える装備は対象外です。</div>'
     +`<div class="goldrow">供養点 <b>${player.reposePts}</b> 点</div>`
-    +`<div class="suggest-note">重複レア装備を供養し、供養点${REPOSE_SCROLL_COST}点で強化の巻物と交換できます。</div>`;
-  if(!copies.length){
-    html+='<div class="social-empty">供養できる重複レア装備はありません</div>';
-  }else for(const [id,n] of copies){
+    +`<div class="suggest-note">所持しているレア装備を供養し、供養点${REPOSE_SCROLL_COST}点で強化の巻物と交換できます。</div>`;
+  if(!offerings.length){
+    html+='<div class="social-empty">供養できるレア装備はありません</div>';
+  }else for(const [id,n] of offerings){
     const it=ITEMS[id];
+    const equipped=Object.values(player.eq).includes(id);
     html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
-      <span class="nm">${itemNameHtml(id)} <span class="rare-copy">余り ×${n}</span>
+      <span class="nm">${itemNameHtml(id)} <span class="rare-copy">所持 ×${n}${equipped?' / 装備中':''}</span>
       <span class="fx">${itemFx(it)} / 1個につき${it.repose}点</span></span>
       <button class="buyb" data-repose="${id}">供養</button></div>`;
   }
@@ -2926,13 +2962,17 @@ function renderRepose(){
   host.innerHTML=html;
   for(const b of host.querySelectorAll('[data-repose]'))b.addEventListener('click',()=>{
     const id=b.getAttribute('data-repose'),it=ITEMS[id];
-    if(!it||!player.rareCopies[id]||!confirm(`余っている「${it.name}」を供養し、${it.repose}点に換えますか？`))return;
-    player.rareCopies[id]--;
-    if(player.rareCopies[id]<=0)delete player.rareCopies[id];
+    if(!it||rareEquipmentCount(id)<=0)return;
+    const consumesOriginal=(player.rareCopies[id]||0)<=0;
+    const equipped=consumesOriginal&&Object.values(player.eq).includes(id);
+    const enhanced=consumesOriginal&&weaponPlus(id)>0;
+    const warning=equipped||enhanced?`\n\n${equipped?'装備中の品です。供養すると自動的に外れます。':''}${enhanced?`\n強化値 +${weaponPlus(id)} も失われます。`:''}`:'';
+    if(!confirm(`「${it.name}」を供養し、${it.repose}点に換えますか？${warning}`))return;
+    if(!consumeRareEquipmentForRepose(id))return;
     player.reposePts+=it.repose;
     log(`${it.name}を供養した（供養点 +${it.repose}）`,'rare');
     addFloat(player.x,player.y-1,'供養点 +'+it.repose,'#8fe8ff',true);
-    sfx.coin();save();renderRepose();
+    sfx.coin();save();hud();renderRepose();
   });
   for(const b of host.querySelectorAll('[data-repose-exchange]'))b.addEventListener('click',()=>{
     if(player.reposePts<REPOSE_SCROLL_COST)return;
