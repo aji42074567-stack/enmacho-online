@@ -1690,7 +1690,8 @@ const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0;
 
 // 船は海上に描き、乗船手続きは歩行可能な桟橋の先端で行う。
 function ferryWorldPoint(){
-  return PIER?{x:PIER.x+5.9,y:PIER.y+2.7}:null;
+  // 船体を桟橋と同じx軸方向へ向け、桟橋の南側へ一船幅あけて横付けする。
+  return PIER?{x:PIER.x+5.4,y:PIER.y+4.6}:null;
 }
 function ferryDockPoint(){
   return PIER?{x:Math.round(PIER.x+0.5)+PIER_DECK_LENGTH-1,y:PIER.y}:null;
@@ -5464,10 +5465,13 @@ function drawFerry(sx,sy){
   const img=SPRITES.ferry;if(!img)return;
   const w=210,h=w*img.height/img.width;
   const bob=Math.sin(time*1.1)*1.4;
-  const x=sx-w/2,y=sy-h*0.72+bob;
-  ctx.drawImage(img,x,y,w,h);
+  // 元素材は桟橋に対して直角の向きなので、左右反転して等角投影のx軸へ揃える。
+  ctx.save();
+  ctx.translate(sx,sy+bob);ctx.scale(-1,1);
+  ctx.drawImage(img,-w/2,-h*0.72,w,h);
+  ctx.restore();
   const pulse=0.65+Math.sin(time*2.4)*0.12;
-  const lx=sx-w*0.11,ly=sy-h*0.16+bob;
+  const lx=sx+w*0.11,ly=sy-h*0.16+bob;
   const glow=ctx.createRadialGradient(lx,ly,0,lx,ly,18);
   glow.addColorStop(0,`rgba(255,190,95,${0.22*pulse})`);
   glow.addColorStop(1,'rgba(255,170,70,0)');
