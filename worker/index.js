@@ -11,10 +11,16 @@ const WORLD_VERSION = 1;
 const PLAYER_LIMIT = 80;
 
 const ALLOWED_ORIGINS = new Set([
+  'https://enmacho.com',
+  'https://www.enmacho.com',
   'https://enmacho-online.pages.dev',
   'https://aji42074567-stack.github.io',
   'http://127.0.0.1:8765',
   'http://localhost:8765',
+  'http://127.0.0.1:8935',
+  'http://localhost:8935',
+  'http://127.0.0.1:8734',
+  'http://localhost:8734',
 ]);
 
 const DEFINITIONS = {

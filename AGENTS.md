@@ -31,6 +31,10 @@
 - Supabase DB/RLS: `supabase/migrations/`
 - Resend Contacts同期Edge Function: `supabase/functions/sync-resend-contact/`
 - Cloudflare Durable Objectsの魔物同期: `worker/index.js` と `wrangler.jsonc`
+  - workerは**pushでは反映されない**。変更したら `npx wrangler deploy` が必要(このMacは認証済み)
+  - `ALLOWED_ORIGINS` に公開ドメインを必ず入れる。2026-07-21、enmacho.com が漏れていて
+    独自ドメイン移行後の魔物同期が黙って切れていた(各端末で別々の敵が見えた)
+  - 魔物同期は現状「賽の森(field)」のみ。洞窟・ダンジョンは端末ローカル
 - 正式公開URL: `https://enmacho.com/`
 - Cloudflare Pages予備URL: `https://enmacho-online.pages.dev/`
 
