@@ -1,8 +1,20 @@
 const SOCIAL_POLL_MS = 30_000;
 const VALID_ID = /^[0-9a-f-]{16,64}$/i;
+const GIFT_KINDS = new Set([
+  'equipment', 'heal_s', 'heal_m', 'heal_l', 'haste', 'crit',
+  'wscroll', 'ascroll', 'dragon_blood',
+]);
 
 const cleanId = value => String(value || '').trim().slice(0, 64);
 const cleanName = value => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || 'ナナシ';
+function cleanGift(raw) {
+  if (!raw) return null;
+  const kind = String(raw.kind || '').trim();
+  const id = String(raw.id || '').trim().slice(0, 64);
+  const name = String(raw.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (!GIFT_KINDS.has(kind) || !id || !name) throw new Error('添付する品を確認できません');
+  return { kind, id, name };
+}
 
 export function createSocialController(client, bridge = window.EnmaGameBridge) {
   let session = null;
@@ -59,7 +71,7 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
 
       const mailResult = await client
         .from('soul_mail')
-        .select('id,sender_id,recipient_id,body,created_at,read_at')
+        .select('id,sender_id,recipient_id,body,created_at,read_at,attachment_kind,attachment_id,attachment_name,attachment_claimed_at')
         .eq('recipient_id', ownId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -105,6 +117,12 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
           body: String(row.body || '').slice(0, 240),
           createdAt: row.created_at,
           readAt: row.read_at,
+          gift: row.attachment_kind ? {
+            kind: row.attachment_kind,
+            id: row.attachment_id,
+            name: String(row.attachment_name || '添付品').slice(0, 40),
+            claimedAt: row.attachment_claimed_at,
+          } : null,
         })),
         ...devReplies.map(row => ({
           id: `fb-${row.id}`,
@@ -211,19 +229,32 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
     await refresh();
   }
 
-  async function sendMail(rawRecipientId, rawBody) {
+  async function sendMail(rawRecipientId, rawBody, rawGift = null) {
     const ownId = userId();
     const recipientId = cleanId(rawRecipientId);
     const body = String(rawBody || '').replace(/\r\n?/g, '\n').trim().slice(0, 240);
     if (!ownId || !VALID_ID.test(recipientId)) throw new Error('宛先を確認できません');
     if (!body) throw new Error('手紙の本文を入力してください');
+    const gift = cleanGift(rawGift);
     const { error } = await client.from('soul_mail').insert({
       sender_id: ownId,
       recipient_id: recipientId,
       body,
+      attachment_kind: gift?.kind || null,
+      attachment_id: gift?.id || null,
+      attachment_name: gift?.name || null,
     });
     if (error) throw error;
     return true;
+  }
+
+  async function claimMailGift(mailId) {
+    const id = cleanId(mailId);
+    if (!userId() || !VALID_ID.test(id)) throw new Error('添付品を確認できません');
+    const { data, error } = await client.rpc('claim_soul_mail_attachment', { p_mail_id: id });
+    if (error) throw error;
+    await refresh();
+    return data;
   }
 
   async function markMailRead(mailId) {
@@ -294,6 +325,7 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
     declineFriendRequest,
     removeFriend,
     sendMail,
+    claimMailGift,
     markMailRead,
     submitFeedback,
     stop,

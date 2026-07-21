@@ -87,6 +87,7 @@
   #log div{color:#cfc2a0;opacity:.9}
   #log div.sys{color:#8fb2d9}
   #log div.gain{color:#d9c07a}
+  #log div.rare{color:#d9a8ff;text-shadow:0 0 7px rgba(154,86,220,.45)}
   #log div.glitch{color:#7fd8a0;letter-spacing:.05em}
 
   /* ---- バーチャルパッド(タッチ端末のみ) ---- */
@@ -159,14 +160,15 @@
   .chatMsg.sysmsg{align-self:center;background:none;border:none;color:var(--dim);
     font-size:10.5px;text-align:center;padding:2px}
   .chatMsg.drop{align-self:center;max-width:96%;text-align:center;
-    background:linear-gradient(180deg,#2e2410,#231a0c);border:1px solid #8a6423;
-    border-radius:4px;color:#ffe9b8;font-size:11px;letter-spacing:.03em;
-    box-shadow:0 0 10px rgba(201,162,74,.18)}
-  .chatMsg.drop::before{content:'✦ ';color:#ffd97a}
+    background:linear-gradient(180deg,#291a35,#1d1326);border:1px solid #996bc1;
+    border-radius:4px;color:#edd6ff;font-size:11px;letter-spacing:.03em;
+    box-shadow:0 0 12px rgba(167,96,220,.25)}
+  .chatMsg.drop::before{content:'✦ ';color:#ffd479}
   .chatMsg.logline{align-self:stretch;max-width:100%;background:none;border:none;
     padding:1px 2px;font-size:11px;line-height:1.6;color:#cfc2a0}
   .chatMsg.logline.sys{color:#8fb2d9}
   .chatMsg.logline.gain{color:#d9c07a}
+  .chatMsg.logline.rare{color:#d9a8ff;text-shadow:0 0 7px rgba(154,86,220,.4)}
   .chatMsg.logline.glitch{color:#7fd8a0;letter-spacing:.05em}
   .chatFloatMsg.drop{border-left-color:#ffd97a;color:#ffe9b8;
     box-shadow:0 2px 8px rgba(0,0,0,.45),0 0 12px rgba(201,162,74,.25)}
@@ -431,6 +433,9 @@
     font-family:var(--sans);font-size:11.5px;color:#ffd98a;pointer-events:none;
     text-shadow:0 1px 3px #000,0 0 6px #000;letter-spacing:.04em}
   .itemrow .nm{flex:1}
+  .rare-name{color:#dfb4ff;font-weight:700;letter-spacing:.035em;
+    text-shadow:0 0 7px rgba(151,72,214,.5)}
+  .rare-copy{display:inline-block;margin-left:4px;color:#ffcf68;font-size:10px}
   .itemrow .fx{color:var(--dim);font-size:11px}
   .itemrow .pr{color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .buyb{font-family:var(--sans);font-size:12px;color:var(--parchment);
@@ -629,9 +634,12 @@
   .social-compose textarea{display:block;width:100%;min-height:72px;resize:vertical;
     box-sizing:border-box;padding:8px;color:var(--parchment);background:#0d0b08;
     border:1px solid var(--panel-edge);border-radius:3px;font:12px/1.6 var(--sans)}
+  .social-compose select{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:8px;
+    color:var(--parchment);background:#0d0b08;border:1px solid var(--panel-edge);border-radius:3px;
+    font:11px var(--sans)}
   .social-compose-foot{display:flex;align-items:center;justify-content:space-between;
     gap:8px;margin-top:7px;color:var(--dim);font:9.5px var(--sans)}
-  #suggestBody .suggest-note,#kesshaBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
+  #suggestBody .suggest-note,#kesshaBody .suggest-note,#reposeBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
   #suggestBody .suggest-note.thanks{color:#ffe9b8;font-family:var(--serif);font-size:13px;text-align:center;padding:14px 0}
   #kesshaBody .suggest-note b{color:#ffe9b8}
   #suggestBody textarea{width:100%;box-sizing:border-box;background:#0d0c10;color:#e8dcc0;border:1px solid #3e3422;
@@ -641,6 +649,8 @@
   #suggestBody .suggest-actions span,#kesshaBody .suggest-actions span{color:#c9b489;font-size:11px}
   .mail-body{margin-top:5px;color:#cfc2a0;font:11px/1.65 var(--sans);white-space:pre-wrap;
     overflow-wrap:anywhere}
+  .mail-gift{margin-top:7px;padding:7px 8px;border:1px solid #78539a;background:#21152b;
+    color:#dfb4ff;font:11px var(--sans)}
   #doll{position:relative;width:272px;height:252px;margin:0 auto 12px}
   #dollImg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     width:120px;height:120px;background:url(assets/char_player_m.png) 0 0/400% 100% no-repeat;
@@ -656,6 +666,7 @@
   .slotbox .eqn{font-family:var(--sans);font-size:9px;color:var(--parchment);
     max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .slotbox.empty .eqn{color:#5d5340}
+  .slotbox.rare .eqn{color:#dfb4ff;text-shadow:0 0 6px rgba(151,72,214,.5)}
   .slotmark{display:inline-block}
   .skill .item-icon{display:block;width:27px;height:27px;line-height:1}
   .skill .item-icon img{display:block;width:100%;height:100%;object-fit:contain;
@@ -1015,6 +1026,15 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="repose">
+    <div class="scroll">
+      <h2>魂具供養所</h2>
+      <div class="sub">重なったレア装備を魂火へ返し、供養点に換える</div>
+      <div id="reposeBody"></div>
+      <button class="btn small" id="reposeClose">立ち去る</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="kessha">
     <div class="scroll">
       <h2>結社係 ムスビ</h2>
@@ -1169,7 +1189,7 @@ const ITEMS={
   dagger:      {slot:'weapon',name:'小刀',        atk:2, price:0,  icon:'icon_tanto.png'},
   long_sword:  {slot:'weapon',name:'打刀',        atk:6, price:120,icon:'icon_katana.png'},
   bastard:     {slot:'weapon',name:'大太刀',      atk:12,price:400,icon:'icon_greatsword.png'},
-  drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:20,price:0,rare:true,icon:'icon_greatsword.png'},
+  drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:32,price:0,rare:true,source:'ゴウリュウ',repose:20,icon:'icon_greatsword.png'},
   cloth:       {slot:'body',  name:'経帷子',      def:1, price:0,  icon:'items/armor_kyokatabira.png'},
   leather:     {slot:'body',  name:'鬼革の胴着',  def:3, price:100,icon:'items/armor_onigawa_dogi.png'},
   chain:       {slot:'body',  name:'冥鉄の段鎧',  def:6, price:350,icon:'items/armor_meitetsu_dan.png'},
@@ -1180,22 +1200,38 @@ const ITEMS={
   oni_kote:    {slot:'arms',  name:'鬼鉄の籠手',  def:3, price:280,icon:'items/arms_onitetsu_kote.png'},
   waraji:      {slot:'feet',  name:'白緒の草鞋',  def:1, price:70, icon:'items/feet_shirao_waraji.png'},
   suneate:     {slot:'feet',  name:'冥鉄の脛当て',def:3, price:300,icon:'items/feet_meitetsu_suneate.png'},
-  kuchinuno_mask:{slot:'head',name:'朽布の覆面',  def:2, price:0,source:'森限定',icon:'items/head_kuchinuno_mask.png'},
-  kuchinuno_kote:{slot:'arms',name:'朽布の巻籠手',def:2, price:0,source:'森限定',icon:'items/arms_kuchinuno_makigote.png'},
-  kawa_boots:  {slot:'feet',  name:'獣革の長靴',  def:2, price:0,source:'森限定',icon:'items/feet_kawa_nagagutsu.png'},
-  rokumon_black:{slot:'body', name:'六文の黒衣',  def:5, price:0,source:'森限定',icon:'items/armor_rokumon_black.png'},
-  kifuda_gofu: {slot:'acc',   name:'森守りの木札',hpb:15,mpb:15,price:0,source:'森限定',icon:'items/acc_kifuda_gofu.png'},
-  kagenui:     {slot:'head',  name:'影縫いの頭巾',  def:2, price:0,  icon:'items/head_kagenui_hood.png'},
-  jukotsu_crown:{slot:'head', name:'獣骨の呪冠',  def:7, price:0,rare:true,icon:'items/head_jukotsu_crown.png'},
-  gokusotsu:   {slot:'body',  name:'獄卒の綿鎧',  def:8, price:0,  icon:'items/armor_gokusotsu_padded.png'},
-  kusarifuji:  {slot:'arms',  name:'鎖封じの鉄籠手',def:5, price:0,  icon:'items/arms_kusarifuji_kote.png'},
+  rokumon_black:{slot:'body', name:'六文の黒衣',  def:14,price:0,rare:true,source:'オニオウ',repose:4,icon:'items/armor_rokumon_black.png'},
+  kurogane_babi:{slot:'head', name:'黒鉄の馬尾兜',def:9, price:0,rare:true,source:'オニオウ',repose:4,icon:'items/head_kurogane_babi.png'},
+  shunawa_kote:{slot:'arms', name:'朱縄の大籠手',def:8, price:0,rare:true,source:'オニオウ',repose:4,icon:'items/arms_shunawa_ogote.png'},
+  gokusotsu:   {slot:'body', name:'獄卒の綿鎧',def:13,price:0,rare:true,source:'オニオウ',repose:4,icon:'items/armor_gokusotsu_padded.png'},
+  kusarifuji:  {slot:'arms',name:'鎖封じの鉄籠手',def:8,price:0,rare:true,source:'オニオウ',repose:4,icon:'items/arms_kusarifuji_kote.png'},
+  kuchinuno_mask:{slot:'head',name:'朽布の覆面',def:8,price:0,rare:true,source:'シラホネ',repose:5,icon:'items/head_kuchinuno_mask.png'},
+  kuchinuno_kote:{slot:'arms',name:'朽布の巻籠手',def:7,price:0,rare:true,source:'シラホネ',repose:5,icon:'items/arms_kuchinuno_makigote.png'},
+  kawa_boots:  {slot:'feet',name:'獣革の長靴',def:8,price:0,rare:true,source:'シラホネ',repose:5,icon:'items/feet_kawa_nagagutsu.png'},
+  kifuda_gofu: {slot:'acc',name:'白骨守りの木札',hpb:35,mpb:25,price:0,rare:true,source:'シラホネ',repose:5,icon:'items/acc_kifuda_gofu.png'},
+  fuju_eboshi: {slot:'head',name:'符呪の烏帽子',def:10,mpb:20,price:0,rare:true,source:'シラホネ',repose:5,icon:'items/head_fuju_eboshi.png'},
+  jukotsu_crown:{slot:'head',name:'獣骨の呪冠',def:11,price:0,rare:true,source:'キョウコツ',repose:6,icon:'items/head_jukotsu_crown.png'},
   juzu:        {slot:'acc',   name:'六道の数珠',  hpb:30,price:200,icon:'items/acc_rokudo_juzu.png'},
   magatama:    {slot:'acc',   name:'蒼の勾玉',    mpb:20,price:200,icon:'items/acc_ao_magatama.png'},
-  saso_tabi:   {slot:'feet',  name:'砂葬の数珠足袋',def:5, price:0,  icon:'items/feet_saso_juzu_tabi.png'},
-  jukotsu_kote:{slot:'arms',  name:'獣骨の呪籠手',def:6, price:0,  icon:'items/arms_jukotsu_noroi.png'},
-  gaimen_hood: {slot:'head',  name:'骸面の頭巾',  def:8, price:0,  icon:'items/head_gaimen_hood.png'},
-  shion_mofuku:{slot:'body',  name:'紫怨の喪衣',  def:11,price:0,rare:true,icon:'items/armor_shion_mourning.png'},
-  kiyome_bukuro:{slot:'acc',  name:'浄めの匂袋',  hpb:35,mpb:15,price:0,rare:true,icon:'items/acc_kiyome_nioibukuro.png'},
+  saso_tabi:   {slot:'feet',name:'砂葬の数珠足袋',def:9,price:0,rare:true,source:'キョウコツ',repose:6,icon:'items/feet_saso_juzu_tabi.png'},
+  jukotsu_kote:{slot:'arms',name:'獣骨の呪籠手',def:10,price:0,rare:true,source:'キョウコツ',repose:6,icon:'items/arms_jukotsu_noroi.png'},
+  setsuju_boots:{slot:'feet',name:'雪獣の毛沓',def:10,hpb:20,price:0,rare:true,source:'キョウコツ',repose:6,icon:'items/feet_setsuju_kegawa.png'},
+  kagenui:     {slot:'head',name:'影縫いの頭巾',def:12,price:0,rare:true,source:'オオドクロ',repose:8,icon:'items/head_kagenui_hood.png'},
+  gaimen_hood: {slot:'head',name:'骸面の頭巾',def:14,price:0,rare:true,source:'オオドクロ',repose:8,icon:'items/head_gaimen_hood.png'},
+  kagegoku_ninja:{slot:'body',name:'影獄の忍装束',def:18,price:0,rare:true,source:'オオドクロ',repose:8,icon:'items/armor_kagegoku_ninja.png'},
+  kagegoku_kote:{slot:'arms',name:'影獄の忍鉄甲',def:12,price:0,rare:true,source:'オオドクロ',repose:8,icon:'items/arms_kagegoku_nintekko.png'},
+  kagegoku_tabi:{slot:'feet',name:'影獄の忍足袋',def:11,price:0,rare:true,source:'オオドクロ',repose:8,icon:'items/feet_kagegoku_nintabi.png'},
+  shion_mofuku:{slot:'body',name:'紫怨の喪衣',def:22,hpb:30,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/armor_shion_mourning.png'},
+  shion_kote:  {slot:'arms',name:'紫怨の鬼火籠手',def:15,mpb:20,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/arms_shion_onibi.png'},
+  shion_tabi:  {slot:'feet',name:'紫怨の呪足袋',def:14,mpb:15,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/feet_shion_noroi_tabi.png'},
+  higan_shuin: {slot:'body',name:'彼岸の朱印装束',def:21,hpb:20,mpb:25,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/armor_higan_shuin.png'},
+  higan_tekko: {slot:'arms',name:'彼岸の朱印鉄甲',def:14,hpb:10,mpb:10,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/arms_higan_shuin_tekko.png'},
+  hakkin_gusoku:{slot:'feet',name:'白金の法具足',def:15,mpb:15,price:0,rare:true,source:'ガシャオウ',repose:10,icon:'items/feet_hakkin_hougusoku.png'},
+  sogetsu_kabuto:{slot:'head',name:'蒼月の龍兜',def:20,hpb:25,price:0,rare:true,source:'ゴウリュウ',repose:15,icon:'items/head_sogetsu_kabuto.png'},
+  seirin_musha:{slot:'body',name:'青鱗の武者鎧',def:28,hpb:40,price:0,rare:true,source:'ゴウリュウ',repose:15,icon:'items/armor_seirin_musha.png'},
+  kurogane_tsutsugote:{slot:'arms',name:'黒鉄の筒籠手',def:18,price:0,rare:true,source:'ゴウリュウ',repose:15,icon:'items/arms_kurogane_tsutsugote.png'},
+  seirin_gusoku:{slot:'feet',name:'青鱗の武者具足',def:18,hpb:20,price:0,rare:true,source:'ゴウリュウ',repose:15,icon:'items/feet_seirin_musha.png'},
+  kiyome_bukuro:{slot:'acc',name:'浄めの匂袋',hpb:35,mpb:15,price:0,rare:true,source:'第一章報酬',repose:8,icon:'items/acc_kiyome_nioibukuro.png'},
 };
 const SLOTS=[['weapon','武器'],['head','頭'],['body','胴'],['arms','腕'],['feet','足'],['acc','飾り']];
 const SLOT_NAME=Object.fromEntries(SLOTS);
@@ -1206,6 +1242,10 @@ function itemFx(it){
   if(it.source)p.push(`【${it.source}】`);
   return p.join(' ');
 }
+const itemNameHtml=id=>{
+  const it=ITEMS[id];
+  return `<span class="${it?.rare?'rare-name':''}">${esc(dispName(id))}</span>`;
+};
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
 const HEAL_POTION_DELAY=1;
 const HEAL_POTIONS={
@@ -1373,6 +1413,7 @@ let npcs=[
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
   {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
   {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
+  {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・重複レア装備の焚き上げ所
 ];
 
 /* ---- 町を囲う柵と門 ---- */
@@ -1414,7 +1455,7 @@ const ELDER_LINES=[
   '「北西の竜の洞窟にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
   '「オババの店で装備を整えよ。銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
   '「印は徳が積まれれば自然と授かる。回向は徳位3、業火は徳位6じゃ」',
-  '「アッキは大太刀を、ガシャドクロは鎖帷子を落とすことがある。執着の強い品ほど、よく落ちるものでな」',
+  '「店で買える品は旅立ちの備えにすぎん。徳位15を越えた魔物は、生前の執着が染みついた強い魂具を落とすことがある。名の色が違う品は手放すなよ」',
   '「詰所の中は庁の加護で回復が速い。疲れたら戻ってこい。休むことは、逃げることではないぞ」',
   '「魂を斬るのは殺生ではない。迷いを断ち、成仏させてやる功徳じゃ。……生きておった頃、お前は誰かの迷いを断ってやれたかの?」',
   '「ここだけの話じゃがな……この世界、時々"ほころび"のようなものが見える。まあ、わしの気のせいじゃろうて」',
@@ -1686,6 +1727,8 @@ const player={
   partySupportT:0,                          // 回向支援の余韻(この間はチーム討伐の徳が全額入る)
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
+  rareCopies:{},                           // レア装備の2個目以降(供養・贈答用)
+  reposePts:0,                             // 供養所で得る供養点
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
   plus:{},                                  // 装備の強化値 {装備id:+n}
   wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
@@ -1739,11 +1782,11 @@ function save(){
   try{
     const savedAt=Date.now();
     const serialized=JSON.stringify({
-      v:8,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:9,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
-      items:player.items,eq:player.eq,kills,
+      items:player.items,rareCopies:player.rareCopies,reposePts:player.reposePts,eq:player.eq,kills,
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
@@ -1762,7 +1805,7 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6&&d.v!==7&&d.v!==8))return false;
+    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>9)return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -1774,6 +1817,11 @@ function load(){
     player.quickPage=clamp(d.quickPage|0,0,2);
     player.dragonBlood=Math.max(0,d.dragonBlood|0);
     player.items=Array.isArray(d.items)?d.items:['dagger','cloth'];
+    player.rareCopies={};
+    if(d.rareCopies&&typeof d.rareCopies==='object')for(const [id,n] of Object.entries(d.rareCopies)){
+      if(ITEMS[id]?.rare&&(n|0)>0)player.rareCopies[id]=Math.min(999,n|0);
+    }
+    player.reposePts=Math.max(0,d.reposePts|0);
     if(d.v>=3&&d.eq){
       // 各部位のidが正しいものだけ採用
       for(const [k] of SLOTS){
@@ -1872,11 +1920,15 @@ const MOBS={
   gashao:  {name:'ガシャオウ',  lv:30,hp:6800,dmg:[52,92],xp:2000,gold:[450,650],speed:2.0,aggro:6.0,atkCd:1.9,size:2.6,bar:220,boss:true},
   drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[80,180],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
-const FOREST_DROPS={goblin:['kuchinuno_mask',0.06],goblin_red:['kuchinuno_kote',0.05],
-  wolf:['kawa_boots',0.06],orc:['rokumon_black',0.05],skeleton:['kifuda_gofu',0.06]};
-const DROPS={drake:['drake_slayer',1],
-  dark_dog:['kagenui',0.08],oni_bone:['gokusotsu',0.07],gozu:['kusarifuji',0.08],oni_king:['jukotsu_crown',0.35],
-  shira_bone:['saso_tabi',0.07],kyokotsu:['jukotsu_kote',0.07],oo_dokuro:['gaimen_hood',0.07],gashao:['shion_mofuku',0.35]};
+// 装備ドロップは徳位15以上の魔物だけ。各枠を独立抽選するため、中ボス・竜は複数同時に落とせる。
+const RARE_DROPS={
+  oni_king:[['kurogane_babi',0.22],['rokumon_black',0.20],['shunawa_kote',0.20],['gokusotsu',0.16],['kusarifuji',0.16]],
+  shira_bone:[['kuchinuno_mask',0.045],['kuchinuno_kote',0.045],['kawa_boots',0.045],['kifuda_gofu',0.035],['fuju_eboshi',0.035]],
+  kyokotsu:[['jukotsu_crown',0.05],['jukotsu_kote',0.05],['saso_tabi',0.05],['setsuju_boots',0.04]],
+  oo_dokuro:[['kagenui',0.045],['gaimen_hood',0.04],['kagegoku_ninja',0.035],['kagegoku_kote',0.035],['kagegoku_tabi',0.035]],
+  gashao:[['shion_mofuku',0.24],['shion_kote',0.22],['shion_tabi',0.22],['higan_shuin',0.18],['higan_tekko',0.18],['hakkin_gusoku',0.18]],
+  drake:[['drake_slayer',1],['sogetsu_kabuto',0.35],['seirin_musha',0.35],['kurogane_tsutsugote',0.35],['seirin_gusoku',0.35]],
+};
 const DRAGON_BLOOD_DROP_RATE=0.07;
 let mobs=[];
 function spawnMob(type,x,y){
@@ -2172,13 +2224,22 @@ function autoEquipIfBetter(id){
   }
 }
 function gainItem(id){
-  if(player.items.includes(id))return;
-  player.items.push(id);
   const it=ITEMS[id];
-  addFloat(player.x,player.y-0.8,`${it.name}！`,'#ffd97a',true);
-  log(`${it.name}を手に入れた！`,'gain');
+  if(!it)return {ignored:true};
+  if(player.items.includes(id)){
+    if(!it.rare)return {ignored:true};
+    player.rareCopies[id]=(player.rareCopies[id]||0)+1;
+    addFloat(player.x,player.y-0.8,`${it.name}（重複）！`,'#d9a8ff',true);
+    log(`レア装備「${it.name}」をもう1つ手に入れた！ 供養または贈答に使える`,'rare');
+    save();
+    return {duplicate:true};
+  }
+  player.items.push(id);
+  addFloat(player.x,player.y-0.8,`${it.name}！`,it.rare?'#d9a8ff':'#ffd97a',true);
+  log(`${it.rare?'レア装備「'+it.name+'」':it.name}を手に入れた！`,it.rare?'rare':'gain');
   autoEquipIfBetter(id);
   save();
+  return {newItem:true};
 }
 
 /* ================= クエスト進行 ================= */
@@ -2243,9 +2304,6 @@ function grantMobReward(m){
   player.gold+=gold;
   gainXp(m.def.xp);
   log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
-  const candidateDrop=(zone==='field'?FOREST_DROPS[m.type]:null)||DROPS[m.type];
-  // 店で買える装備は敵から落とさない。設定を誤っても抽選と全体告知の両方を止める。
-  const drop=candidateDrop&&!SHOP_STOCK.includes(candidateDrop[0])?candidateDrop:null;
   // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
   const lootTo=()=>{
     if(!party.id)return null;
@@ -2257,10 +2315,17 @@ function grantMobReward(m){
     }
     return cands[rndi(0,cands.length-1)];
   };
-  if(drop&&Math.random()<dropChance(drop[1])&&!player.items.includes(drop[0])){
-    gainItem(drop[0]);
-    announceRareDrop(m.name,ITEMS[drop[0]].name);
-  }else if(Math.random()<dropChance(0.28)){
+  let equipmentDropped=false;
+  // 二重防止: 徳位15未満・店売り・非レア装備はテーブルに紛れ込んでも抽選しない。
+  const rareTable=m.def.lv>=15?(RARE_DROPS[m.type]||[]):[];
+  for(const [itemId,rate] of rareTable){
+    const it=ITEMS[itemId];
+    if(!it?.rare||SHOP_STOCK.includes(itemId)||Math.random()>=dropChance(rate))continue;
+    equipmentDropped=true;
+    gainItem(itemId);
+    announceRareDrop(m.name,it.name);
+  }
+  if(!equipmentDropped&&Math.random()<dropChance(0.28)){
     const to=lootTo();
     if(to){netOutbox.push({type:'party_loot',partyId:party.id,toUserId:to.userId,loot:'nectar',mobName:m.name});
       log(`甘露水は ${to.name} の手に渡った`,'sys');}
@@ -2797,6 +2862,50 @@ function renderSuggest(){
     }
   });
 }
+const REPOSE_SCROLL_COST=15;
+function renderRepose(){
+  const host=$('reposeBody');
+  const copies=Object.entries(player.rareCopies)
+    .filter(([id,n])=>ITEMS[id]?.rare&&n>0)
+    .sort((a,b)=>(ITEMS[b[0]].repose||0)-(ITEMS[a[0]].repose||0));
+  let html=`<div class="goldrow">供養点 <b>${player.reposePts}</b> 点</div>`
+    +'<div class="suggest-note">手元に残る最初の一品は供養できません。重なったレア装備だけを魂火へ返せます。店売り品から供養点は得られません。</div>';
+  if(!copies.length){
+    html+='<div class="social-empty">供養できる重複レア装備はありません</div>';
+  }else for(const [id,n] of copies){
+    const it=ITEMS[id];
+    html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
+      <span class="nm">${itemNameHtml(id)} <span class="rare-copy">余り ×${n}</span>
+      <span class="fx">${itemFx(it)} / 1個につき${it.repose}点</span></span>
+      <button class="buyb" data-repose="${id}">供養</button></div>`;
+  }
+  html+='<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 供養点の交換 ─</span></div>'
+    +`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
+      <span class="nm">武器強化の巻物 <span class="fx">${REPOSE_SCROLL_COST}点</span></span>
+      <button class="buyb" data-repose-exchange="weapon" ${player.reposePts<REPOSE_SCROLL_COST?'disabled':''}>交換</button></div>`
+    +`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
+      <span class="nm">防具強化の巻物 <span class="fx">${REPOSE_SCROLL_COST}点</span></span>
+      <button class="buyb" data-repose-exchange="armor" ${player.reposePts<REPOSE_SCROLL_COST?'disabled':''}>交換</button></div>`;
+  host.innerHTML=html;
+  for(const b of host.querySelectorAll('[data-repose]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-repose'),it=ITEMS[id];
+    if(!it||!player.rareCopies[id]||!confirm(`余っている「${it.name}」を供養し、${it.repose}点に換えますか？`))return;
+    player.rareCopies[id]--;
+    if(player.rareCopies[id]<=0)delete player.rareCopies[id];
+    player.reposePts+=it.repose;
+    log(`${it.name}を供養した（供養点 +${it.repose}）`,'rare');
+    addFloat(player.x,player.y-1,'供養点 +'+it.repose,'#8fe8ff',true);
+    sfx.coin();save();renderRepose();
+  });
+  for(const b of host.querySelectorAll('[data-repose-exchange]'))b.addEventListener('click',()=>{
+    if(player.reposePts<REPOSE_SCROLL_COST)return;
+    const weapon=b.getAttribute('data-repose-exchange')==='weapon';
+    player.reposePts-=REPOSE_SCROLL_COST;
+    if(weapon)player.wScrolls++;else player.aScrolls++;
+    log(`供養点${REPOSE_SCROLL_COST}点を${weapon?'武器':'防具'}強化の巻物と交換した`,'gain');
+    sfx.coin();save();renderRepose();
+  });
+}
 function renderBoard(){
   let html='';
   for(const q of QUESTS){
@@ -2859,7 +2968,7 @@ function renderEquipTab(){
   for(const [slot,nm] of SLOTS){
     const id=player.eq[slot],it=ITEMS[id];
     const icn=it&&it.icon?`<img src="assets/${it.icon}" alt="">`:'';
-    html+=`<div class="slotbox ${selSlot===slot?'sel':''} ${it?'':'empty'}" data-slot="${slot}" style="${SLOT_POS[slot]}">
+    html+=`<div class="slotbox ${selSlot===slot?'sel':''} ${it?'':'empty'} ${it?.rare?'rare':''}" data-slot="${slot}" style="${SLOT_POS[slot]}">
       <span class="sl">${nm}</span>${icn}
       <span class="eqn">${it?esc(dispName(id)):'なし'}</span></div>`;
   }
@@ -2875,7 +2984,8 @@ function renderEquipTab(){
     const it=ITEMS[id];if(!it||it.slot!==selSlot)continue;cnt++;
     const on=player.eq[selSlot]===id;
     const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn"></span>';
-    list+=`<div class="itemrow">${icn}<span class="nm">${esc(dispName(id))} <span class="fx">${itemFx(it)}</span></span>
+    const copies=it.rare?(player.rareCopies[id]||0):0;
+    list+=`<div class="itemrow">${icn}<span class="nm">${itemNameHtml(id)} ${copies?`<span class="rare-copy">余り ×${copies}</span>`:''} <span class="fx">${itemFx(it)}</span></span>
       <button class="buyb ${on?'on':''}" data-eq="${id}">${on?(selSlot==='weapon'?'装備中':'外す'):'装備する'}</button></div>`;
   }
   if(!cnt)list+=`<div class="itemrow"><span class="fx">この部位の装備を持っていない。オババの店を覗いてみよう</span></div>`;
@@ -2977,6 +3087,60 @@ function socialTime(value){
   if(!Number.isFinite(d.getTime()))return '';
   return d.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
+function giftOptions(){
+  const out=[];
+  for(const [id,it] of Object.entries(ITEMS)){
+    if(!it.rare)continue;
+    const spare=player.rareCopies[id]||0;
+    const original=player.items.includes(id)&&!Object.values(player.eq).includes(id)&&!weaponPlus(id)?1:0;
+    const count=spare+original;
+    if(count>0)out.push({value:`equipment:${id}`,kind:'equipment',id,name:it.name,count,rare:true});
+  }
+  const consumables=[
+    ['heal_s','甘露水 S',player.potions],['heal_m','甘露水 M',player.potionsM],['heal_l','甘露水 L',player.potionsL],
+    ['haste','韋駄天の水',player.hastePots],['crit','修羅の酒',player.critPots],
+    ['wscroll','武器強化の巻物',player.wScrolls],['ascroll','防具強化の巻物',player.aScrolls],
+    ['dragon_blood','竜の血',player.dragonBlood],
+  ];
+  for(const [kind,name,count] of consumables)if(count>0)
+    out.push({value:`${kind}:${kind}`,kind,id:kind,name,count});
+  return out;
+}
+function giftByValue(value){return giftOptions().find(g=>g.value===value)||null;}
+function consumeMailGift(gift){
+  if(!gift) return;
+  if(gift.kind==='equipment'){
+    const id=gift.id;
+    if((player.rareCopies[id]||0)>0){
+      player.rareCopies[id]--;
+      if(player.rareCopies[id]<=0)delete player.rareCopies[id];
+    }else if(player.items.includes(id)&&!Object.values(player.eq).includes(id)&&!weaponPlus(id)){
+      player.items=player.items.filter(x=>x!==id);delete player.plus[id];
+    }else throw new Error('添付する装備を手元で確認できません');
+  }else{
+    const fields={heal_s:'potions',heal_m:'potionsM',heal_l:'potionsL',haste:'hastePots',crit:'critPots',
+      wscroll:'wScrolls',ascroll:'aScrolls',dragon_blood:'dragonBlood'};
+    const field=fields[gift.kind];
+    if(!field||player[field]<=0)throw new Error('添付する道具が足りません');
+    player[field]--;
+  }
+  save();hud();
+}
+function receiveMailGift(gift){
+  if(!gift)throw new Error('添付品を確認できません');
+  if(gift.kind==='equipment'){
+    if(!ITEMS[gift.id]?.rare)throw new Error('受け取れない装備です');
+    gainItem(gift.id);
+  }else{
+    const fields={heal_s:'potions',heal_m:'potionsM',heal_l:'potionsL',haste:'hastePots',crit:'critPots',
+      wscroll:'wScrolls',ascroll:'aScrolls',dragon_blood:'dragonBlood'};
+    const field=fields[gift.kind];
+    if(!field)throw new Error('受け取れない道具です');
+    player[field]++;save();hud();
+  }
+  log(`手紙の添付品「${gift.name||ITEMS[gift.id]?.name||'品'}」を受け取った`,'gain');
+  addFloat(player.x,player.y-1,'贈り物を受領！','#dfb4ff',true);sfx.coin();
+}
 function updateSocialBadge(){
   const unread=socialState.mail.filter(m=>!m.readAt).length;
   const count=unread+socialState.incoming.length;
@@ -3066,8 +3230,12 @@ function renderSocialTab(){
 
   const to=friends.find(f=>f.id===socialComposeId&&f.cloud);
   if(to){
+    const gifts=giftOptions();
     html+=`<form class="social-compose" id="socialComposeForm"><label>${esc(to.name)} へ手紙を書く</label>
       <textarea id="socialMailBody" maxlength="240" required placeholder="相手が不在でも届きます"></textarea>
+      <select id="socialMailGift"><option value="">添付なし</option>${gifts.map(g=>
+        `<option value="${g.value}">${g.rare?'◆ ':''}${esc(g.name)} ×${g.count}</option>`).join('')}</select>
+      <small>レア装備または道具を1個添付できます。送信後は手元からなくなります。</small>
       <div class="social-compose-foot"><span>240文字まで</span>
       <button class="buyb" type="submit" ${socialBusy?'disabled':''}>送る</button></div></form>`;
   }
@@ -3075,10 +3243,14 @@ function renderSocialTab(){
   html+='<div class="social-section"><div class="social-head"><span>届いた手紙</span></div>';
   if(!socialState.mail.length)html+='<div class="social-empty">届いている手紙はありません</div>';
   for(const m of socialState.mail){
+    const gift=m.gift;
+    const giftHtml=gift?`<div class="mail-gift">贈り物：${esc(gift.name)}${gift.claimedAt?'（受取済み）':''}</div>`:'';
     html+=`<div class="social-row ${m.readAt?'':'unread'}"><div class="social-person">
       <b>${esc(m.senderName)} <small>${socialTime(m.createdAt)}</small></b>
-      <div class="mail-body">${esc(m.body)}</div></div>${m.readAt?'':
-        `<button class="buyb" data-mail-read="${m.id}" ${socialBusy?'disabled':''}>既読</button>`}</div>`;
+      <div class="mail-body">${esc(m.body)}</div>${giftHtml}</div><div class="social-actions">
+      ${gift&&!gift.claimedAt?`<button class="buyb" data-mail-claim="${m.id}" ${socialBusy?'disabled':''}>受け取る</button>`:''}
+      ${m.readAt?'':`<button class="buyb" data-mail-read="${m.id}" ${socialBusy?'disabled':''}>既読</button>`}
+      </div></div>`;
   }
   html+='</div>';
   host.innerHTML=html;
@@ -3152,9 +3324,18 @@ function renderSocialTab(){
   host.querySelector('#socialComposeForm')?.addEventListener('submit',ev=>{
     ev.preventDefault();
     const body=$('socialMailBody').value;
+    const gift=giftByValue($('socialMailGift')?.value||'');
     socialAction(async()=>{
-      await window.EnmaSocialClient.sendMail(socialComposeId,body);
-      notifyNet('手紙を送りました');socialComposeId='';
+      await window.EnmaSocialClient.sendMail(socialComposeId,body,gift);
+      if(gift)consumeMailGift(gift);
+      notifyNet(gift?`手紙に「${gift.name}」を添えて送りました`:'手紙を送りました');socialComposeId='';
+    });
+  });
+  for(const b of host.querySelectorAll('[data-mail-claim]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-mail-claim');
+    socialAction(async()=>{
+      const gift=await window.EnmaSocialClient.claimMailGift(id);
+      receiveMailGift(gift);
     });
   });
   for(const b of host.querySelectorAll('[data-mail-read]'))b.addEventListener('click',()=>{
@@ -3223,6 +3404,7 @@ function openNpc(npc){
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='suggest'){renderSuggest();$('suggest').classList.remove('hidden');}
+  else if(npc.kind==='repose'){renderRepose();$('repose').classList.remove('hidden');}
   else if(npc.kind==='kessha'){
     questProgress('talk','kessha');
     renderKessha();$('kessha').classList.remove('hidden');
@@ -3276,6 +3458,7 @@ $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'))
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
 $('suggestClose').addEventListener('click',()=>$('suggest').classList.add('hidden'));
+$('reposeClose').addEventListener('click',()=>$('repose').classList.add('hidden'));
 $('kesshaClose').addEventListener('click',()=>$('kessha').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>{
   $('talk').classList.add('hidden');
@@ -4354,6 +4537,7 @@ loadSprite('map_stone_well','assets/map_stone_well.png');
 loadSprite('map_tavern','assets/map_tavern.png');
 loadSprite('map_kosatsu','assets/map_kosatsu.png');
 loadSprite('map_suggestion_box','assets/map_suggestion_box.png');
+loadSprite('map_memorial_altar','assets/map_memorial_altar.png');
 loadSprite('npc_einer','assets/npc_einer.png');
 loadSprite('npc_kazu','assets/npc_kazu.png');
 loadSprite('map_fence_x','assets/map_fence_x.png');
@@ -5071,6 +5255,22 @@ function drawSuggestBox(sx,sy){
   ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
   ctx.fillText('意見箱',sx,sy+14);
 }
+function drawReposeAltar(sx,sy){
+  const img=SPRITES.map_memorial_altar;
+  drawShadow(sx,sy+4,26);
+  if(img){
+    const w=116,h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy-h+17,w,h);
+  }else{
+    ctx.save();ctx.translate(sx,sy);
+    ctx.fillStyle='#292a2c';ctx.fillRect(-22,-35,44,35);
+    ctx.fillStyle='#5ed7ed';ctx.beginPath();ctx.arc(0,-28,7,0,6.29);ctx.fill();
+    ctx.restore();
+  }
+  const pulse=.72+Math.sin(time*3)*.22;
+  ctx.fillStyle=`rgba(218,240,255,${pulse})`;ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('供養所',sx,sy+15);
+}
 function drawKosatsu(sx,sy){
   const img=SPRITES.map_kosatsu;
   const w=84,h=img?w*img.height/img.width:0;
@@ -5349,6 +5549,7 @@ const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
   if(n.kind==='suggest'){drawSuggestBox(sx,sy);return;}
+  if(n.kind==='repose'){drawReposeAltar(sx,sy);return;}
   const isSoul=n.kind==='soul';
   const img=SPRITES[n.sprite||NPC_SPRITE[n.kind]];
   if(img){
@@ -5818,7 +6019,7 @@ canvas.addEventListener('pointerdown',ev=>{
   for(const n of npcs){
     const nx=isoX(n.x,n.y)-camX+W/2;
     const ny=isoY(n.x,n.y)-camY+H/2-14;
-    if(Math.hypot(nx-sx,ny-sy)<26){
+    if(Math.hypot(nx-sx,ny-sy)<(n.kind==='repose'?48:26)){
       if(dist(player,n)<2.6){openNpc(n);}
       else{
         player.talkTarget=n;player.target=null;
@@ -6795,7 +6996,7 @@ window.EnmaGameBridge={
   },
   importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
-      payload.v<1||payload.v>8)throw new Error('対応していない記録です');
+      payload.v<1||payload.v>9)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
@@ -7266,6 +7467,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722c"></script>
+<script type="module" src="online/account.js?v=20260722d"></script>
 </body>
 </html>
