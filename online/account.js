@@ -177,6 +177,12 @@ const payloadSavedAt = (payload, fallback = '') => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const comparePayloadLevel = (localPayload, cloudPayload) => {
+  const localLevel = Math.max(1, Math.trunc(Number(localPayload?.lv) || 1));
+  const cloudLevel = Math.max(1, Math.trunc(Number(cloudPayload?.lv) || 1));
+  return Math.sign(localLevel - cloudLevel);
+};
+
 function setAutoSyncState(kind, message) {
   state.autoSyncState = kind;
   state.autoSyncMessage = message;
@@ -723,6 +729,20 @@ async function reconcileCloudSave() {
     return true;
   }
 
+  // 別端末の古い記録を後から開いても、徳位を巻き戻してクラウドへ保存しない。
+  // 徳位が異なる場合は保存時刻より進行度を優先し、同じ徳位だけ時刻で比較する。
+  const levelOrder = comparePayloadLevel(local.payload, cloud.payload);
+  if (levelOrder < 0) {
+    setAutoSyncState('loading', '進行したクラウド記録を自動で読み込んでいます…');
+    window.EnmaGameBridge?.importSave?.(cloud.payload, { ownerId: state.session.user.id });
+    return false;
+  }
+  if (levelOrder > 0) {
+    setAutoSyncState('saving', '進行した端末記録をクラウドへ自動保存しています…');
+    scheduleCloudSave(0);
+    return true;
+  }
+
   const localAt = payloadSavedAt(local.payload);
   const cloudAt = payloadSavedAt(cloud.payload, cloud.client_updated_at || cloud.updated_at);
   if (cloudAt > localAt) {
@@ -747,6 +767,13 @@ async function flushCloudSave() {
   const binding = saveBinding();
   const payload = binding.local.payload;
   if (binding.kind !== 'match' || !payload) return;
+  if (state.cloudSave && comparePayloadLevel(payload, state.cloudSave.payload) < 0) {
+    setAutoSyncState('loading', '進行したクラウド記録を自動で読み込んでいます…');
+    window.EnmaGameBridge?.importSave?.(state.cloudSave.payload, {
+      ownerId: state.session.user.id,
+    });
+    return;
+  }
   if (state.cloudSave && payloadSignature(payload) === payloadSignature(state.cloudSave.payload)) {
     setAutoSyncState('synced', 'クラウドへ自動保存済み');
     return;
