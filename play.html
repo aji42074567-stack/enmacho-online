@@ -987,7 +987,7 @@
       <div class="sub">因果の島を越えて</div>
       <div class="rule"></div>
       <div class="say">ゴウリュウの咆哮が止み、島を閉ざしていた海霧が晴れた。<br>
-        千本亭のカズーから渡し守の古銭を託されたあなたを、桟橋の渡し船が待っている。<br><br>
+        千本亭のカズーから渡し守の六文銭を託されたあなたを、桟橋の渡し船が待っている。<br><br>
         次の転生では魂の役目を選び、海の向こうの広大な審査区へ進むことになる。</div>
       <div class="chapter-jobs" aria-label="次章で選べる四つの職">
         <span>羅刹</span><span>影法師</span><span>呪禁師</span><span>護法僧</span>
@@ -1652,6 +1652,14 @@ const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0;
   }
 })();
 
+// 船は海上に描き、乗船手続きは歩行可能な桟橋の先端で行う。
+function ferryWorldPoint(){
+  return PIER?{x:PIER.x+5.9,y:PIER.y+2.7}:null;
+}
+function ferryDockPoint(){
+  return PIER?{x:Math.round(PIER.x+0.5)+PIER_DECK_LENGTH-1,y:PIER.y}:null;
+}
+
 // 試練の洞窟の入口: 岩山の高台の上。西の坂からだけ登れる
 for(let x=MT.x0;x<=MT.x1;x++)for(let y=MT.y0;y<=MT.y1;y++){
   const border=(x===MT.x0||x===MT.x1||y===MT.y0||y===MT.y1);
@@ -1721,7 +1729,7 @@ const player={
   qb:{active:null,prog:0,done:{}},          // クエスト掲示板
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false},
-  ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
+  ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
   partySupportT:0,                          // 回向支援の余韻(この間はチーム討伐の徳が全額入る)
@@ -2249,7 +2257,7 @@ function completeQuest(q){
   player.gold+=q.rw.gold;gainXp(q.rw.xp);
   if(q.rw.key==='ferrymanCoin'&&!player.ferrymanCoin){
     player.ferrymanCoin=true;
-    log('カズーから鍵物「渡し守の古銭」を託された','gain');
+    log('カズーから鍵物「渡し守の六文銭」を託された','gain');
   }
   if(q.rw.item)gainItem(q.rw.item);
   banner={txt:`頼み事「${q.name}」達成！`,age:0};
@@ -3022,8 +3030,8 @@ function renderItemTab(){
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
   }
   if(player.ferrymanCoin){
-    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">渡</span>
-      <span class="nm">渡し守の古銭 <span class="fx">次の審査区へ渡る資格の証</span></span></div>`;
+    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">六</span>
+      <span class="nm">渡し守の六文銭 <span class="fx">船賃ではなく、次の審査区へ渡る資格の証</span></span></div>`;
   }
   $('itemList').innerHTML=html;
   for(const b of $('itemList').querySelectorAll('[data-quick-page]')){
@@ -3360,7 +3368,7 @@ function kazuDialogue(){
   const q=questById('q_tokkuri');
   if(player.qb.done.q_tokkuri){
     if(!player.story.chapter1Seen)pendingChapterEnd=true;
-    return '「渡し船は桟橋に着いてる。古銭はなくすなよ。次に会う時、お前がどんな役目を選んだか聞かせてくれ」';
+    return '「渡し船は桟橋に着いてる。渡し守の六文銭はなくすなよ。あれは船賃じゃない、次の審査区へ渡る資格の証だ。次に会う時、お前がどんな役目を選んだか聞かせてくれ」';
   }
   if(player.qb.active!=='q_tokkuri'){
     return '「俺の昔話を聞く気なら、クエストの『酔客の因果話』を受けてきな。酔言かどうかは、お前が歩いた道で確かめりゃいい」';
@@ -3368,7 +3376,7 @@ function kazuDialogue(){
   const idx=clamp(player.story.kazuStage|0,0,KAZU_STORY.length);
   if(idx>=KAZU_STORY.length){
     completeQuest(q);pendingChapterEnd=!player.story.chapter1Seen;save();
-    return '「話は全部した。渡し守の古銭を持っていけ。あとは桟橋の船が、お前を次の審査区へ運ぶ」';
+    return '「話は全部した。渡し守だった俺から、この六文銭を託す。船賃じゃない。次の審査区へ渡る資格の証だ。あとは桟橋の船が、お前を運ぶ」';
   }
   const beat=KAZU_STORY[idx];
   if(!beat.unlock())return beat.wait;
@@ -3389,7 +3397,23 @@ function showChapterEnd(){
   player.story.chapter1Seen=true;pendingChapterEnd=false;save();
   $('chapterEnd').classList.remove('hidden');
 }
+function openFerry(){
+  setTalkPortrait(null);
+  $('talkTitle').textContent='渡し船';
+  $('talkSub').textContent='第二審査区行き';
+  if(!player.ferrymanCoin){
+    $('talkText').textContent='船頭は静かに首を横へ振った。\n\n「渡し守の六文銭がなければ、この船には乗せられぬ。あれは金ではなく、次の審査区へ渡る資格の証。千本亭のカズーに因果話の続きを聞いてこい」';
+    log('渡し船に乗るには、カズーから託される「渡し守の六文銭」が必要だ','sys');
+  }else{
+    $('talkText').textContent='船頭は差し出された六文銭を確かめ、深くうなずいた。\n\n「渡し守の六文銭、確かに。次の審査区へ渡る資格を認めよう。これは通行の証ゆえ、船賃として取り上げはせぬ。出航の刻を待て」';
+    log('渡し守の六文銭を示し、第二審査区への乗船資格が認められた','gain');
+    // 第二章実装時は、六文銭を消費せず、ここから新たな島へ遷移する。
+  }
+  $('talk').classList.remove('hidden');
+  sfx.click();
+}
 function openNpc(npc){
+  if(npc.kind==='ferry'){openFerry();return;}
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
   else if(npc.kind==='smith'){
     if(!player.smithIntro){
@@ -3431,9 +3455,11 @@ function openNpc(npc){
     setTalkPortrait('enma');
     $('talkTitle').textContent='閻魔';
     $('talkSub').textContent='閻魔庁の主・因果を裁く者';
-    $('talkText').textContent=player.story.dragonCleared
-      ?'「業龍を鎮め、ここまで来たか。魔物とは、強欲に溺れ徳を積まぬまま、人の姿へ戻れなくなった魂の成れの果てよ。浄めることは滅ぼすことではない。輪廻転生の機会を、もう一度与える裁きである。古銭を携え船へ向かえ。次の審査区で、四つの役目から己の道を選ぶがよい」'
-      :'「すべては因果応報。森をさまよう魔物も、生前の行いが形となった魂よ。汝はまず試練を越え、業龍を浄めてみせよ。その時、輪廻転生へ進む資格を裁こう」';
+    $('talkText').textContent=!player.story.dragonCleared
+      ?'「すべては因果応報。森をさまよう魔物も、生前の行いが形となった魂よ。汝はまず試練を越え、業龍を浄めてみせよ。その時、輪廻転生へ進む資格を裁こう」'
+      :!player.ferrymanCoin
+        ?'「業龍を鎮め、ここまで来たか。浄めることは滅ぼすことではない。輪廻転生の機会を、もう一度与える裁きである。次は千本亭のカズーを訪ね、因果話を最後まで聞け。元渡し守のあの者から、次の審査区へ渡る資格の証——渡し守の六文銭を受け取るのだ」'
+        :'「業龍を鎮め、渡し守の六文銭も受け取ったか。その六文銭は船賃ではなく、次の審査区へ渡る資格の証。失くさず携え、桟橋の渡し船へ向かえ。海の向こうで、四つの役目から己の道を選ぶがよい」';
     $('talk').classList.remove('hidden');
   }
   else{
@@ -5712,8 +5738,8 @@ function render(){
   }
   // ゴウリュウ鎮魂後、海霧の向こうから渡し船が桟橋へ着く
   if(zone==='field'&&PIER&&player.story.dragonCleared){
-    const fx=PIER.x+5.9,fy=PIER.y+2.7;
-    drawFerry(SX(fx,fy),SY(fx,fy));
+    const ferry=ferryWorldPoint();
+    drawFerry(SX(ferry.x,ferry.y),SY(ferry.x,ferry.y));
   }
   // 完成形の桟橋を1枚だけ背景側に描き、人物をその上へ重ねる
   if(zone==='field'&&PIER)drawPierBase(SX(PIER.x,PIER.y),SY(PIER.x,PIER.y));
@@ -5940,7 +5966,7 @@ function hud(){
     const q=questById(player.qb.active);
     el.goal.textContent=q.n>1?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
   }else{
-    el.goal.textContent=player.story.chapter1Seen?'第一章「賽の森」完 — 第二章へ続く'
+    el.goal.textContent=player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
       :player.story.dragonCleared?'クエストを受け、カズーの因果話を聞こう'
       :player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
@@ -6015,6 +6041,23 @@ canvas.addEventListener('pointerdown',ev=>{
   // 引いたカメラで描画した座標を、従来のワールド画面座標へ戻して判定する。
   const sx=W/2+(rawSx-W/2)/viewScale;
   const sy=H/2+(rawSy-H/2)/viewScale;
+  // 渡し船クリック。海上の船そのものではなく、歩行可能な桟橋先端まで移動して話す。
+  if(zone==='field'&&PIER&&player.story.dragonCleared){
+    const ferry=ferryWorldPoint();
+    const nx=isoX(ferry.x,ferry.y)-camX+W/2;
+    const ny=isoY(ferry.x,ferry.y)-camY+H/2-42;
+    if(Math.abs(nx-sx)<112&&Math.abs(ny-sy)<76){
+      const dock=ferryDockPoint();
+      const target={...dock,kind:'ferry',name:'渡し船'};
+      if(dist(player,dock)<2.6){openFerry();}
+      else{
+        player.talkTarget=target;player.target=null;
+        player.path=findPath(player.x,player.y,dock.x,dock.y);
+        log('桟橋の先の渡し船へ向かう…','sys');
+      }
+      return;
+    }
+  }
   // NPCクリック
   for(const n of npcs){
     const nx=isoX(n.x,n.y)-camX+W/2;
