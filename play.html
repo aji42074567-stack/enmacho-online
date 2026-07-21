@@ -5327,6 +5327,17 @@ updateChatInputState();
 
 /* ================= チーム・フレンド・プレイヤーカード ================= */
 const party={id:null,members:[]};
+// リロードしてもチームが解散しないよう、このタブの間は覚えておく
+function rememberParty(){
+  try{
+    if(party.id)sessionStorage.setItem('enma_party',party.id);
+    else sessionStorage.removeItem('enma_party');
+  }catch(e){}
+}
+try{
+  const savedParty=sessionStorage.getItem('enma_party');
+  if(savedParty&&/^[0-9a-f-]{16,64}$/i.test(savedParty))party.id=savedParty;
+}catch(e){}
 // 画面左のログ(常時見える)とチャットの両方に知らせる
 function notifyNet(text){
   log(text,'sys');
@@ -5399,7 +5410,7 @@ $('pcClose').addEventListener('click',()=>{closePlayerCard();sfx.click();});
 $('pcTeamBtn').addEventListener('click',()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
-  if(!party.id){party.id=genPartyId();renderTeamUI();}
+  if(!party.id){party.id=genPartyId();rememberParty();renderTeamUI();}
   netOutbox.push({type:'invite',kind:'team',targetUserId:playerCard.userId,partyId:party.id});
   notifyNet(`${e.name} をチームに誘った。返事を待とう`);
   closePlayerCard();
@@ -5443,6 +5454,7 @@ $('inviteAccept').addEventListener('click',()=>{
   if(!inv)return;
   if(inv.kind==='team'){
     party.id=inv.partyId;party.members=[];
+    rememberParty();
     netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
       targetUserId:inv.from.userId,partyId:inv.partyId});
     notifyNet(`${inv.from.displayName} のチームに加わった`);
@@ -5523,6 +5535,7 @@ function renderTeamUI(){
 function leaveParty(announce){
   if(!party.id)return;
   party.id=null;party.members=[];
+  rememberParty();
   chat.teamOnline=false;
   if(announce)notifyNet('チームを抜けた');
   if(chat.open)renderChatTab();
@@ -6070,11 +6083,10 @@ window.EnmaGameBridge={
   receivePartyKill(msg){
     if(!party.id||!msg||msg.zone!==zone||player.dead)return;
     const support=player.partySupportT>0;
-    const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=12;
-    if(!support&&!near)return;  // 敵から離れていて支援もしていなければ入らない
-    const share=support?msg.xp:Math.max(1,Math.ceil(msg.xp*0.5));
-    gainXp(share);
-    addFloat(player.x,player.y-0.9,`+${share} 徳(チーム)`,'#d9c07a');
+    const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=18;  // 近く〜中距離
+    if(!support&&!near)return;  // 遠く離れていて支援もしていなければ入らない
+    gainXp(msg.xp);  // 範囲内なら討伐者と同じだけ徳が入る
+    addFloat(player.x,player.y-0.9,`+${msg.xp} 徳(チーム)`,'#d9c07a');
     save();
   },
   receivePartyHeal(msg){
