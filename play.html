@@ -326,8 +326,18 @@
     background:linear-gradient(168deg,transparent 38%,var(--boss-accent) 38.2% 38.6%,transparent 38.8%),
       repeating-linear-gradient(168deg,transparent 0 28px,rgba(255,255,255,.08) 29px,transparent 31px);
     animation:bossStreakIn .8s ease-out both}
+  .boss-cutin-video{position:absolute;inset:10vh 0;z-index:1;width:100%;height:80vh;
+    object-fit:cover;object-position:center;background:#020203;opacity:0;
+    filter:brightness(.74) saturate(.9) contrast(1.06);transition:opacity .45s ease,filter .8s ease}
+  .boss-cutin.video-ready .boss-cutin-video{opacity:1}
+  .boss-cutin.video-ended .boss-cutin-video{filter:brightness(.62) saturate(.82) contrast(1.08)}
+  .boss-cutin.has-video .boss-cutin-streak{z-index:2;mix-blend-mode:screen;opacity:.14}
   .boss-cutin-copy{position:relative;z-index:3;width:min(52vw,650px);margin-left:8vw;
     padding:4vh 0;text-shadow:0 3px 9px #000;animation:bossCopyIn .7s .12s ease-out both}
+  .boss-cutin.has-video .boss-cutin-copy{animation:none}
+  .boss-cutin.has-video .boss-cutin-copy::before{content:"";position:absolute;z-index:-1;
+    inset:-7vh -15vw -7vh -8vw;background:linear-gradient(90deg,rgba(1,2,4,.88) 0 45%,
+      rgba(1,2,4,.58) 70%,transparent 100%);pointer-events:none}
   .boss-cutin-kicker{font:600 11px/1 var(--sans);color:var(--boss-accent);
     letter-spacing:.42em;margin-bottom:14px}
   .boss-cutin h2{margin:0;color:#f4ead8;font:600 clamp(30px,5vw,68px)/1.06 var(--serif);
@@ -337,10 +347,20 @@
     font:600 clamp(13px,1.5vw,19px)/1.4 var(--serif);letter-spacing:.16em}
   .boss-cutin-message{max-width:620px;margin:22px 0 0;color:#cfc7bc;
     font:500 clamp(13px,1.4vw,17px)/2 var(--serif);letter-spacing:.06em}
+  .boss-cutin-message span{display:block}
+  .boss-cutin-message-tail{margin-top:2px}
   .boss-cutin-art{--boss-art-opacity:.86;position:absolute;z-index:2;right:3vw;bottom:8vh;width:min(43vw,560px);
     height:min(76vh,680px);object-fit:contain;object-position:center bottom;image-rendering:pixelated;
     filter:brightness(.52) saturate(.75) drop-shadow(0 0 24px var(--boss-accent));
     opacity:var(--boss-art-opacity);animation:bossArtIn .85s ease-out both}
+  .boss-cutin.video-ready .boss-cutin-art{visibility:hidden}
+  .boss-cutin.has-video .boss-cutin-kicker,.boss-cutin.has-video h2,
+  .boss-cutin.has-video .boss-cutin-epithet,.boss-cutin.has-video .boss-cutin-message span{opacity:0}
+  .boss-cutin.video-playing .boss-cutin-kicker{animation:bossVideoTextIn .5s .35s both}
+  .boss-cutin.video-playing h2{animation:bossVideoTextIn .62s .85s both}
+  .boss-cutin.video-playing .boss-cutin-epithet{animation:bossVideoTextIn .55s 1.9s both}
+  .boss-cutin.video-playing .boss-cutin-message-lead{animation:bossVideoTextIn .65s 4.35s both}
+  .boss-cutin.video-playing .boss-cutin-message-tail{animation:bossVideoTextIn .75s 5.65s both}
   .boss-cutin[data-boss="drake"] .boss-cutin-art{right:-5vw;width:min(68vw,860px);
     filter:brightness(.44) saturate(.82) drop-shadow(0 0 30px var(--boss-accent))}
   .boss-cutin-skip{position:absolute;z-index:7;right:max(22px,env(safe-area-inset-right));
@@ -351,6 +371,8 @@
   @keyframes bossStreakIn{from{opacity:0;transform:translateX(-16%)}to{opacity:.24;transform:none}}
   @keyframes bossCopyIn{from{opacity:0;transform:translateX(-70px)}to{opacity:1;transform:none}}
   @keyframes bossArtIn{from{opacity:0;transform:translateX(110px) scale(1.08)}to{opacity:var(--boss-art-opacity);transform:none}}
+  @keyframes bossVideoTextIn{from{opacity:0;transform:translateX(-28px);filter:blur(4px)}
+    to{opacity:1;transform:none;filter:none}}
   .portrait{width:112px;height:112px;margin:0 auto 10px;
     background-repeat:no-repeat;background-position:center bottom;background-size:contain;
     image-rendering:pixelated;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
@@ -802,6 +824,10 @@
     .boss-cutin h2{font-size:clamp(28px,10vw,44px)}
     .boss-cutin-epithet{margin-top:10px;font-size:12px}
     .boss-cutin-message{margin-top:14px;font-size:12px;line-height:1.75}
+    .boss-cutin.has-video .boss-cutin-copy{margin:0 20px 15vh}
+    .boss-cutin.has-video .boss-cutin-copy::before{inset:-5vh -22px -4vh -20px;
+      background:linear-gradient(0deg,rgba(1,2,4,.92),rgba(1,2,4,.66) 72%,transparent)}
+    .boss-cutin.has-video .boss-cutin-video{object-position:64% center}
     .boss-cutin-art,.boss-cutin[data-boss="drake"] .boss-cutin-art{--boss-art-opacity:.36;
       right:-18vw;bottom:17vh;width:95vw;height:64vh;
       filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
@@ -1005,11 +1031,16 @@
   <section class="boss-cutin hidden" id="bossCutin" role="dialog" aria-modal="true"
     aria-labelledby="bossCutinName" aria-describedby="bossCutinMessage" data-boss="oni">
     <i class="boss-cutin-streak" aria-hidden="true"></i>
+    <video class="boss-cutin-video hidden" id="bossCutinVideo" playsinline preload="auto"
+      aria-hidden="true"></video>
     <div class="boss-cutin-copy">
       <div class="boss-cutin-kicker" id="bossCutinKicker">因果顕現</div>
       <h2 id="bossCutinName">鬼王 オニオウ</h2>
       <div class="boss-cutin-epithet" id="bossCutinEpithet">怒りの成れの果て</div>
-      <p class="boss-cutin-message" id="bossCutinMessage"></p>
+      <p class="boss-cutin-message" id="bossCutinMessage">
+        <span class="boss-cutin-message-lead" id="bossCutinMessageLead"></span>
+        <span class="boss-cutin-message-tail" id="bossCutinMessageTail"></span>
+      </p>
     </div>
     <img class="boss-cutin-art" id="bossCutinArt" alt="" aria-hidden="true">
     <button class="boss-cutin-skip" id="bossCutinSkip" type="button">進む ›</button>
@@ -1830,7 +1861,7 @@ const player={
   qb:emptyQuestBoard(),                     // 受注中 {クエストID:進捗} / 達成済み
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false,
-    oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false},
+    oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false,oniVideoIntroSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
@@ -1978,6 +2009,7 @@ function load(){
       oniIntroSeen:!!st.oniIntroSeen,
       gashaoIntroSeen:!!st.gashaoIntroSeen,
       dragonIntroSeen:!!st.dragonIntroSeen,
+      oniVideoIntroSeen:!!st.oniVideoIntroSeen,
     };
     // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
     if(oldKazuDone){
@@ -4573,9 +4605,11 @@ function blockDragonGate(){
   }
 }
 const BOSS_CUTINS={
-  cave3:{flag:'oniIntroSeen',boss:'oni',kicker:'試練の洞窟 最深部　／　因果顕現',
+  cave3:{flag:'oniVideoIntroSeen',boss:'oni',kicker:'試練の洞窟 最深部　／　因果顕現',
     name:'鬼王 オニオウ',epithet:'怒りの成れの果て',art:'assets/mob_orc_blue.png',
-    message:'その怒りは誰かを傷つけた。だが、痛みを越えた者は以前より強くなった。傷つけた罪と、生まれた強さ——因果は善悪だけでは割り切れない。'},
+    video:'assets/boss_oni_intro.mp4',
+    messageLead:'その怒りは誰かを傷つけた。',
+    messageTail:'だが、痛みを越えた者は以前より強くなった。傷つけた罪と、生まれた強さ——因果は善悪だけでは割り切れない。'},
   muen3:{flag:'gashaoIntroSeen',boss:'gashao',kicker:'無縁塚 最深部　／　因果顕現',
     name:'骨王 ガシャオウ',epithet:'孤独の成れの果て',art:'assets/mob_skeleton.png',
     message:'孤独に耐え切れなかった。それだけで悪と呼べるのか。誰の胸にも同じ空洞はある。違ったのは、差し伸べる手がなかったことだけだ。'},
@@ -4584,11 +4618,61 @@ const BOSS_CUTINS={
     message:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。災厄であることと、守護者であることは両立する。'},
 };
 let bossCutinActive=false,bossCutinTimer=0;
+function duckBossCutinBgm(duck){
+  if(!AC)return;
+  if(!duck){applyAudioSettings();return;}
+  const t=AC.currentTime,v=settings.bgm/100*BGM_MIX_LEVEL;
+  if(musicGain){musicGain.gain.cancelScheduledValues(t);musicGain.gain.setTargetAtTime(v*.12,t,.12);}
+  if(bgmGain){bgmGain.gain.cancelScheduledValues(t);bgmGain.gain.setTargetAtTime(musicReady?0:v*.1,t,.12);}
+}
+function stopBossCutinVideo(){
+  const video=$('bossCutinVideo');
+  video.onplaying=video.onended=video.onerror=null;
+  video.pause();video.removeAttribute('src');video.load();video.classList.add('hidden');
+  duckBossCutinBgm(false);
+}
 function dismissBossCutin(){
   if(!bossCutinActive)return;
   bossCutinActive=false;
   clearTimeout(bossCutinTimer);bossCutinTimer=0;
   $('bossCutin').classList.add('hidden');
+  stopBossCutinVideo();
+}
+function fallbackBossCutinVideo(panel){
+  if(!bossCutinActive)return;
+  stopBossCutinVideo();
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
+  $('bossCutinSkip').textContent='進む ›';
+  clearTimeout(bossCutinTimer);
+  bossCutinTimer=setTimeout(dismissBossCutin,7200);
+}
+function playBossCutinVideo(scene,panel){
+  const video=$('bossCutinVideo');
+  video.classList.remove('hidden');
+  video.src=scene.video;video.currentTime=0;
+  video.volume=clamp((settings.sfx*.7+settings.bgm*.3)/100,0,1);
+  video.muted=video.volume<=0;
+  video.onplaying=()=>{
+    if(!bossCutinActive){video.pause();return;}
+    panel.classList.add('video-ready','video-playing');
+    $('bossCutinSkip').textContent='スキップ ›';
+    if(!video.muted)duckBossCutinBgm(true);
+  };
+  video.onended=()=>{
+    if(!bossCutinActive)return;
+    panel.classList.add('video-ended');
+    $('bossCutinSkip').textContent='進む ›';
+    clearTimeout(bossCutinTimer);
+    bossCutinTimer=setTimeout(dismissBossCutin,3400);
+  };
+  video.onerror=()=>fallbackBossCutinVideo(panel);
+  const attempt=video.play();
+  if(attempt)attempt.catch(()=>{
+    if(!bossCutinActive)return;
+    video.muted=true;
+    const mutedAttempt=video.play();
+    if(mutedAttempt)mutedAttempt.catch(()=>fallbackBossCutinVideo(panel));
+  });
 }
 function showBossCutinForZone(zoneName){
   const scene=BOSS_CUTINS[zoneName];
@@ -4597,17 +4681,23 @@ function showBossCutinForZone(zoneName){
   player.path=[];player.target=null;player.talkTarget=null;player.pendingHit=null;
   player.attackDur=0;player.attackT=0;player.combatT=0;
   const panel=$('bossCutin');
+  const useVideo=!!scene.video&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
+  panel.classList.toggle('has-video',useVideo);
   panel.dataset.boss=scene.boss;
   $('bossCutinKicker').textContent=scene.kicker;
   $('bossCutinName').textContent=scene.name;
   $('bossCutinEpithet').textContent=scene.epithet;
-  $('bossCutinMessage').textContent=scene.message;
+  $('bossCutinMessageLead').textContent=scene.messageLead||scene.message||'';
+  $('bossCutinMessageTail').textContent=scene.messageTail||'';
   $('bossCutinArt').src=scene.art;
+  $('bossCutinSkip').textContent=useVideo?'スキップ ›':'進む ›';
   bossCutinActive=true;
   panel.classList.add('hidden');void panel.offsetWidth;panel.classList.remove('hidden');
   $('bossCutinSkip').focus({preventScroll:true});
   clearTimeout(bossCutinTimer);
-  bossCutinTimer=setTimeout(dismissBossCutin,7200);
+  bossCutinTimer=setTimeout(dismissBossCutin,useVideo?16000:7200);
+  if(useVideo)playBossCutinVideo(scene,panel);
   save();
 }
 $('bossCutin').addEventListener('click',dismissBossCutin);
