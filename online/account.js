@@ -1,6 +1,6 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260721e';
-import { createWorldController } from './world.js?v=20260721e';
+import { createPresenceController } from './presence.js?v=20260721f';
+import { createWorldController } from './world.js?v=20260721f';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -68,6 +68,8 @@ const setFeedback = (message = '', error = '') => {
 
 const friendlyError = error => {
   const message = error?.message || '処理に失敗しました';
+  if (/profiles_display_name_unique|duplicate key.*display_name|魂名はすでに/i.test(message))
+    return 'この魂名はすでに使われています。別の魂名を選んでください';
   if (/invalid login credentials/i.test(message))
     return 'メールアドレスまたはパスワードが違います';
   if (/email not confirmed/i.test(message))
@@ -80,6 +82,15 @@ const friendlyError = error => {
     return '試行回数が多いため一時停止中です。少し待ってからお試しください';
   return message;
 };
+
+async function assertDisplayNameAvailable(displayName) {
+  const { data, error } = await state.client.rpc('is_display_name_available', {
+    p_display_name: displayName,
+  });
+  if (error) throw new Error(`魂名の重複確認に失敗しました：${error.message}`);
+  if (data !== true)
+    throw new Error('この魂名はすでに使われています。別の魂名を選んでください');
+}
 
 function localSaveInfo() {
   const payload = window.EnmaGameBridge?.exportSave?.() || null;
@@ -196,7 +207,7 @@ function renderSignedOut() {
             autocomplete="nickname" ${local.payload ? 'readonly' : ''}>
           ${local.payload
             ? '<small class="account-name-note">現在のキャラクター名で登録します（変更不可）</small>'
-            : '<small class="account-name-note">一度決めた名は変えられません</small>'}
+            : '<small class="account-name-note">一度決めた名は変更できず、他の魂籍と同じ名も使えません</small>'}
         </label>
         <label>メールアドレス
           <input name="email" type="email" required placeholder="name@example.com"
@@ -446,9 +457,10 @@ async function signUp(event) {
     setFeedback();
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
-    const displayName = String(form.get('displayName') || '').trim().slice(0, 16);
+    const displayName = String(form.get('displayName') || '').normalize('NFKC').trim().slice(0, 16);
     const newsletterOptIn = form.get('newsletter') === 'on';
     state.lastEmail = email;
+    await assertDisplayNameAvailable(displayName);
     const { data, error } = await state.client.auth.signUp({
       email,
       password,
@@ -457,7 +469,11 @@ async function signUp(event) {
         data: { display_name: displayName, newsletter_opt_in: newsletterOptIn },
       },
     });
-    if (error) throw error;
+    if (error) {
+      // 同時登録で事前確認をすり抜けても、DBの一意制約後に日本語で案内する。
+      await assertDisplayNameAvailable(displayName);
+      throw error;
+    }
     state.session = data.session;
     state.sessionSource = 'signup';
     if (data.session) window.EnmaGameBridge?.claimSave?.(data.session.user.id);
