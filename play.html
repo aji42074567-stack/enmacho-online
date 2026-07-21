@@ -1274,6 +1274,26 @@ const GUEST_AMBIENT_LINES=[
   '「海の向こうに行こうとしたやつがいてな。桟橋の先でぷっつり、いなくなった。……転生ってやつかね」',
   '「この町の夜空、星の数がいっつも同じなんだ。ひっく……増えも減りもしねえ。きっちり同じ」',
 ];
+// 閻魔庁で裁きを待つ、ごく普通だった魂たち。神示の直引用ではなく、この世界の言葉で語る。
+const ENMA_SOUL_VOICES=[
+  {name:'カヨ',sprite:'npc_soul_kayo',line:'「魔物だって、生前は皆それなりに頑張っていたんだよ。道を違えたからって、最初から悪だったわけじゃない。もっと深い業を背負った者は、草木や石ころとなり、何千年も同じ場所で己を見つめるそうさ」'},
+  {name:'源太',sprite:'npc_soul_genta',line:'「与えることが、いただくことだった。生きているうちにそれに気づいていれば、こんな格好で列に並ばずに済んだのによ」'},
+  {name:'サエ',sprite:'npc_soul_sae',line:'「喜びは分けたら減ると思っていました。でも、分けた喜びだけが、死後まで持って来られる荷物だったんですね」'},
+  {name:'レン',sprite:'npc_soul_ren',line:'「神示も教えも、ずいぶん読みました。けれど腹を立てた時に一度譲ることさえできなかった。知ることと、生きることは別でした」'},
+  {name:'お房',sprite:'npc_soul_kayo',line:'「世の中を変えたいと声を上げ続けたよ。でも、目の前の一人に優しくするほうが先だったのかもしれないね」'},
+  {name:'甚八',sprite:'npc_soul_genta',line:'「自分だけ得をしたつもりだった。ここじゃ金の帳面なんか見ちゃいない。誰かから奪うたび、心がどれだけ痩せたかを量られるんだ」'},
+  {name:'ミネ',sprite:'npc_soul_sae',line:'「冥府の鏡は、顔ではなく人にしたことを映すそうです。忘れたふりをした痛みまで、相手の側から見せられるとか」'},
+  {name:'宗助',sprite:'npc_soul_ren',line:'「小さな親切を損だと思って避けてきた。その損こそ、魂が受け取る徳だったんだな」'},
+  {name:'マツ',sprite:'npc_soul_kayo',line:'「因果応報は罰じゃないと聞いたよ。自分で蒔いた種を、自分で刈るだけ。刈り終えたら、次は違う種を選べるんだって」'},
+  {name:'新吉',sprite:'npc_soul_genta',line:'「列は長いけど、誰も追い越さない。生きていた時は一番にこだわってたのに、順番を譲るだけでこんなに心が軽い」'},
+  {name:'名を失った魂',sprite:'npc_soul_ren',line:'「名も財産も置いてきたら、残ったのは人に渡したものだけだった。持っていた物より、手放した物のほうが俺を形作っていたらしい」'},
+  {name:'古い魂',sprite:'npc_soul_sae',line:'「石になれば罰、草木なら救い、という単純な話じゃないらしい。動けぬ長い時の中で、雨も陽も分け隔てなく受ける。それも学びなんだと」'},
+];
+const ENMA_SOUL_LAYOUT={
+  1:[[35,41,0],[33,39,1],[31,37,2],[29,35,3],[27,33,4],[25,31,5]],
+  2:[[31,37,6],[29,35,7],[37,29,8],[35,27,9]],
+  3:[[29,35,10],[35,29,11]],
+};
 const KAZU_STORY=[
   {
     unlock:()=>true,
@@ -2591,7 +2611,7 @@ for(const b of document.querySelectorAll('.mtab')){
 }
 let okamiIdx=0,guestIdx=0,pendingChapterEnd=false;
 function setTalkPortrait(kind){
-  const key=NPC_SPRITE[kind];
+  const key=NPC_SPRITE[kind]||kind;   // 個別画像を持つ庁内の魂は画像キーを直接渡せる
   const p=$('talkPortrait');
   if(key){p.style.backgroundImage=`url(assets/${key}.png)`;p.classList.remove('hidden');}
   else p.classList.add('hidden');
@@ -2652,6 +2672,13 @@ function openNpc(npc){
     $('talkText').textContent=player.qb.active==='q_tokkuri'||player.qb.done.q_tokkuri
       ?kazuDialogue()
       :GUEST_AMBIENT_LINES[guestIdx++%GUEST_AMBIENT_LINES.length]+'　高札に、俺の話を聞けって頼みが出てるぜ。';
+    $('talk').classList.remove('hidden');
+  }
+  else if(npc.kind==='soul'){
+    setTalkPortrait(npc.sprite);
+    $('talkTitle').textContent=npc.name;
+    $('talkSub').textContent=npc.sub||'裁きを待つ魂';
+    $('talkText').textContent=npc.line;
     $('talk').classList.remove('hidden');
   }
   else if(npc.kind==='enma'){
@@ -3453,6 +3480,11 @@ function buildEnmaHall(){
       if(L.from===zn&&L.label)
         props.push({x:L.at.x,y:L.at.y,kind:'hallportal',label:L.label,tone:L.tone});
     }
+    const soulSub=floor===1?'魂籍の受付を待つ魂':floor===2?'二次審査を待つ魂':'閻魔の裁定を待つ魂';
+    for(const [x,y,voiceIdx] of ENMA_SOUL_LAYOUT[floor]){
+      const voice=ENMA_SOUL_VOICES[voiceIdx];
+      npcs.push({x,y,kind:'soul',sub:soulSub,...voice});
+    }
     if(floor===3)npcs.push({x:23,y:20,kind:'enma',name:'閻魔'});
     ground=document.createElement('canvas');
     floors.push({blocked,tileKind,props,npcs,mobs,ground,zone:zn,artKey:`map_enmacho_${floor}f`});
@@ -3635,6 +3667,10 @@ loadSprite('map_enmacho_1f','assets/map_enmacho_1f.jpg');
 loadSprite('map_enmacho_2f','assets/map_enmacho_2f.jpg');
 loadSprite('map_enmacho_3f','assets/map_enmacho_3f.jpg');
 loadSprite('npc_enma','assets/npc_enma.png');
+loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
+loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
+loadSprite('npc_soul_sae','assets/npc_soul_sae.png');
+loadSprite('npc_soul_ren','assets/npc_soul_ren.png');
 loadSprite('map_respawn_statue','assets/map_respawn_statue.png');
 loadSprite('map_pine_tall','assets/map_pine_tall.png');
 loadSprite('map_pine_full','assets/map_pine_full.png');
@@ -4601,18 +4637,19 @@ function drawGate(sx,sy,p){
 const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith:'npc_kanayama',guest:'npc_kazu',enma:'npc_enma'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
-  const img=SPRITES[NPC_SPRITE[n.kind]];
+  const isSoul=n.kind==='soul';
+  const img=SPRITES[n.sprite||NPC_SPRITE[n.kind]];
   if(img){
     const isEnma=n.kind==='enma';
     drawShadow(sx,sy+2,isEnma?28:10);
     const D=isEnma?150:50,F=img.naturalWidth||128;
-    const bob=isEnma?0:Math.sin(time*1.5+(n.kind==='merchant'?0:2))*1.2;
+    const bob=isEnma?0:Math.sin(time*(isSoul?1.1:1.5)+(isSoul?n.x+n.y:n.kind==='merchant'?0:2))*(isSoul?0.65:1.2);
     ctx.drawImage(img,0,0,F,F,sx-D/2,sy-D+3+bob,D,D);
     const puls=0.6+Math.sin(time*3)*0.4;
-    ctx.fillStyle=`rgba(255,225,120,${puls})`;
+    ctx.fillStyle=isSoul?`rgba(190,215,235,${0.55+puls*0.3})`:`rgba(255,225,120,${puls})`;
     ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-    ctx.fillText('!',sx,sy-D-4);
-    ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';
+    ctx.fillText(isSoul?'…':'!',sx,sy-D-4);
+    ctx.fillStyle=isSoul?'#d4dde5':'#ffe9a0';ctx.font='10px sans-serif';
     ctx.fillText(n.name,sx,sy+12);
     return;
   }
@@ -4661,6 +4698,10 @@ function drawNpc(sx,sy,n){
     ctx.beginPath();ctx.moveTo(0,2);ctx.lineTo(0,-11);ctx.stroke();
     ctx.fillStyle='#8a8e9a';ctx.fillRect(-4,-15,8,5);   // 槌頭
     ctx.restore();
+  }else if(n.kind==='soul'){
+    ctx.fillStyle='#5c5963';
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#cdbba9';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
   }else{
     ctx.fillStyle='#7d8290';
     ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
@@ -4671,10 +4712,10 @@ function drawNpc(sx,sy,n){
     ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(8,-26);ctx.stroke();
   }
   const puls=0.6+Math.sin(time*3)*0.4;
-  ctx.fillStyle=`rgba(255,225,120,${puls})`;
+  ctx.fillStyle=isSoul?`rgba(190,215,235,${0.55+puls*0.3})`:`rgba(255,225,120,${puls})`;
   ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('!',0,-40);
-  ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';
+  ctx.fillText(isSoul?'…':'!',0,-40);
+  ctx.fillStyle=isSoul?'#d4dde5':'#ffe9a0';ctx.font='10px sans-serif';
   ctx.fillText(n.name,0,10);
   ctx.restore();
 }
