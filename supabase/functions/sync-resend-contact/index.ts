@@ -81,5 +81,18 @@ Deno.serve(async request => {
     return json({ error: 'Resend contact sync failed' }, 502)
   }
 
+  // 既存Contactを購読へ戻した場合も、更新情報Segmentへ確実に所属させる。
+  if (optedIn && resendSegmentId) {
+    const segmentResponse = await fetch(
+      `https://api.resend.com/contacts/${encodedEmail}/segments/${encodeURIComponent(resendSegmentId)}`,
+      { method: 'POST', headers },
+    )
+    if (!segmentResponse.ok && segmentResponse.status !== 409) {
+      const detail = await segmentResponse.text()
+      console.error('Resend segment sync failed', segmentResponse.status, detail)
+      return json({ error: 'Resend segment sync failed' }, 502)
+    }
+  }
+
   return json({ ok: true, subscribed: optedIn })
 })

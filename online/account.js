@@ -1,7 +1,7 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260721m';
-import { createWorldController } from './world.js?v=20260721m';
-import { createSocialController } from './social.js?v=20260721m';
+import { createPresenceController } from './presence.js?v=20260721n';
+import { createWorldController } from './world.js?v=20260721n';
+import { createSocialController } from './social.js?v=20260721n';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -434,6 +434,12 @@ async function loadAccountData() {
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;
+  if (state.profile) {
+    const lastSeenAt = new Date().toISOString();
+    state.profile.last_seen_at = lastSeenAt;
+    void state.client.from('profiles').update({ last_seen_at: lastSeenAt })
+      .eq('id', userId).then(() => {});
+  }
   bindLegacySaveIfSafe();
   syncOnlineControllers(state.session, state.profile);
   render();

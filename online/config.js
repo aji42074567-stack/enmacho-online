@@ -6,5 +6,6 @@ window.ENMA_ONLINE_CONFIG = {
   supabaseUrl: 'https://xdsbhayygewhychrapcj.supabase.co',
   supabasePublishableKey: 'sb_publishable_eR2B-UdqrTYt1yp7V-G5tQ_vYoFKaIj',
   resendSyncFunction: 'sync-resend-contact',
+  adminMailFunction: 'admin-newsletter',
   worldServerUrl: 'https://enmacho-world.aji42074567.workers.dev',
 };

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>閻魔庁 運営台帳</title>
+<style>
+  :root{
+    --bg:#07080b;--panel:#111015;--panel2:#17130e;--line:#3e3422;
+    --text:#e9dfc9;--muted:#958a75;--gold:#d3ab51;--red:#a83b2e;
+    --cyan:#70d5cf;--green:#79c998;--sans:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;
+    --serif:'Hiragino Mincho ProN','YuMincho','Yu Mincho',serif;
+  }
+  *{box-sizing:border-box}html{color-scheme:dark}body{margin:0;background:radial-gradient(circle at 50% -20%,#28200f 0,transparent 36%),var(--bg);color:var(--text);font:13px/1.7 var(--sans)}
+  button,input,textarea{font:inherit}button{cursor:pointer}a{color:inherit}
+  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;padding:14px clamp(16px,4vw,46px);border-bottom:1px solid #282116;background:rgba(7,8,11,.94);backdrop-filter:blur(14px)}
+  .brand{font:20px var(--serif);letter-spacing:.15em;color:var(--gold);text-decoration:none;white-space:nowrap}.brand small{font:8px var(--sans);letter-spacing:.35em;color:var(--muted)}
+  .live{display:flex;align-items:center;gap:7px;color:var(--cyan);font-size:10px;letter-spacing:.12em}.live i{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+  .head-user{margin-left:auto;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}.head-user b{color:var(--text)}
+  main{width:min(1280px,94vw);margin:0 auto;padding:34px 0 80px}.hidden{display:none!important}
+  h1{margin:0;font:clamp(25px,4vw,38px) var(--serif);letter-spacing:.12em}h2{margin:0;font:18px var(--serif);letter-spacing:.1em}h3{margin:0;font:15px var(--serif);color:var(--gold)}
+  .lead{margin:7px 0 26px;color:var(--muted)}.section{margin-top:28px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:12px}.section-head p{margin:0;color:var(--muted);font-size:11px}
+  .panel{border:1px solid var(--line);border-radius:8px;background:linear-gradient(145deg,rgba(23,19,14,.96),rgba(13,13,16,.97));box-shadow:0 18px 50px rgba(0,0,0,.22)}
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.metric{padding:18px 16px;min-height:108px}.metric span{display:block;color:var(--muted);font-size:10px;letter-spacing:.08em}.metric b{display:block;margin-top:9px;font:30px var(--serif);color:var(--gold)}.metric.online b{color:var(--cyan)}.metric small{color:#6f6656}
+  .grid2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:14px}.pad{padding:20px}
+  .btn{border:1px solid #65512d;border-radius:4px;padding:9px 15px;background:linear-gradient(#342a19,#201a11);color:var(--text)}.btn:hover{border-color:var(--gold)}.btn:disabled{opacity:.42;cursor:not-allowed}.btn.red{border-color:#7d352e;background:linear-gradient(#5d211c,#341512)}.btn.ghost{background:#0c0d10;border-color:#38342c}.btn.small{padding:6px 10px;font-size:11px}
+  .feedback{margin:14px 0 0;padding:10px 12px;border:1px solid #315f5c;background:#102322;color:#9ce4df;border-radius:4px}.feedback.error{border-color:#7f3b32;background:#271411;color:#efaaa2}
+  .auth{width:min(430px,92vw);margin:12vh auto;padding:30px}.auth .seal{width:55px;height:55px;border:2px solid var(--red);display:grid;place-items:center;margin:0 auto 18px;color:#db5b4d;font:26px var(--serif);transform:rotate(-3deg)}
+  .auth h1{text-align:center;font-size:24px}.auth p{text-align:center;color:var(--muted)}
+  label{display:block;color:#bdae90;font-size:11px;margin:12px 0 5px}input,textarea{width:100%;border:1px solid #4a402f;border-radius:4px;background:#090a0d;color:var(--text);padding:10px 11px;outline:none}input:focus,textarea:focus{border-color:var(--gold)}textarea{min-height:180px;resize:vertical;line-height:1.8}.form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.check{display:flex;align-items:center;gap:9px}.check input{width:auto}.danger-note{margin-top:9px;color:#ba746b;font-size:10px}
+  .online-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}.online-person{padding:10px;border:1px solid #302a20;background:#0d0e10}.online-person b{display:block}.online-person small{color:var(--muted)}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-right:6px}
+  .toolbar{display:flex;gap:8px}.toolbar input{min-width:240px}.table-wrap{overflow:auto}.users{width:100%;border-collapse:collapse;min-width:900px}.users th,.users td{padding:11px 12px;border-bottom:1px solid #2a251c;text-align:left;white-space:nowrap}.users th{position:sticky;top:0;background:#17130e;color:var(--muted);font-size:10px}.users td.name{color:var(--gold)}.yes{color:var(--green)}.no{color:#6f6656}
+  .mail-form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.mail-form .wide{grid-column:1/-1}.campaign-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}.campaign{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px;border:1px solid #332c21;background:#0c0d0f}.campaign b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.campaign small{color:var(--muted)}.status{display:inline-block;padding:2px 7px;border:1px solid #4a402f;border-radius:10px;color:var(--muted);font-size:9px}.status.submitted{color:var(--green);border-color:#315942}.status.failed{color:#e28e83;border-color:#713a33}.status.sending{color:var(--cyan);border-color:#33615e}
+  .empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #3b3326}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  @media(max-width:1050px){.metrics{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
+  @media(max-width:620px){header{gap:10px}.brand{font-size:16px}.brand small{display:none}.head-user span{display:none}main{width:92vw;padding-top:24px}.metrics{grid-template-columns:repeat(2,1fr)}.metric{min-height:92px;padding:14px}.metric b{font-size:25px}.mail-form{grid-template-columns:1fr}.mail-form .wide{grid-column:auto}.toolbar{width:100%}.toolbar input{min-width:0}.online-list{grid-template-columns:1fr}.pad{padding:16px}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="./">閻魔庁 <small>ADMIN</small></a>
+  <div class="live"><i></i><span>運営台帳</span></div>
+  <div class="head-user hidden" id="headUser"><span>管理者 </span><b id="adminEmail"></b></div>
+  <button class="btn ghost small hidden" id="logoutBtn" type="button">ログアウト</button>
+</header>
+
+<main>
+  <section class="auth panel" id="authPanel">
+    <div class="seal">閻</div>
+    <h1>運営台帳へ入る</h1>
+    <p>管理者として登録された魂籍だけが入れます。</p>
+    <form id="loginForm">
+      <label for="loginEmail">メールアドレス</label>
+      <input id="loginEmail" name="email" type="email" autocomplete="email" required>
+      <label for="loginPassword">パスワード</label>
+      <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+      <button class="btn" style="width:100%;margin-top:18px" type="submit">管理者照合</button>
+    </form>
+    <div id="authFeedback"></div>
+  </section>
+
+  <section class="hidden" id="forbiddenPanel">
+    <div class="auth panel"><div class="seal">否</div><h1>閲覧権限がありません</h1><p>この魂籍は管理者として登録されていません。</p></div>
+  </section>
+
+  <div class="hidden" id="adminApp">
+    <h1>運営状況</h1>
+    <p class="lead">魂籍、現世接続、更新情報メールを一つの台帳で確認します。</p>
+    <div class="metrics" id="metrics"></div>
+    <div id="globalFeedback"></div>
+
+    <section class="section">
+      <div class="section-head"><div><h2>現在の同時接続</h2><p>ゲームを開いているログイン済みプレイヤーをリアルタイム集計</p></div><button class="btn ghost small" id="refreshBtn">更新</button></div>
+      <div class="panel pad"><div id="onlineSummary"></div><div class="online-list" id="onlineList"></div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><h2>登録者一覧</h2><p>メールアドレスは運営管理のため、この画面だけに表示</p></div><form class="toolbar" id="userSearchForm"><input id="userSearch" placeholder="魂名・魂籍番号・メールで検索"><button class="btn small">検索</button></form></div>
+      <div class="panel table-wrap"><table class="users"><thead><tr><th>魂名</th><th>魂籍番号</th><th>メール</th><th>徳位</th><th>身分</th><th>配信</th><th>登録日</th><th>最終接続</th></tr></thead><tbody id="userRows"></tbody></table></div>
+    </section>
+
+    <section class="section grid2">
+      <div>
+        <div class="section-head"><div><h2>メール配信設定</h2><p>Resend更新情報Segmentへの配信元と安全装置</p></div></div>
+        <div class="panel pad">
+          <form id="mailSettingsForm" class="mail-form">
+            <div><label>差出人名</label><input name="from_name" maxlength="60" required></div>
+            <div><label>差出人メール</label><input name="from_email" type="email" required></div>
+            <div class="wide"><label>テスト送信先</label><input name="test_recipient" type="email" required></div>
+            <label class="check wide"><input name="delivery_enabled" type="checkbox">本配信を許可する</label>
+            <div class="form-actions wide"><button class="btn" type="submit">設定を保存</button><button class="btn ghost" id="syncAudienceBtn" type="button">配信対象をResendへ同期</button></div>
+          </form>
+          <p class="danger-note">本配信はここを有効にしたうえで、配信画面でも確認文字の入力が必要です。</p>
+          <div id="settingsFeedback"></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-head"><div><h2>配信履歴</h2><p>下書きとResendへの送信記録</p></div><button class="btn small" id="newCampaignBtn">新規</button></div>
+        <div class="panel pad"><div class="campaign-list" id="campaignList"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><h2>配信原稿</h2><p>受信を希望した登録者だけが対象です</p></div></div>
+      <div class="panel pad">
+        <form id="campaignForm">
+          <input name="id" type="hidden">
+          <div class="mail-form">
+            <div><label>管理用タイトル</label><input name="name" maxlength="80" required placeholder="例：第一章公開のお知らせ"></div>
+            <div><label>メール件名</label><input name="subject" maxlength="120" required placeholder="例：閻魔庁ONLINE 第一章公開"></div>
+            <div class="wide"><label>本文</label><textarea name="body_text" maxlength="20000" required placeholder="更新内容を書いてください。段落と改行はメールにも反映されます。"></textarea></div>
+          </div>
+          <div class="form-actions"><button class="btn" type="submit">下書きを保存</button><button class="btn ghost" id="testCampaignBtn" type="button">テスト送信</button><button class="btn red" id="sendCampaignBtn" type="button">希望者へ本配信</button></div>
+        </form>
+        <div id="campaignFeedback"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="online/config.js?v=20260721n"></script>
+<script src="online/vendor/supabase.min.js"></script>
+<script type="module" src="online/admin.js?v=20260721n"></script>
+</body>
+</html>

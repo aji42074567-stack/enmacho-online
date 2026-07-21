@@ -2,3 +2,7 @@
 # The function validates the caller with supabase.auth.getUser().
 # Legacy JWT verification would reject newer publishable-key auth flows.
 verify_jwt = false
+
+[functions.admin-newsletter]
+# The function validates the user JWT itself and separately checks admin_users.
+verify_jwt = false

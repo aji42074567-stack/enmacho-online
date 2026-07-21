@@ -42,6 +42,7 @@ window.ENMA_ONLINE_CONFIG = {
   supabaseUrl: 'https://PROJECT_REF.supabase.co',
   supabasePublishableKey: 'sb_publishable_...',
   resendSyncFunction: 'sync-resend-contact',
+  adminMailFunction: 'admin-newsletter',
   worldServerUrl: 'https://enmacho-world.SUBDOMAIN.workers.dev',
 };
 ```
@@ -61,6 +62,7 @@ window.ENMA_ONLINE_CONFIG = {
 supabase secrets set RESEND_API_KEY=re_xxx
 supabase secrets set RESEND_SEGMENT_ID=segment_xxx
 supabase functions deploy sync-resend-contact
+supabase functions deploy admin-newsletter
 ```
 
 Edge Function用とSMTP用のAPIキーは分離する。
@@ -91,6 +93,9 @@ Edge Function用とSMTP用のAPIキーは分離する。
 - `friendships`: フレンド申請と承認状態
 - `blocks`: ブロック関係
 - `nearby_chat_messages`: 画面内吹き出しチャットの履歴
+- `admin_users`: 管理画面へ入れる魂籍（一般ユーザーからは非公開）
+- `admin_email_settings`: 配信元・テスト送信先・本配信の安全装置
+- `email_campaigns`: メール原稿とResend受付履歴
 
 吹き出しチャットは1通50文字、1秒1通、1分20通まで。
 履歴の保存期間は7日を想定し、定期処理から
@@ -116,3 +121,26 @@ npx wrangler deploy
 
 `wrangler.jsonc`のSupabase値は公開可能なProject URLとPublishable keyだけを置く。
 `service_role`やSecret keyは置かない。
+
+## 7. 運営台帳
+
+管理画面は `https://enmacho.com/admin.html`。管理者も通常の魂籍でログインし、
+`admin_users`に登録されたUUIDだけが統計・登録者メール・配信設定を閲覧できる。
+
+初回だけSQL Editorで管理者を登録する（メールアドレスはリポジトリへ保存しない）。
+
+```sql
+insert into public.admin_users (user_id)
+select id from auth.users where email = '管理者の魂籍メールアドレス'
+on conflict (user_id) do nothing;
+```
+
+管理画面では以下を扱う。
+
+- 登録魂籍数、24時間の新規・接続、クラウド保存数、メール希望者数
+- `game:zone:world` Presenceを使った現在の接続人数・端末数・居場所
+- 魂名、魂籍番号、メール、徳位、身分、配信希望、最終接続の一覧と検索
+- 差出人、テスト送信先、本配信許可、Resend Segment再同期
+- 配信下書き、テスト送信、二段階確認つきの希望者向け本配信
+
+秘密鍵はEdge Function内の環境変数だけで利用し、`admin.html`には公開しない。
