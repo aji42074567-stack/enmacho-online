@@ -9,6 +9,7 @@ const state = {
   session: null,
   stats: {},
   users: [],
+  feedbackRows: [],
   settings: null,
   campaigns: [],
   presence: null,
@@ -264,6 +265,57 @@ async function loadUsers(search = '') {
   ).join('') : '<tr><td colspan="8"><div class="empty">該当する登録者はいません</div></td></tr>';
 }
 
+const fbStatusLabel = status => ({
+  new: '新着', replied: '返礼済み', archived: '保管',
+}[status] || status);
+
+function renderFeedbackRows() {
+  const rows = state.feedbackRows;
+  const open = rows.filter(row => row.status === 'new').length;
+  const guide = 'お礼は送信者のゲーム内「縁」タブへ手紙で届きます';
+  $('feedbackSummary').textContent = rows.length
+    ? `未対応 ${open}件 / 全${rows.length}件。${guide}`
+    : `ゲーム内の目安箱に投書された意見・要望。${guide}`;
+  $('feedbackList').innerHTML = rows.length ? rows.map(row => {
+    const name = row.display_name || row.soul_name || '名無しの魂';
+    const replied = row.status === 'replied';
+    const readState = !replied ? '' : row.reply_read_at ? '・相手は既読' : '・相手は未読';
+    return `<div class="fb-item">
+      <div class="fb-head"><b>${esc(name)}</b><small class="mono">${esc(row.soul_code || '')}</small>
+        <span class="status ${replied ? 'submitted' : ''}">${esc(fbStatusLabel(row.status))}${esc(readState)}</span>
+        <small>${esc(dateText(row.created_at))}</small></div>
+      <div class="fb-body">${esc(row.body)}</div>
+      <div class="fb-reply">
+        <textarea data-fb-text="${esc(row.id)}" maxlength="500"
+          placeholder="お礼・返事を書く">${replied ? esc(row.reply_body || '') : ''}</textarea>
+        <div class="fb-actions"><button class="btn small" data-fb-send="${esc(row.id)}">${
+          replied ? 'お礼を書き直して送る（相手は未読に戻ります）' : 'お礼を送る'}</button></div>
+      </div></div>`;
+  }).join('') : '<div class="empty">投書はまだありません</div>';
+  for (const button of $('feedbackList').querySelectorAll('[data-fb-send]')) {
+    button.addEventListener('click', () => void runBusy(async () => {
+      const id = button.dataset.fbSend;
+      const textarea = $('feedbackList').querySelector(`[data-fb-text="${CSS.escape(id)}"]`);
+      const body = String(textarea?.value || '').trim();
+      if (!body) throw new Error('お礼の本文を入力してください');
+      const { error } = await state.client.rpc('admin_reply_feedback', { p_id: id, p_body: body });
+      if (error) throw error;
+      await loadFeedbackRows();
+      feedback('feedbackBoxFeedback', 'お礼を送りました。相手のゲーム内へ手紙として届きます');
+    }, 'feedbackBoxFeedback'));
+  }
+}
+
+async function loadFeedbackRows() {
+  const { data, error } = await state.client.rpc('admin_list_feedback', {
+    p_limit: 100,
+    p_offset: 0,
+  });
+  if (error) throw error;
+  state.feedbackRows = data || [];
+  renderFeedbackRows();
+}
+
 async function loadSettings() {
   const { data, error } = await state.client.from('admin_email_settings')
     .select('*').eq('id', 1).single();
@@ -364,7 +416,7 @@ async function invokeNewsletter(body) {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStats(), loadUsers($('userSearch').value.trim()), loadSettings(), loadCampaigns(), loadSystemHealth()]);
+  await Promise.all([loadStats(), loadUsers($('userSearch').value.trim()), loadFeedbackRows(), loadSettings(), loadCampaigns(), loadSystemHealth()]);
   renderOnline();
 }
 
@@ -406,6 +458,7 @@ $('logoutBtn').addEventListener('click', () => void runBusy(async () => {
 
 $('refreshBtn').addEventListener('click', () => void runBusy(refreshAll));
 $('refreshSystemBtn').addEventListener('click', () => void runBusy(loadSystemHealth));
+$('refreshFeedbackBtn').addEventListener('click', () => void runBusy(loadFeedbackRows, 'feedbackBoxFeedback'));
 $('userSearchForm').addEventListener('submit', event => {
   event.preventDefault();
   void runBusy(() => loadUsers($('userSearch').value.trim()));

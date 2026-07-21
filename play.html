@@ -616,6 +616,13 @@
     border:1px solid var(--panel-edge);border-radius:3px;font:12px/1.6 var(--sans)}
   .social-compose-foot{display:flex;align-items:center;justify-content:space-between;
     gap:8px;margin-top:7px;color:var(--dim);font:9.5px var(--sans)}
+  #suggestBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
+  #suggestBody .suggest-note.thanks{color:#ffe9b8;font-family:var(--serif);font-size:13px;text-align:center;padding:14px 0}
+  #suggestBody textarea{width:100%;box-sizing:border-box;background:#0d0c10;color:#e8dcc0;border:1px solid #3e3422;
+    border-radius:6px;padding:10px;font:13px/1.6 var(--sans);resize:vertical;outline:none}
+  #suggestBody textarea:focus{border-color:#8a7448}
+  #suggestBody .suggest-actions{display:flex;gap:10px;align-items:center;margin:10px 0 4px}
+  #suggestBody .suggest-actions span{color:#c9b489;font-size:11px}
   .mail-body{margin-top:5px;color:#cfc2a0;font:11px/1.65 var(--sans);white-space:pre-wrap;
     overflow-wrap:anywhere}
   #doll{position:relative;width:272px;height:252px;margin:0 auto 12px}
@@ -981,6 +988,15 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="suggest">
+    <div class="scroll">
+      <h2>目安箱</h2>
+      <div class="sub">ご意見・ご要望をお聞かせください</div>
+      <div id="suggestBody"></div>
+      <button class="btn small" id="suggestClose">立ち去る</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="equip">
     <div class="scroll">
       <h2>メニュー</h2>
@@ -1312,6 +1328,7 @@ let npcs=[
   {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
   {x:34.4,y:42.2,kind:'board',name:'高札'},       // 閻魔庁の東を回る北門通り
+  {x:36.4,y:43.2,kind:'suggest',name:'目安箱'},   // 高札の隣。意見・要望の投書箱
 ];
 
 /* ---- 町を囲う柵と門 ---- */
@@ -2650,6 +2667,36 @@ function renderTavern(){
 }
 
 /* ---- 高札(クエスト掲示板) ---- */
+let suggestSentAt=0;   // 目安箱の連投防止(60秒)
+function renderSuggest(){
+  const host=$('suggestBody');
+  if(!socialState.online){
+    host.innerHTML='<div class="suggest-note">投書には魂籍(アカウント)の登録・ログインが必要です。<br>'
+      +'画面右上の「魂籍」から手続きすると、開発者からのお礼も手紙で受け取れます。</div>';
+    return;
+  }
+  host.innerHTML='<div class="suggest-note">遊んで気づいたこと、欲しい機能、困りごと——どんな声でも構いません。<br>'
+    +'良き声には、閻魔庁(開発者)からお礼の手紙が届くことがあります。</div>'
+    +'<textarea id="suggestText" maxlength="500" rows="6" placeholder="ここに書いて「投書する」を押してください(500文字まで)"></textarea>'
+    +'<div class="suggest-actions"><button class="btn small" id="suggestSend">投書する</button><span id="suggestMsg"></span></div>';
+  $('suggestSend').addEventListener('click',async()=>{
+    const ta=$('suggestText'),btn=$('suggestSend'),msg=$('suggestMsg');
+    const text=(ta.value||'').trim();
+    if(!text){msg.textContent='内容を入力してください';return;}
+    if(suggestSentAt>0&&time-suggestSentAt<60){msg.textContent='続けての投書は、少し間を置いてからどうぞ';return;}
+    btn.disabled=true;msg.textContent='届けています…';
+    try{
+      await window.EnmaSocialClient?.submitFeedback?.(text,player.name);
+      suggestSentAt=time;
+      host.innerHTML='<div class="suggest-note thanks">投書は、確かに閻魔庁へ届けられた。<br><br>'
+        +'「貴重な声、痛み入る。<br>　より良き冥府のため、必ず役立てる」<br><br>――閻魔庁 目安箱係</div>';
+      log('目安箱に投書した','gain');
+      sfx.coin();
+    }catch(e){
+      btn.disabled=false;msg.textContent=e?.message||'送信に失敗しました';
+    }
+  });
+}
 function renderBoard(){
   let html='';
   for(const q of QUESTS){
@@ -3011,6 +3058,7 @@ function openNpc(npc){
   }
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
+  else if(npc.kind==='suggest'){renderSuggest();$('suggest').classList.remove('hidden');}
   else if(npc.kind==='guest'){
     setTalkPortrait('guest');
     $('talkTitle').textContent='カズー';
@@ -3059,6 +3107,7 @@ $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
 $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
+$('suggestClose').addEventListener('click',()=>$('suggest').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>{
   $('talk').classList.add('hidden');
   if(pendingChapterEnd)showChapterEnd();
@@ -4828,6 +4877,20 @@ function drawHouse(sx,sy,p){
   }
   ctx.restore();
 }
+function drawSuggestBox(sx,sy){
+  drawShadow(sx,sy+3,14);
+  ctx.save();ctx.translate(sx,sy);
+  // 柱の上に木箱+投入口。江戸の目安箱風
+  ctx.fillStyle='#4a3a26';ctx.fillRect(-3,-24,6,26);
+  ctx.fillStyle='#8a7448';ctx.fillRect(-15,-42,30,19);
+  ctx.strokeStyle='#5d4a30';ctx.lineWidth=1.5;ctx.strokeRect(-15,-42,30,19);
+  ctx.fillStyle='#6d5a38';ctx.fillRect(-17,-45,34,5);   // ふた
+  ctx.fillStyle='#241b12';ctx.fillRect(-8,-41.5,16,2.5);  // 投入口
+  ctx.fillStyle='#e8dcb8';ctx.fillRect(-6,-37,12,11);     // 「意」の札
+  ctx.fillStyle='#5a3a1a';ctx.font='9px serif';ctx.textAlign='center';
+  ctx.fillText('意',0,-28.5);
+  ctx.restore();
+}
 function drawKosatsu(sx,sy){
   const img=SPRITES.map_kosatsu;
   const w=84,h=img?w*img.height/img.width:0;
@@ -5105,6 +5168,7 @@ function drawGate(sx,sy,p){
 const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith:'npc_kanayama',guest:'npc_kazu',enma:'npc_enma'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
+  if(n.kind==='suggest'){drawSuggestBox(sx,sy);return;}
   const isSoul=n.kind==='soul';
   const img=SPRITES[n.sprite||NPC_SPRITE[n.kind]];
   if(img){
@@ -6899,6 +6963,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721p"></script>
+<script type="module" src="online/account.js?v=20260721q"></script>
 </body>
 </html>

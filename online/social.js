@@ -65,6 +65,15 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
         .limit(50);
       const mail = mailResult.error ? [] : (mailResult.data || []);
 
+      // 目安箱への開発者返礼も「手紙」として合流させる(RLSで自分の投書だけ返る)
+      const feedbackResult = await client
+        .from('feedback_box')
+        .select('id,body,reply_body,replied_at,reply_read_at')
+        .not('reply_body', 'is', null)
+        .order('replied_at', { ascending: false })
+        .limit(20);
+      const devReplies = feedbackResult.error ? [] : (feedbackResult.data || []);
+
       const peerIds = friendships.map(row => (
         row.requester_id === ownId ? row.addressee_id : row.requester_id
       ));
@@ -88,12 +97,8 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
         else if (row.status === 'pending') outgoing.push(peer);
       }
 
-      const state = {
-        online: true,
-        friends,
-        incoming,
-        outgoing,
-        mail: mail.map(row => ({
+      const mailItems = [
+        ...mail.map(row => ({
           id: row.id,
           senderId: row.sender_id,
           senderName: profiles.get(row.sender_id) || 'ナナシ',
@@ -101,6 +106,25 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
           createdAt: row.created_at,
           readAt: row.read_at,
         })),
+        ...devReplies.map(row => ({
+          id: `fb-${row.id}`,
+          senderId: '',
+          senderName: '閻魔庁',
+          body: `${String(row.reply_body || '').slice(0, 500)}\n――目安箱への投書「${
+            String(row.body || '').replace(/\s+/g, ' ').slice(0, 24)}${
+            String(row.body || '').length > 24 ? '…' : ''}」への返礼`,
+          createdAt: row.replied_at,
+          readAt: row.reply_read_at,
+          dev: true,
+        })),
+      ].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+
+      const state = {
+        online: true,
+        friends,
+        incoming,
+        outgoing,
+        mail: mailItems,
         error: mailResult.error ? '手紙台帳を読み込めませんでした' : '',
       };
       bridge?.syncSocialState?.(state);
@@ -203,6 +227,19 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
   }
 
   async function markMailRead(mailId) {
+    // 目安箱の返礼(fb-〜)は feedback_box 側の既読を更新する
+    if (String(mailId || '').startsWith('fb-')) {
+      const feedbackId = cleanId(String(mailId).slice(3));
+      if (!userId() || !VALID_ID.test(feedbackId)) return;
+      const { error } = await client
+        .from('feedback_box')
+        .update({ reply_read_at: new Date().toISOString() })
+        .eq('id', feedbackId)
+        .eq('user_id', userId());
+      if (error) throw error;
+      await refresh();
+      return;
+    }
     if (!userId() || !VALID_ID.test(cleanId(mailId))) return;
     const { error } = await client
       .from('soul_mail')
@@ -211,6 +248,20 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
       .eq('recipient_id', userId());
     if (error) throw error;
     await refresh();
+  }
+
+  async function submitFeedback(rawBody, rawName) {
+    const ownId = userId();
+    if (!ownId) throw new Error('目安箱への投書には魂籍ログインが必要です');
+    const body = String(rawBody || '').replace(/\r\n?/g, '\n').trim().slice(0, 500);
+    if (!body) throw new Error('投書の内容を入力してください');
+    const { error } = await client.from('feedback_box').insert({
+      user_id: ownId,
+      soul_name: cleanName(rawName),
+      body,
+    });
+    if (error) throw error;
+    return true;
   }
 
   async function setAccount(nextSession) {
@@ -244,6 +295,7 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
     removeFriend,
     sendMail,
     markMailRead,
+    submitFeedback,
     stop,
   };
 }

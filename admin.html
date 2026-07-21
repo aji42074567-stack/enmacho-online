@@ -34,6 +34,7 @@
   .system-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.system-card{padding:14px;border:1px solid #302a20;background:#0d0e10}.system-card span{display:block;color:var(--muted);font-size:10px}.system-card b{display:block;margin:5px 0 2px;font:17px var(--serif)}.system-card small{color:#756b5a}.system-card.ok b{color:var(--green)}.system-card.warn b{color:#e0b260}.system-card.down b{color:#e57d72}.system-alert{margin-bottom:12px;padding:11px 13px;border:1px solid #315942;background:#102019;color:#9dd9b2;border-radius:4px}.system-alert.warn{border-color:#72562b;background:#2a2110;color:#e8c780}.system-alert.down{border-color:#7f3b32;background:#271411;color:#efaaa2}.event-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 8px}.event-head span{color:var(--muted);font-size:10px}.event-list{display:flex;flex-direction:column;gap:7px}.event{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 11px;border:1px solid #302a20;background:#0b0c0e}.event-level{min-width:44px;text-align:center;padding:2px 6px;border:1px solid #6b5129;border-radius:10px;color:#e0b260;font-size:9px}.event.error .event-level,.event.critical .event-level{border-color:#713a33;color:#e28e83}.event b{display:block;font-size:12px}.event small{display:block;color:var(--muted)}.event time{white-space:nowrap;color:#756b5a;font-size:9px}
   .toolbar{display:flex;gap:8px}.toolbar input{min-width:240px}.table-wrap{overflow:auto}.users{width:100%;border-collapse:collapse;min-width:900px}.users th,.users td{padding:11px 12px;border-bottom:1px solid #2a251c;text-align:left;white-space:nowrap}.users th{position:sticky;top:0;background:#17130e;color:var(--muted);font-size:10px}.users td.name{color:var(--gold)}.yes{color:var(--green)}.no{color:#6f6656}
   .mail-form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.mail-form .wide{grid-column:1/-1}.campaign-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}.campaign{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px;border:1px solid #332c21;background:#0c0d0f}.campaign b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.campaign small{color:var(--muted)}.status{display:inline-block;padding:2px 7px;border:1px solid #4a402f;border-radius:10px;color:var(--muted);font-size:9px}.status.submitted{color:var(--green);border-color:#315942}.status.failed{color:#e28e83;border-color:#713a33}.status.sending{color:var(--cyan);border-color:#33615e}
+  .fb-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}.fb-item{border:1px solid #302a20;background:#0b0c0e;padding:13px 14px}.fb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fb-head b{color:var(--gold)}.fb-head small{color:var(--muted)}.fb-body{margin:9px 0 0;white-space:pre-wrap;line-height:1.75;color:#d8cdb4}.fb-reply{margin-top:11px;border-top:1px dashed #3b3326;padding-top:11px}.fb-reply textarea{min-height:64px}.fb-actions{display:flex;gap:8px;align-items:center;margin-top:8px}
   .empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #3b3326}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
   @media(max-width:1050px){.metrics{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
   @media(max-width:620px){header{gap:10px}.brand{font-size:16px}.brand small{display:none}.head-user span{display:none}main{width:92vw;padding-top:24px}.metrics{grid-template-columns:repeat(2,1fr)}.metric{min-height:92px;padding:14px}.metric b{font-size:25px}.mail-form{grid-template-columns:1fr}.mail-form .wide{grid-column:auto}.toolbar{width:100%}.toolbar input{min-width:0}.online-list,.system-grid{grid-template-columns:1fr}.event{grid-template-columns:auto minmax(0,1fr)}.event time{grid-column:2}.pad{padding:16px}}
@@ -92,6 +93,11 @@
       <div class="panel table-wrap"><table class="users"><thead><tr><th>魂名</th><th>魂籍番号</th><th>メール</th><th>徳位</th><th>身分</th><th>配信</th><th>登録日</th><th>最終接続</th></tr></thead><tbody id="userRows"></tbody></table></div>
     </section>
 
+    <section class="section">
+      <div class="section-head"><div><h2>目安箱</h2><p id="feedbackSummary">ゲーム内の目安箱に投書された意見・要望。お礼は送信者のゲーム内「縁」タブへ手紙で届きます</p></div><button class="btn ghost small" id="refreshFeedbackBtn">更新</button></div>
+      <div class="panel pad"><div id="feedbackBoxFeedback"></div><div class="fb-list" id="feedbackList"></div></div>
+    </section>
+
     <section class="section grid2">
       <div>
         <div class="section-head"><div><h2>メール配信設定</h2><p>Resend更新情報Segmentへの配信元と安全装置</p></div></div>
@@ -133,6 +139,6 @@
 
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/admin.js?v=20260721o"></script>
+<script type="module" src="online/admin.js?v=20260721p"></script>
 </body>
 </html>
