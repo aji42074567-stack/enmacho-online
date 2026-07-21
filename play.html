@@ -1547,6 +1547,7 @@ const player={
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
   combatT:0,
   autoMode:false,
+  moveHold:false,   // AUTO中でも、クリック移動が終わるまで索敵を待たせる
   hitT:0,attackT:0,attackDur:0,pendingHit:null,attackSeq:0,attackKind:'melee',
   actionTargetX:SPAWN.x,actionTargetY:SPAWN.y,
   dead:false,face:1,dir:'down',moving:false,gender:'m'
@@ -2909,7 +2910,9 @@ function update(dt){
         toggleGate(g);
       }
     }
-    if(player.autoMode&&!player.target&&!player.talkTarget&&!player.gateTarget){
+    if(player.moveHold&&!player.path.length)player.moveHold=false;  // 指示地点に到着
+    if(player.autoMode&&!player.moveHold
+      &&!player.target&&!player.talkTarget&&!player.gateTarget){
       let best=null,bd=AUTO_RANGE;
       for(const m of mobs){
         if(m.dead)continue;
@@ -5137,6 +5140,7 @@ canvas.addEventListener('pointerdown',ev=>{
   }
   if(hit){
     player.target=hit;player.talkTarget=null;player.repath=0;
+    player.moveHold=false;
     sfx.click();
     return;
   }
@@ -5159,6 +5163,7 @@ canvas.addEventListener('pointerdown',ev=>{
   if(!t)return;
   player.target=null;player.talkTarget=null;
   player.path=findPath(player.x,player.y,t.x,t.y);
+  player.moveHold=player.path.length>0;  // AUTO中でもクリック移動を優先
   clickMark={x:t.x,y:t.y,age:0};
 });
 /* ================= チャット ================= */
