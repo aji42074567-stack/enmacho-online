@@ -33,7 +33,7 @@ create table if not exists public.admin_email_settings (
   id smallint primary key default 1 check (id = 1),
   from_name text not null default '閻魔庁ONLINE'
     check (char_length(from_name) between 1 and 60),
-  from_email text not null default 'noreply@notify.mkrainbowshiva.com'
+  from_email text not null default 'noreply@notify.enmacho.com'
     check (char_length(from_email) between 3 and 254 and position('@' in from_email) > 1),
   test_recipient text not null default 'enmacho.online@gmail.com'
     check (char_length(test_recipient) between 3 and 254 and position('@' in test_recipient) > 1),
