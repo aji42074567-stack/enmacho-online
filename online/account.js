@@ -1,7 +1,8 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260721n';
-import { createWorldController } from './world.js?v=20260721p';
-import { createSocialController } from './social.js?v=20260721p';
+import { createPresenceController } from './presence.js?v=20260722b';
+import { createWorldController } from './world.js?v=20260722b';
+import { createSocialController } from './social.js?v=20260722b';
+import { createGuildController } from './guild.js?v=20260722b';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -43,6 +44,7 @@ let accountLoadRevision = 0;
 let presenceController = null;
 let worldController = null;
 let socialController = null;
+let guildController = null;
 let cloudSaveTimer = 0;
 let cloudSaveInFlight = false;
 let cloudSaveQueued = false;
@@ -99,6 +101,7 @@ function syncOnlineControllers(session, profile) {
     presenceController?.setAccount(session, profile),
     worldController?.setAccount(session, profile),
     socialController?.setAccount(session, profile),
+    guildController?.setAccount(session, profile),
   ]).catch(() => {});
 }
 
@@ -909,8 +912,10 @@ async function initialize(attempt = 0) {
     presenceController = createPresenceController(state.client);
     worldController = createWorldController(config);
     socialController = createSocialController(state.client);
+    guildController = createGuildController(state.client);
     window.EnmaWorldClient = worldController;
     window.EnmaSocialClient = socialController;
+    window.EnmaGuildClient = guildController;
     const { data, error } = await state.client.auth.getSession();
     if (error) throw error;
     state.session = data.session;
@@ -934,11 +939,14 @@ async function initialize(attempt = 0) {
     try { await presenceController?.stop?.(); } catch {}
     try { worldController?.stop?.(); } catch {}
     try { await socialController?.stop?.(); } catch {}
+    try { await guildController?.stop?.(); } catch {}
     presenceController = null;
     worldController = null;
     socialController = null;
+    guildController = null;
     window.EnmaWorldClient = null;
     window.EnmaSocialClient = null;
+    window.EnmaGuildClient = null;
     state.client = null;
     setFeedback('', `魂籍台帳へ接続できません：${error?.message || '通信エラー'}`);
     content.innerHTML = `<p class="account-lead">魂籍台帳へ接続できませんでした。</p>${feedbackHtml()}

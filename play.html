@@ -631,13 +631,14 @@
     border:1px solid var(--panel-edge);border-radius:3px;font:12px/1.6 var(--sans)}
   .social-compose-foot{display:flex;align-items:center;justify-content:space-between;
     gap:8px;margin-top:7px;color:var(--dim);font:9.5px var(--sans)}
-  #suggestBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
+  #suggestBody .suggest-note,#kesshaBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
   #suggestBody .suggest-note.thanks{color:#ffe9b8;font-family:var(--serif);font-size:13px;text-align:center;padding:14px 0}
+  #kesshaBody .suggest-note b{color:#ffe9b8}
   #suggestBody textarea{width:100%;box-sizing:border-box;background:#0d0c10;color:#e8dcc0;border:1px solid #3e3422;
     border-radius:6px;padding:10px;font:13px/1.6 var(--sans);resize:vertical;outline:none}
   #suggestBody textarea:focus{border-color:#8a7448}
-  #suggestBody .suggest-actions{display:flex;gap:10px;align-items:center;margin:10px 0 4px}
-  #suggestBody .suggest-actions span{color:#c9b489;font-size:11px}
+  #suggestBody .suggest-actions,#kesshaBody .suggest-actions{display:flex;gap:10px;align-items:center;margin:10px 0 4px}
+  #suggestBody .suggest-actions span,#kesshaBody .suggest-actions span{color:#c9b489;font-size:11px}
   .mail-body{margin-top:5px;color:#cfc2a0;font:11px/1.65 var(--sans);white-space:pre-wrap;
     overflow-wrap:anywhere}
   #doll{position:relative;width:272px;height:252px;margin:0 auto 12px}
@@ -773,6 +774,7 @@
         <button class="chatTab" data-ch="world" role="tab">全体</button>
         <button class="chatTab" data-ch="friend" role="tab">フレンド</button>
         <button class="chatTab" data-ch="team" role="tab">チーム</button>
+        <button class="chatTab" data-ch="guild" role="tab">講</button>
         <button class="chatTab" data-ch="log" role="tab">ログ</button>
         <button id="chatClose" aria-label="チャットを閉じる">✕</button>
       </div>
@@ -814,6 +816,7 @@
     <div class="pc-actions">
       <button id="pcTeamBtn">チームに誘う</button>
       <button id="pcFriendBtn">フレンド申請</button>
+      <button id="pcGuildBtn" hidden>講に勧誘</button>
     </div>
     <p id="pcHint" class="pc-hint" hidden></p>
   </div>
@@ -1009,6 +1012,15 @@
       <div class="sub">ご意見・ご要望をお聞かせください</div>
       <div id="suggestBody"></div>
       <button class="btn small" id="suggestClose">立ち去る</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="kessha">
+    <div class="scroll">
+      <h2>結社係 ムスビ</h2>
+      <div class="sub">講(亡者の相互扶助結社)の記帳窓口</div>
+      <div id="kesshaBody"></div>
+      <button class="btn small" id="kesshaClose">窓口を離れる</button>
     </div>
   </div>
 
@@ -1475,6 +1487,7 @@ const QUESTS=[
   {id:'q_inugami',name:'イヌガミの群れ',  desc:'森のイヌガミを5体成仏させる',      type:'kill', mob:['wolf'], n:5, rw:{gold:150,xp:90}},
   {id:'q_akki',   name:'アッキ討伐',      desc:'森の奥のアッキを3体成仏させる',    type:'kill', mob:['orc'], n:3, rw:{gold:220,xp:160}},
   {id:'q_muen',   name:'無縁塚の骨鎮め',  desc:'南西の無縁塚でシラホネを5体成仏させる',type:'kill', mob:['shira_bone'], n:5, rw:{gold:400,xp:600}},
+  {id:'q_kou',    name:'講の噂',          desc:'閻魔庁一階の結社係ムスビを訪ね、講の話を聞く',type:'talk', mob:['kessha'], n:1, rw:{gold:200,xp:150}},
   {id:'q_gashao', name:'骨の王の鎮魂',    desc:'無縁塚の最深部で骨の王ガシャオウを鎮める',type:'kill', mob:['gashao'], n:1, rw:{gold:1200,xp:2000,item:'kiyome_bukuro'}},
 ];
 const questById=id=>QUESTS.find(q=>q.id===id);
@@ -2178,7 +2191,7 @@ function questProgress(type,tag){
   if(!player.qb.active)return;
   const q=questById(player.qb.active);
   if(!q||q.type!==type)return;
-  if(type==='kill'&&!q.mob.includes(tag))return;
+  if((type==='kill'||type==='talk')&&!q.mob.includes(tag))return;
   player.qb.prog++;
   if(player.qb.prog>=q.n){
     completeQuest(q);
@@ -2697,6 +2710,53 @@ function renderTavern(){
 }
 
 /* ---- クエスト掲示板 ---- */
+function renderKessha(){
+  const host=$('kesshaBody');
+  const intro='<div class="suggest-note">「ここは結社の窓口。亡者同士が助け合う結社——<b>講</b>の記帳を担っております」<br>'
+    +'「講に入るのは、亡者の身分でもどなたでも。講の仲間とは離れていても言葉を交わせ、名の上に講名を戴けます」</div>';
+  if(guildState.id){
+    host.innerHTML=intro
+      +`<div class="suggest-note">「あなたは講【<b>${esc(guildState.name)}</b>】の${guildRoleLabel(guildState.myRole)}として記帳済み。`
+      +`講員は${guildState.members.length}名。……良き講あれかし」</div>`;
+    return;
+  }
+  if(!socialState.online){
+    host.innerHTML=intro
+      +'<div class="suggest-note">「講の記帳には<b>魂籍(アカウント)</b>が要ります。画面右上の「魂籍」からどうぞ」</div>';
+    return;
+  }
+  if(!player.story.dragonCleared){
+    host.innerHTML=intro
+      +'<div class="suggest-note">「講を立てられる(講元になれる)のは——<b>賽の森の業竜ゴウリュウを鎮めた御方だけ</b>。'
+      +'人を導くには、最後の門番を越えた証が要るのです」<br>'
+      +'「まずはどこかの講に入れてもらうのがよろしいかと。講の者に声をかけてもらえば、その場で記帳できます」</div>';
+    return;
+  }
+  host.innerHTML=intro
+    +'<div class="suggest-note">「……おお、業竜を鎮めし御方！ あなたには<b>結社願</b>を受理できます。'
+    +`講名と設立料<b>${GUILD_FOUND_COST.toLocaleString()}モン</b>を添えてご提出ください」</div>`
+    +'<input id="kesshaName" maxlength="12" placeholder="講名(2〜12文字。例: 骨鎮講)" '
+    +'style="width:100%;box-sizing:border-box;background:#0d0c10;color:#e8dcc0;border:1px solid #3e3422;border-radius:6px;padding:10px;font:13px var(--sans);outline:none">'
+    +`<div class="suggest-actions"><button class="btn small" id="kesshaFound">結社願を提出する(${GUILD_FOUND_COST.toLocaleString()}モン)</button><span id="kesshaMsg"></span></div>`;
+  $('kesshaFound').addEventListener('click',async()=>{
+    const name=($('kesshaName').value||'').replace(/\s+/g,' ').trim();
+    const btn=$('kesshaFound'),msg=$('kesshaMsg');
+    if(name.length<2||name.length>12){msg.textContent='講名は2〜12文字で';return;}
+    if(player.gold<GUILD_FOUND_COST){msg.textContent=`設立料が足りない(所持 ${player.gold}モン)`;return;}
+    btn.disabled=true;msg.textContent='記帳中…';
+    try{
+      await window.EnmaGuildClient?.createGuild?.(name);
+      player.gold-=GUILD_FOUND_COST;save();
+      banner={txt:`講【${name}】設立！`,age:0};
+      log(`講【${name}】を設立した！ あなたが講元だ`,'gain');
+      log('[系統] 群体形成を承認…相互学習係数を更新','glitch');
+      sfx.lvup();
+      renderKessha();
+    }catch(e){
+      btn.disabled=false;msg.textContent=e?.message||'受理できませんでした';
+    }
+  });
+}
 let suggestSentAt=0;   // 意見箱の連投防止(60秒)
 function renderSuggest(){
   const host=$('suggestBody');
@@ -2928,6 +2988,41 @@ function renderSocialTab(){
   }
   let html='';
   if(socialState.error)html+=`<div class="social-error">${esc(socialState.error)}</div>`;
+
+  /* ---- 講(ギルド) ---- */
+  html+=`<div class="social-section"><div class="social-head"><span>講</span>
+    <button class="buyb" data-guild-refresh ${socialBusy?'disabled':''}>更新</button></div>`;
+  if(guildState.error)html+=`<div class="social-error">${esc(guildState.error)}</div>`;
+  if(!guildState.id){
+    html+='<div class="social-empty">講に未加入。講の者から勧誘を受けるか、ゴウリュウを鎮めて閻魔庁一階の結社係を訪ねると自ら講を立てられる。</div>';
+  }else{
+    const isMaster=guildState.myRole==='master';
+    const canManage=isMaster||guildState.myRole==='officer';
+    html+=`<div class="social-row"><div class="social-person"><b>【${esc(guildState.name)}】</b>
+      <small>あなたは${guildRoleLabel(guildState.myRole)}・${guildState.members.length}/${guildState.memberLimit}人</small></div>
+      <div class="social-actions">
+      ${isMaster?`<button class="buyb" data-guild-disband ${socialBusy?'disabled':''}>解散</button>`:''}
+      <button class="buyb" data-guild-leave ${socialBusy?'disabled':''}>脱退</button></div></div>`;
+    for(const m of guildState.members){
+      const live=guildState.online.get(m.userId)||globalOnline.get(m.userId);
+      const self=m.userId===guildState.selfId;
+      html+=`<div class="social-row${live?' online':''}"><div class="social-person">
+        <b>${esc(m.name)}${self?'（自分）':''}</b>
+        <small>${guildRoleLabel(m.role)}${live?`・${zoneLabel(live.zone)}に在席`:'・不在'}</small></div>
+        <div class="social-actions">`;
+      if(isMaster&&!self&&m.role!=='master'){
+        html+=`<button class="buyb" data-guild-role="${m.userId}" data-role="${
+          m.role==='officer'?'member':'officer'}" ${socialBusy?'disabled':''}>${
+          m.role==='officer'?'講員に戻す':'世話役に'}</button>`;
+      }
+      if(!self&&((canManage&&m.role==='member')||(isMaster&&m.role==='officer'))){
+        html+=`<button class="buyb" data-guild-kick="${m.userId}" data-name="${esc(m.name)}" ${socialBusy?'disabled':''}>破門</button>`;
+      }
+      html+='</div></div>';
+    }
+  }
+  html+='</div>';
+
   html+=`<div class="social-section"><div class="social-head"><span>申請</span>
     <button class="buyb" data-social-refresh ${socialBusy?'disabled':''}>更新</button></div>`;
   if(!socialState.incoming.length&&!socialState.outgoing.length){
@@ -2980,6 +3075,35 @@ function renderSocialTab(){
 
   host.querySelector('[data-social-refresh]')?.addEventListener('click',()=>
     socialAction(()=>window.EnmaSocialClient.refresh()));
+  host.querySelector('[data-guild-refresh]')?.addEventListener('click',()=>
+    socialAction(()=>window.EnmaGuildClient?.refresh?.()));
+  host.querySelector('[data-guild-leave]')?.addEventListener('click',()=>{
+    if(!confirm(guildState.myRole==='master'
+      ?'講元を退きます。世話役か古参の講員が跡を継ぎ、誰もいなければ講は消えます。よろしい？'
+      :`講【${guildState.name}】を抜けますか？`))return;
+    socialAction(async()=>{
+      await window.EnmaGuildClient?.leave?.();
+      notifyNet('講の籍を抜けた');
+    });
+  });
+  host.querySelector('[data-guild-disband]')?.addEventListener('click',()=>{
+    if(prompt(`講【${guildState.name}】を解散します。確認のため「解散」と入力してください`)!=='解散')return;
+    socialAction(async()=>{
+      await window.EnmaGuildClient?.disband?.();
+      notifyNet('講を解散した。皆の記帳から名が消えた');
+    });
+  });
+  for(const b of host.querySelectorAll('[data-guild-kick]'))b.addEventListener('click',()=>{
+    if(!confirm(`${b.getAttribute('data-name')||'この魂'} を講から破門しますか？`))return;
+    socialAction(async()=>{
+      await window.EnmaGuildClient?.kick?.(b.getAttribute('data-guild-kick'));
+      notifyNet('破門の沙汰を下した');
+    });
+  });
+  for(const b of host.querySelectorAll('[data-guild-role]'))b.addEventListener('click',()=>{
+    socialAction(()=>window.EnmaGuildClient?.setRole?.(
+      b.getAttribute('data-guild-role'),b.getAttribute('data-role')));
+  });
   for(const b of host.querySelectorAll('[data-social-accept]'))b.addEventListener('click',()=>{
     const id=b.getAttribute('data-social-accept'),f=socialState.incoming.find(x=>x.id===id);
     socialAction(async()=>{
@@ -3089,6 +3213,10 @@ function openNpc(npc){
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='suggest'){renderSuggest();$('suggest').classList.remove('hidden');}
+  else if(npc.kind==='kessha'){
+    questProgress('talk','kessha');
+    renderKessha();$('kessha').classList.remove('hidden');
+  }
   else if(npc.kind==='guest'){
     setTalkPortrait('guest');
     $('talkTitle').textContent='カズー';
@@ -3138,6 +3266,7 @@ $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'))
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
 $('suggestClose').addEventListener('click',()=>$('suggest').classList.add('hidden'));
+$('kesshaClose').addEventListener('click',()=>$('kessha').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>{
   $('talk').classList.add('hidden');
   if(pendingChapterEnd)showChapterEnd();
@@ -3937,6 +4066,7 @@ function buildEnmaHall(){
       if(L.from===zn&&L.label)
         props.push({x:L.at.x,y:L.at.y,kind:'hallportal',label:L.label,tone:L.tone});
     }
+    if(floor===1)npcs.push({x:27,y:26,kind:'kessha',name:'ムスビ'});   // 結社係(講の窓口)
     const soulSub=floor===1?'魂籍の受付を待つ魂':floor===2?'二次審査を待つ魂':'閻魔の裁定を待つ魂';
     for(const [x,y,voiceIdx] of ENMA_SOUL_LAYOUT[floor]){
       const voice=ENMA_SOUL_VOICES[voiceIdx];
@@ -4389,15 +4519,16 @@ function drawRemotePlayer(sx,sy,e){
 }
 function drawRemotePlayerLabel(sx,sy,e){
   if(e.dead)return;
-  const name=e.name||'ナナシ';
+  const name=(e.guild?`【${e.guild}】`:'')+(e.name||'ナナシ');
   // 世界を縮小するスマホでも、自分の名前と同じ画面上11px・高さ52pxを保つ。
-  const labelScale=worldViewScale(),labelY=sy-52/labelScale,maxW=128/labelScale;
+  const labelScale=worldViewScale(),labelY=sy-52/labelScale,maxW=150/labelScale;
   ctx.font=`bold ${11/labelScale}px sans-serif`;ctx.textAlign='center';
   ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3/labelScale;
   ctx.strokeText(name,sx,labelY,maxW);
-  // チームの仲間は青、フレンドは緑がかった名前で見分けられる
+  // チームの仲間は青、同じ講は金、フレンドは緑がかった名前で見分けられる
   const inParty=partyHas(e.userId);
   ctx.fillStyle=inParty?'#8fc4ff'
+    :inMyGuild(e.userId)?'#ffd97a'
     :isFriend(e.userId)?'#a8e7b6':'#bfe7d0';
   ctx.fillText(name,sx,labelY,maxW);
   // チームの仲間はHP/MPバーを名前の下に出す
@@ -4412,7 +4543,7 @@ function drawRemotePlayerLabel(sx,sy,e){
     ctx.fillRect(bx,by+bh+gap,bw*clamp((e.mp||0)/Math.max(1,e.maxMp||0),0,1),bh);
   }
 }
-const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8'};
+const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8',guild:'#b48ce8'};
 function drawChatBubbleFx(sx,sy,fx){
   const remain=fx.until-performance.now();
   if(remain<=0)return false;
@@ -5275,6 +5406,15 @@ function drawNpc(sx,sy,n){
     ctx.fillStyle='#5c5963';
     ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
     ctx.fillStyle='#cdbba9';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
+  }else if(n.kind==='kessha'){
+    // 結社係ムスビ: 墨色の官服+烏帽子+結社帳
+    ctx.fillStyle='#3a3f52';
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#e0c0a0';ctx.beginPath();ctx.arc(0,-21,5,0,6.29);ctx.fill();
+    ctx.fillStyle='#1c1c26';
+    ctx.beginPath();ctx.moveTo(-3,-24);ctx.lineTo(0,-31);ctx.lineTo(3,-24);ctx.closePath();ctx.fill();   // 烏帽子
+    ctx.fillStyle='#e8dcb8';ctx.fillRect(4,-15,6,8);   // 結社帳
+    ctx.strokeStyle='#8a7448';ctx.lineWidth=0.8;ctx.strokeRect(4,-15,6,8);
   }else{
     ctx.fillStyle='#7d8290';
     ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-5,-16);ctx.lineTo(5,-16);ctx.lineTo(7,0);ctx.closePath();ctx.fill();
@@ -5751,15 +5891,22 @@ canvas.addEventListener('pointerdown',ev=>{
   clickMark={x:t.x,y:t.y,age:0};
 });
 /* ================= チャット ================= */
+/* ---- 講(ギルド)の状態。台帳はguild.js、講チャット回線はpresence.jsが供給する ---- */
+const guildState={id:'',name:'',motto:'',myRole:'member',memberLimit:20,
+  members:[],online:new Map(),error:'',selfId:''};
+const GUILD_FOUND_COST=10000;   // 講の設立料(モン)
+const guildRoleLabel=r=>r==='master'?'講元':r==='officer'?'世話役':'講員';
+const inMyGuild=id=>!!guildState.id&&guildState.members.some(m=>m.userId===id);
 const CHAT_CHANNELS={
   general:{label:'一般',color:'#c9a24a'},
   world:{label:'全体',color:'#e0824a'},
   friend:{label:'フレンド',color:'#75c36c'},
   team:{label:'チーム',color:'#6ea8e8'},
+  guild:{label:'講',color:'#b48ce8'},
   log:{label:'ログ',color:'#8fb2d9'},
 };
 const chat={open:false,tab:'general',online:false,worldOnline:false,teamOnline:false,
-  outbox:[],history:[],unread:0,lastSentAt:0};
+  guildOnline:false,outbox:[],history:[],unread:0,lastSentAt:0};
 const chatMessageDomLimit=()=>MOBILE_RENDER?36:80;
 const chatLogDomLimit=()=>MOBILE_RENDER?60:150;
 function chatMsgNode(m){
@@ -5855,13 +6002,15 @@ function addChatMessage(m){
 }
 function updateChatInputState(){
   // 送信できるのは一般(付近)・全体・チーム(結成時)。未ログインでも入力可にし、送信時に案内を出す
-  const t=chat.tab,canSend=t==='general'||t==='world'||(t==='team'&&!!party.id);
+  const t=chat.tab,canSend=t==='general'||t==='world'||(t==='team'&&!!party.id)
+    ||(t==='guild'&&!!guildState.id);
   $('chatIn').disabled=!canSend;
   $('chatSend').disabled=!canSend;
   $('chatIn').placeholder=
     t==='general'?(chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要')
     :t==='world'?(chat.worldOnline?'冥府全体へ話す (Enter)':'話すには魂籍ログインが必要')
     :t==='team'?(party.id?(chat.teamOnline?'チームへ話す (Enter)':'チーム回線を接続中…'):'チーム未結成')
+    :t==='guild'?(guildState.id?(chat.guildOnline?`講【${guildState.name}】へ話す (Enter)`:'講の回線を接続中…'):'講に未加入')
     :t==='log'?'戦闘・取得のログ(閲覧のみ)'
     :'フレンド一覧';
 }
@@ -5870,12 +6019,13 @@ function renderChatTab(){
     b.classList.toggle('on',b.dataset.ch===chat.tab);
   const t=chat.tab;
   const hasList=t==='general'||t==='world'||t==='log'||t==='friend'
-    ||(t==='team'&&!!party.id);
+    ||(t==='team'&&!!party.id)||(t==='guild'&&!!guildState.id);
   $('chatNotice').hidden=hasList;
   $('chatLog').hidden=!hasList;
   if(!hasList){
-    $('chatNotice').textContent=
-      'チームは未結成。近くの魂をタップして「チームに誘う」と結成できる。';
+    $('chatNotice').textContent=t==='guild'
+      ?'講に未加入。講の者から勧誘を受けるか、ゴウリュウを鎮めて閻魔庁一階の結社係を訪ねると自ら講を立てられる。'
+      :'チームは未結成。近くの魂をタップして「チームに誘う」と結成できる。';
   }
   renderTeamUI();
   updateChatInputState();
@@ -5901,9 +6051,11 @@ function sendChat(){
   const input=$('chatIn');
   const ch=chat.tab;
   const text=input.value.replace(/\s+/g,' ').trim().slice(0,60);
-  if(!text||(ch!=='general'&&ch!=='world'&&ch!=='team'))return;
+  if(!text||(ch!=='general'&&ch!=='world'&&ch!=='team'&&ch!=='guild'))return;
   if(ch==='team'&&!party.id)return;
-  const connected=ch==='general'?chat.online:ch==='world'?chat.worldOnline:chat.teamOnline;
+  if(ch==='guild'&&!guildState.id)return;
+  const connected=ch==='general'?chat.online:ch==='world'?chat.worldOnline
+    :ch==='guild'?chat.guildOnline:chat.teamOnline;
   if(!connected){
     // 入力内容は消さず、届け方を案内する
     addChatMessage({channel:'sys',
@@ -5973,7 +6125,8 @@ const genPartyId=()=>globalThis.crypto?.randomUUID
   ?crypto.randomUUID()
   :`${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,10)}`;
 const ZONE_LABELS={field:'賽の森',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
-  dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5'};
+  dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5',
+  muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3'};
 const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
 const STAGE_LABELS={deceased:'亡者',rebirth_candidate:'転生候補者',reincarnated:'転生者'};
 function playerTitle(ach,level){
@@ -6007,6 +6160,19 @@ function updatePlayerCardButtons(){
   friendBtn.disabled=friend||outgoing||!socialState.online;
   hint.hidden=chat.online&&socialState.online;
   if(!chat.online||!socialState.online)hint.textContent='誘い・申請には魂籍ログインが必要';
+  // 講への勧誘は講元・世話役だけに見せる。相手が既に講持ちなら所属を表示
+  const guildBtn=$('pcGuildBtn');
+  if(guildBtn){
+    const canInvite=!!guildState.id
+      &&(guildState.myRole==='master'||guildState.myRole==='officer');
+    const remote=remotePlayers.get(id);
+    const already=inMyGuild(id);
+    guildBtn.hidden=!canInvite;
+    guildBtn.textContent=already?'同じ講の同志'
+      :remote?.guild?`講所属【${remote.guild}】`:'講に勧誘';
+    guildBtn.disabled=already||!!remote?.guild||!chat.online
+      ||guildState.members.length>=guildState.memberLimit;
+  }
 }
 function openPlayerCard(e){
   if(!e||!e.userId)return;
@@ -6039,6 +6205,15 @@ $('pcTeamBtn').addEventListener('click',()=>{
   closePlayerCard();
   sfx.click();
 });
+$('pcGuildBtn').addEventListener('click',()=>{
+  const e=remotePlayers.get(playerCard.userId);
+  if(!e||!guildState.id){closePlayerCard();return;}
+  netOutbox.push({type:'invite',kind:'guild',targetUserId:playerCard.userId,
+    guildId:guildState.id,guildName:guildState.name});
+  notifyNet(`${e.name} を講【${guildState.name}】に誘った。返事を待とう`);
+  closePlayerCard();
+  sfx.click();
+});
 $('pcFriendBtn').addEventListener('click',async()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
@@ -6062,7 +6237,8 @@ $('pcFriendBtn').addEventListener('click',async()=>{
 
 /* ---- 招待の受信 ---- */
 function queueInvite(invite){
-  log(`${invite.from.displayName} から${invite.kind==='team'?'チームの誘い':'フレンド申請'}が届いた`,'sys');
+  log(`${invite.from.displayName} から${invite.kind==='team'?'チームの誘い'
+    :invite.kind==='guild'?`講【${invite.guildName||''}】の勧誘`:'フレンド申請'}が届いた`,'sys');
   pendingInvites.push(invite);
   while(pendingInvites.length>4)pendingInvites.shift();
   if(!activeInvite)showNextInvite();
@@ -6079,7 +6255,9 @@ function showNextInvite(){
   b.textContent=`${from.displayName}（徳位${from.level}）`;
   p.appendChild(b);
   p.appendChild(document.createTextNode(
-    kind==='team'?' がチームに誘っています':' からフレンド申請が届きました'));
+    kind==='team'?' がチームに誘っています'
+    :kind==='guild'?` が講【${activeInvite.guildName||'名もなき講'}】に誘っています`
+    :' からフレンド申請が届きました'));
   pop.hidden=false;
   sfx.click();
   inviteTimer=setTimeout(()=>{activeInvite=null;showNextInvite();},30000);
@@ -6095,6 +6273,22 @@ $('inviteAccept').addEventListener('click',async()=>{
       targetUserId:inv.from.userId,partyId:inv.partyId});
     notifyNet(`${inv.from.displayName} のチームに加わった`);
     chat.tab='team';
+    if(chat.open)renderChatTab();else openChat(false);
+  }else if(inv.kind==='guild'){
+    try{await window.EnmaGuildClient?.join?.(inv.guildId);}
+    catch(e){
+      notifyNet(`講に入れません：${e?.message||'通信エラー'}`);
+      netOutbox.push({type:'invite_reply',kind:'guild',accepted:false,
+        targetUserId:inv.from.userId});
+      activeInvite=null;showNextInvite();
+      $('inviteAccept').disabled=false;$('inviteDecline').disabled=false;
+      return;
+    }
+    netOutbox.push({type:'invite_reply',kind:'guild',accepted:true,
+      targetUserId:inv.from.userId});
+    notifyNet(`講【${inv.guildName||''}】に入った！ 相互扶助もまた徳である`);
+    log('[系統] 群体所属を更新…相互学習を開始','glitch');
+    chat.tab='guild';
     if(chat.open)renderChatTab();else openChat(false);
   }else{
     try{await window.EnmaSocialClient?.acceptFriendRequest?.(inv.from.userId);}
@@ -6400,7 +6594,7 @@ for(const [id,g] of [['pickM','m'],['pickF','f']]){
 $('startBtn').addEventListener('click',()=>{
   const nm=$('nameIn').value.trim().slice(0,8);
   player.name=nm||player.name||'ナナシ';
-  $('pname').textContent='亡者'+player.name;
+  $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+player.name;
   save();
   $('intro').classList.add('hidden');
   started=true;
@@ -6630,6 +6824,7 @@ window.EnmaGameBridge={
       displayName:player.name||$('nameIn').value.trim()||'ナナシ',
       gender:player.gender,
       level:player.lv,
+      guild:guildState.name,
       zone,
       x:player.x,
       y:player.y,
@@ -6835,6 +7030,38 @@ window.EnmaGameBridge={
     if(chat.open&&chat.tab==='friend')renderChatLog();
     if(menuTab==='social'&&!$('equip').classList.contains('hidden'))renderSocialTab();
   },
+  getGuildState(){
+    return {guildId:guildState.id};
+  },
+  syncGuildState(next){
+    const g=next?.guild;
+    const hadId=guildState.id;
+    guildState.id=g?.id||'';
+    guildState.name=g?.name||'';
+    guildState.motto=g?.motto||'';
+    guildState.myRole=g?.myRole||'member';
+    guildState.memberLimit=g?.memberLimit||20;
+    guildState.members=Array.isArray(g?.members)?g.members:[];
+    guildState.selfId=g?.selfId||guildState.selfId;
+    guildState.error=String(next?.error||'');
+    $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+(player.name||'');
+    if(started&&guildState.id&&!hadId)
+      notifyNet(`講【${guildState.name}】の一員として記帳されている（チャットの「講」タブ）`);
+    if(started&&!guildState.id&&hadId&&next?.online)
+      notifyNet('講の籍が外れている（脱退・破門・解散のいずれか）');
+    if(chat.open)renderChatTab();else updateChatInputState();
+    if(menuTab==='social'&&!$('equip').classList.contains('hidden'))renderSocialTab();
+    updatePlayerCardButtons();
+  },
+  setGuildOnline(list){
+    guildState.online=new Map((Array.isArray(list)?list:[])
+      .filter(m=>m&&m.userId).map(m=>[m.userId,m]));
+    if(menuTab==='social'&&!$('equip').classList.contains('hidden'))renderSocialTab();
+  },
+  setGuildChatOnline(connected){
+    chat.guildOnline=Boolean(connected);
+    updateChatInputState();
+  },
   syncSocialState(next){
     const incoming=Array.isArray(next?.incoming)?next.incoming:[];
     const mail=Array.isArray(next?.mail)?next.mail:[];
@@ -6932,6 +7159,11 @@ window.EnmaGameBridge={
         window.EnmaSocialClient?.refresh?.().catch(()=>{});
         notifyNet(`${reply.from.displayName} は静かに首を振った`);
       }
+    }else if(reply.kind==='guild'){
+      notifyNet(reply.accepted
+        ?`${reply.from.displayName} が講【${guildState.name||''}】に加わった！`
+        :`${reply.from.displayName} は講の誘いを静かに断った`);
+      if(reply.accepted)window.EnmaGuildClient?.refresh?.().catch(()=>{});
     }else{
       notifyNet(reply.accepted
         ?`${reply.from.displayName} がチームに加わった`
@@ -6967,7 +7199,7 @@ document.dispatchEvent(new CustomEvent('enma-game-ready'));
 checkDrake();
 if(hasSaveData){
   $('nameIn').value=player.name;
-  $('pname').textContent='亡者'+player.name;
+  $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+player.name;
   // キャラ作成後は名を変えられない: 入力欄を固定表示に差し替える
   $('nameIn').classList.add('hidden');
   $('nameFixed').querySelector('b').textContent='亡者 '+player.name;

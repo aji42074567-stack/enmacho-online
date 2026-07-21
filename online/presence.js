@@ -1,13 +1,13 @@
 const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
-const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5])$/;
+const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
 const VALID_ATTACK_KIND = new Set([
   'melee', 'bolt', 'fire', 'heal',
   'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
 ]);
-const VALID_CHAT_CHANNEL = new Set(['general', 'world', 'team']);
+const VALID_CHAT_CHANNEL = new Set(['general', 'world', 'team', 'guild']);
 const CHAT_MIN_INTERVAL_MS = 600;
 const CHAT_MAX_LENGTH = 60;
 // 全体チャンネルのトピック。RLSポリシー(game:zone:%)に合わせた命名で、
@@ -15,8 +15,9 @@ const CHAT_MAX_LENGTH = 60;
 const WORLD_TOPIC = 'game:zone:world';
 const inboxTopic = userId => `game:zone:u:${userId}`;
 const partyTopic = partyId => `game:zone:party:${partyId}`;
+const guildTopic = guildId => `game:zone:guild:${guildId}`;
 const VALID_UUID = /^[0-9a-f-]{16,64}$/i;
-const VALID_INVITE_KIND = new Set(['team', 'friend']);
+const VALID_INVITE_KIND = new Set(['team', 'friend', 'guild']);
 const VALID_STAGE = new Set(['deceased', 'rebirth_candidate', 'reincarnated']);
 
 // 実績サマリー(プレイヤーカード表示用)。位置ペイロードに同乗する
@@ -68,6 +69,7 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     displayName: cleanText(raw.displayName, 16) || 'ナナシ',
     gender: raw.gender === 'f' ? 'f' : 'm',
     level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(raw.level, 1)))),
+    guild: cleanText(raw.guild, 12),
     zone,
     x,
     y,
@@ -94,7 +96,15 @@ function normalizeInvite(raw, ownSessionId) {
   if (!VALID_INVITE_KIND.has(raw.kind)) return null;
   const partyId = cleanText(raw.partyId, 64);
   if (raw.kind === 'team' && !VALID_UUID.test(partyId)) return null;
-  return { kind: raw.kind, partyId: raw.kind === 'team' ? partyId : '', from: identity };
+  const guildId = cleanText(raw.guildId, 64);
+  if (raw.kind === 'guild' && !VALID_UUID.test(guildId)) return null;
+  return {
+    kind: raw.kind,
+    partyId: raw.kind === 'team' ? partyId : '',
+    guildId: raw.kind === 'guild' ? guildId : '',
+    guildName: raw.kind === 'guild' ? cleanText(raw.guildName, 12) : '',
+    from: identity,
+  };
 }
 
 function normalizeInviteReply(raw, ownSessionId) {
@@ -204,6 +214,12 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   let partyRetryAt = 0;
   let partyId = '';
   let partyTrackedKey = '';
+  let guildChannel = null;
+  let guildSubscribed = false;
+  let guildOpening = false;
+  let guildRetryAt = 0;
+  let guildId = '';
+  let guildTrackedKey = '';
 
   function identityFor(snapshot = {}) {
     return {
@@ -219,6 +235,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   function payloadFor(snapshot = {}) {
     return {
       ...identityFor(snapshot),
+      guild: cleanText(snapshot.guild, 12) || undefined,
       ach: normalizeAch(snapshot.ach) || undefined,
       hp: Math.max(0, Math.trunc(cleanNumber(snapshot.hp, 0))),
       maxHp: Math.max(0, Math.trunc(cleanNumber(snapshot.maxHp, 0))),
@@ -533,6 +550,75 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       });
   }
 
+  /* ---- 講(ギルド)チャンネル: 在席が講員のオンライン一覧、broadcastが講チャット ---- */
+  function syncGuildPresence(activeChannel) {
+    if (activeChannel !== guildChannel) return;
+    const byUser = new Map();
+    for (const entries of Object.values(activeChannel.presenceState())) {
+      for (const entry of entries || []) {
+        const member = normalizePartyMember(entry, sessionId);
+        if (member) byUser.set(member.userId, member);
+      }
+    }
+    bridge?.setGuildOnline?.([...byUser.values()]);
+  }
+
+  async function closeGuildChannel() {
+    const oldChannel = guildChannel;
+    guildChannel = null;
+    guildSubscribed = false;
+    guildOpening = false;
+    guildTrackedKey = '';
+    bridge?.setGuildChatOnline?.(false);
+    bridge?.setGuildOnline?.([]);
+    if (!oldChannel) return;
+    try {
+      await oldChannel.untrack();
+    } catch {}
+    try {
+      await client.removeChannel(oldChannel);
+    } catch {}
+  }
+
+  function openGuildChannel(id) {
+    if (guildChannel || guildOpening || !session || !VALID_UUID.test(id)) return;
+    guildOpening = true;
+    const activeChannel = client.channel(guildTopic(id), {
+      config: {
+        private: true,
+        presence: { key: sessionId },
+        broadcast: { self: false, ack: false },
+      },
+    });
+    guildChannel = activeChannel;
+    activeChannel
+      .on('presence', { event: 'sync' }, () => syncGuildPresence(activeChannel))
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (activeChannel !== guildChannel) return;
+        const identity = chatIdentity(payload, sessionId);
+        const text = cleanText(payload?.text, CHAT_MAX_LENGTH);
+        if (!identity || !text) return;
+        bridge?.receiveChatMessage?.({ ...identity, channel: 'guild', text });
+      })
+      .subscribe(async status => {
+        if (activeChannel !== guildChannel) return;
+        guildOpening = false;
+        if (status === 'SUBSCRIBED') {
+          guildSubscribed = true;
+          bridge?.setGuildChatOnline?.(true);
+          const snapshot = bridge?.getRealtimeState?.() || {};
+          try {
+            await activeChannel.track(memberPayload(snapshot));
+            guildTrackedKey = cleanText(snapshot.zone, 16);
+          } catch {}
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          guildSubscribed = false;
+          guildRetryAt = Date.now() + 5_000;
+          void closeGuildChannel();
+        }
+      });
+  }
+
   // 相手の受信箱へ1回だけ届ける(未購読チャンネルのsendはHTTP経由で送られる)
   function sendToInbox(targetUserId, event, payload) {
     if (!VALID_UUID.test(targetUserId)) return;
@@ -689,6 +775,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       identity.displayName,
       identity.gender,
       identity.level,
+      cleanText(snapshot.guild, 12),
       Math.round(cleanNumber(snapshot.hp) / 5),
       Math.round(cleanNumber(snapshot.mp) / 5),
     ].join('|');
@@ -766,6 +853,14 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           event: 'chat',
           payload: { ...identityFor(snapshot), channel: 'team', text, sentAt: now },
         }).catch(() => {});
+      } else if (item.channel === 'guild') {
+        if (!guildChannel || !guildSubscribed) continue;
+        lastChatSentAt = now;
+        guildChannel.send({
+          type: 'broadcast',
+          event: 'chat',
+          payload: { ...identityFor(snapshot), channel: 'guild', text, sentAt: now },
+        }).catch(() => {});
       }
     }
   }
@@ -782,9 +877,12 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           ...identityFor(snapshot),
           kind: item.kind,
           partyId: cleanText(item.partyId, 64),
+          guildId: cleanText(item.guildId, 64),
+          guildName: cleanText(item.guildName, 12),
           sentAt: Date.now(),
         };
         if (item.kind === 'team' && !VALID_UUID.test(payload.partyId)) continue;
+        if (item.kind === 'guild' && !VALID_UUID.test(payload.guildId)) continue;
         sendToInbox(targetUserId, 'invite', payload);
       } else if (item.type === 'party_kill' || item.type === 'party_heal'
         || item.type === 'party_loot') {
@@ -846,6 +944,18 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       openPartyChannel(partyId);
     }
 
+    // 講もゲーム側の意思(getGuildState)に追従する
+    const wantedGuildId = wantWorld
+      ? cleanText(bridge?.getGuildState?.()?.guildId, 64) : '';
+    if (wantedGuildId !== guildId) {
+      guildId = wantedGuildId;
+      void closeGuildChannel().then(() => {
+        if (guildId && VALID_UUID.test(guildId)) openGuildChannel(guildId);
+      });
+    } else if (guildId && !guildChannel && !guildOpening && Date.now() >= guildRetryAt) {
+      openGuildChannel(guildId);
+    }
+
     // ゾーン移動を全体/パーティの在席情報に反映(フレンド一覧などで見える)
     const zoneNow = cleanText(snapshot?.zone, 16);
     if (worldChannel && worldSubscribed && zoneNow && zoneNow !== worldTrackedKey) {
@@ -860,6 +970,10 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (partyChannel && partySubscribed && partyKeyNow && partyKeyNow !== partyTrackedKey) {
       partyTrackedKey = partyKeyNow;
       partyChannel.track(memberPayload(snapshot)).catch(() => {});
+    }
+    if (guildChannel && guildSubscribed && zoneNow && zoneNow !== guildTrackedKey) {
+      guildTrackedKey = zoneNow;
+      guildChannel.track(memberPayload(snapshot)).catch(() => {});
     }
 
     if (nextZone !== channelZone) {
@@ -900,6 +1014,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       await closeWorldChannel();
       await closeInboxChannel();
       await closePartyChannel();
+      await closeGuildChannel();
     }
     tick();
   }
@@ -910,6 +1025,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       void closeWorldChannel();
       void closeInboxChannel();
       void closePartyChannel();
+      void closeGuildChannel();
     } else tick();
   });
   window.addEventListener('pagehide', () => {
@@ -917,6 +1033,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     void closeWorldChannel();
     void closeInboxChannel();
     void closePartyChannel();
+    void closeGuildChannel();
   });
 
   setIndicator(false);
@@ -924,6 +1041,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     setAccount,
     stop: () => Promise.allSettled([
       closeChannel(), closeWorldChannel(), closeInboxChannel(), closePartyChannel(),
+      closeGuildChannel(),
     ]),
   };
 }
