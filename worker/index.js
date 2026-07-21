@@ -153,6 +153,20 @@ function originAllowed(request) {
   return /^https:\/\/[a-z0-9-]+\.enmacho-online\.pages\.dev$/.test(origin);
 }
 
+function healthResponse() {
+  const headers = new Headers({
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+  });
+  return Response.json({
+    ok: true,
+    service: 'enmacho-world',
+    version: WORLD_VERSION,
+    respawnSeconds: RESPAWN_MS / 1_000,
+    dragonRespawnSeconds: DRAKE_RESPAWN_MS / 1_000,
+  }, { headers });
+}
+
 async function authenticate(request, env) {
   const protocols = parseProtocols(request);
   const authProtocol = protocols.find(value => value.startsWith('auth.'));
@@ -179,13 +193,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
-      return Response.json({
-        ok: true,
-        service: 'enmacho-world',
-        version: WORLD_VERSION,
-        respawnSeconds: RESPAWN_MS / 1_000,
-        dragonRespawnSeconds: DRAKE_RESPAWN_MS / 1_000,
-      });
+      return healthResponse();
     }
     const zoneMatch = url.pathname.match(/^\/world\/([a-z0-9]+)$/);
     const zone = zoneMatch?.[1] || '';
