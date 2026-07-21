@@ -90,12 +90,13 @@
   #log div.glitch{color:#7fd8a0;letter-spacing:.05em}
 
   /* ---- バーチャルパッド(タッチ端末のみ) ---- */
-  #vpad{position:absolute;left:18px;bottom:158px;width:104px;height:104px;
+  #vpad{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:158px;width:104px;height:104px;
     border-radius:50%;background:rgba(20,16,11,.32);
     border:1px solid rgba(201,162,74,.35);z-index:5;
     touch-action:none;display:none;
     box-shadow:inset 0 0 18px rgba(0,0,0,.4)}
-  @media(pointer:coarse){#vpad.on{display:block}}
+  #vpad.side-right{left:auto;right:max(18px,env(safe-area-inset-right))}
+  @media(pointer:coarse),(max-width:700px){#vpad.on{display:block}}
   #vpadStick{position:absolute;left:50%;top:50%;width:46px;height:46px;
     border-radius:50%;transform:translate(-50%,-50%);
     background:radial-gradient(circle at 40% 35%,rgba(232,199,106,.55),rgba(138,100,35,.5));
@@ -449,6 +450,11 @@
     font-family:var(--sans);font-size:12px;color:var(--parchment);
     border-top:1px solid #33291a;padding-top:13px;cursor:pointer}
   .setting-toggle input{width:20px;height:20px;accent-color:var(--gold)}
+  .setting-select{display:flex;align-items:center;justify-content:space-between;
+    gap:16px;font-family:var(--sans);font-size:12px;color:var(--parchment)}
+  .setting-select select{min-width:112px;padding:7px 30px 7px 10px;color:var(--parchment);
+    background:#0d0b08;border:1px solid #5a4a2a;border-radius:3px;font:12px var(--sans)}
+  .setting-select select:disabled{opacity:.45;cursor:not-allowed}
   .setting-note{font-family:var(--sans);font-size:10.5px;color:var(--dim);
     line-height:1.7;text-align:left;margin:14px 0 0}
   .account-lead{font-family:var(--serif);font-size:13px;line-height:1.9;
@@ -1024,7 +1030,7 @@
     aria-labelledby="settingsTitle">
     <div class="scroll">
       <h2 id="settingsTitle">設定</h2>
-      <div class="sub">音響・画面</div>
+      <div class="sub">音響・画面・操作</div>
       <div class="settings-list">
         <label class="setting-row" for="bgmVolume">
           <span class="setting-head"><span>BGM音量</span><output id="bgmValue">55%</output></span>
@@ -1042,6 +1048,17 @@
         <label class="setting-toggle" for="screenShakeSetting">
           <span>戦闘時の画面揺れ</span>
           <input id="screenShakeSetting" type="checkbox" checked>
+        </label>
+        <label class="setting-toggle" for="vpadEnabledSetting">
+          <span>スマホ用ゲームパッド</span>
+          <input id="vpadEnabledSetting" type="checkbox" checked>
+        </label>
+        <label class="setting-select" for="vpadSideSetting">
+          <span>ゲームパッドの位置</span>
+          <select id="vpadSideSetting">
+            <option value="left">左</option>
+            <option value="right">右</option>
+          </select>
         </label>
       </div>
       <p class="setting-note">音量を0%にすると消音になります。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
@@ -1623,7 +1640,7 @@ function findPath(fx,fy,tx,ty){
 }
 
 /* ================= プレイヤー ================= */
-const settings={bgm:55,sfx:100,brightness:100,shake:true};
+const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left'};
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
@@ -1797,6 +1814,8 @@ function load(){
     settings.sfx=clamp(Number.isFinite(+cfg.sfx)?+cfg.sfx:100,0,100);
     settings.brightness=clamp(Number.isFinite(+cfg.brightness)?+cfg.brightness:100,70,130);
     settings.shake=cfg.shake!==false;
+    settings.vpadEnabled=cfg.vpadEnabled!==false;
+    settings.vpadSide=cfg.vpadSide==='right'?'right':'left';
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -5597,6 +5616,13 @@ function vpadReset(){
   vpad.active=false;vpad.dx=0;vpad.dy=0;vpad.mag=0;vpad.pid=null;
   vpadStick.style.transform='translate(-50%,-50%)';
 }
+function applyVpadSettings(){
+  const enabled=settings.vpadEnabled!==false;
+  vpadEl.classList.toggle('side-right',settings.vpadSide==='right');
+  vpadEl.classList.toggle('on',started&&enabled);
+  vpadEl.setAttribute('aria-hidden',String(!started||!enabled));
+  if(!enabled&&vpad.active)vpadReset();
+}
 vpadEl.addEventListener('pointerdown',ev=>{
   if(!started||player.dead)return;
   vpad.active=true;vpad.pid=ev.pointerId;
@@ -6279,6 +6305,9 @@ function renderSettings(){
   $('brightnessSetting').value=settings.brightness;
   $('brightnessValue').textContent=`${settings.brightness}%`;
   $('screenShakeSetting').checked=settings.shake;
+  $('vpadEnabledSetting').checked=settings.vpadEnabled;
+  $('vpadSideSetting').value=settings.vpadSide;
+  $('vpadSideSetting').disabled=!settings.vpadEnabled;
 }
 function openSettings(){
   renderSettings();
@@ -6309,6 +6338,17 @@ for(const [id,key,out] of [
 $('screenShakeSetting').addEventListener('change',ev=>{
   settings.shake=ev.target.checked;
   applyVisualSettings();
+  if(started||hasSaveData)save();
+});
+$('vpadEnabledSetting').addEventListener('change',ev=>{
+  settings.vpadEnabled=ev.target.checked;
+  $('vpadSideSetting').disabled=!settings.vpadEnabled;
+  applyVpadSettings();
+  if(started||hasSaveData)save();
+});
+$('vpadSideSetting').addEventListener('change',ev=>{
+  settings.vpadSide=ev.target.value==='right'?'right':'left';
+  applyVpadSettings();
   if(started||hasSaveData)save();
 });
 $('sndBtn').addEventListener('click',openSettings);
@@ -6344,7 +6384,7 @@ $('startBtn').addEventListener('click',()=>{
   save();
   $('intro').classList.add('hidden');
   started=true;
-  vpadEl.classList.add('on');
+  applyVpadSettings();
   startGameplayAssets();
   if(!ground._groundReady){
     if(zone==='field')renderGround();
@@ -6476,6 +6516,7 @@ hasSaveData=load();
   }catch(e){}
 })();
 applyVisualSettings();
+applyVpadSettings();
 renderSettings();
 window.EnmaGameBridge={
   exportSave(){
