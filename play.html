@@ -6240,7 +6240,7 @@ window.EnmaGameBridge={
   },
   importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
-      payload.v<1||payload.v>7)throw new Error('対応していない記録です');
+      payload.v<1||payload.v>8)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
