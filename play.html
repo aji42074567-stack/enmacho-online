@@ -3344,6 +3344,74 @@ function drawKnight(sx,sy,e){
   ctx.fillRect(-5.4,-27,10.8,3);
   ctx.restore();
 }
+const HELD_WEAPON_POSE={
+  down: {x:-8.5,y:-18.5,angle:3.08},
+  up:   {x: 8.0,y:-18.5,angle:1.55},
+  left: {x:-7.0,y:-18.0,angle:1.32},
+  right:{x: 7.0,y:-18.0,angle:3.42},
+};
+function heldWeaponId(e){
+  const id=e===player?player.eq.weapon:e.weaponId;
+  return ITEMS[id]?.slot==='weapon'?id:'dagger';
+}
+function drawHeldWeapon(e,walkFrame=1){
+  const item=ITEMS[heldWeaponId(e)],img=item&&SPRITES[item.icon];
+  if(!img)return;
+  const pose=HELD_WEAPON_POSE[e.dir]||HELD_WEAPON_POSE.down;
+  const step=[0,1,0,-1][walkFrame&3]||0;
+  const large=heldWeaponId(e)==='bastard'||heldWeaponId(e)==='drake_slayer';
+  const size=large?32:(heldWeaponId(e)==='dagger'?23:29);
+  ctx.save();
+  ctx.translate(pose.x+(e.dir==='left'||e.dir==='right'?0:step*0.35),pose.y+Math.abs(step)*0.55);
+  ctx.rotate(pose.angle+step*0.035);
+  // アイコンの柄を手元に固定し、歩行コマに合わせてわずかに揺らす。
+  ctx.drawImage(img,-size*0.18,-size*0.77,size,size);
+  ctx.restore();
+}
+function slashPoint(path,t,offset=0){
+  const u=1-t;
+  const x=u*u*path[0][0]+2*u*t*path[1][0]+t*t*path[2][0];
+  const y=u*u*path[0][1]+2*u*t*path[1][1]+t*t*path[2][1];
+  if(!offset)return{x,y};
+  const dx=2*u*(path[1][0]-path[0][0])+2*t*(path[2][0]-path[1][0]);
+  const dy=2*u*(path[1][1]-path[0][1])+2*t*(path[2][1]-path[1][1]);
+  const len=Math.hypot(dx,dy)||1;
+  return{x:x-dy/len*offset,y:y+dx/len*offset};
+}
+function drawSwordSlashTrail(e,t){
+  if(t<=0.28||t>=0.7)return;
+  const paths={
+    down:[[17,-40],[5,-21],[-21,-8]],
+    up:[[17,-40],[-1,-23],[-20,-11]],
+    left:[[21,-40],[-3,-25],[-25,-9]],
+    right:[[-21,-40],[3,-25],[25,-9]],
+  };
+  const path=paths[e.dir]||paths.down;
+  const phase=(t-0.28)/0.42;
+  const head=Math.min(1,phase*1.22);
+  const tail=Math.max(0,head-(0.34+0.22*Math.sin(phase*Math.PI)));
+  const fade=Math.pow(Math.sin(phase*Math.PI),0.72);
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  ctx.lineCap='round';
+  const layers=[
+    {offset:0,width:1.65,alpha:0.68},
+    {offset:-1.6,width:0.65,alpha:0.24},
+  ];
+  for(const layer of layers){
+    const steps=11;
+    for(let i=0;i<steps;i++){
+      const a=tail+(head-tail)*i/steps;
+      const b=tail+(head-tail)*(i+1)/steps;
+      const p1=slashPoint(path,a,layer.offset),p2=slashPoint(path,b,layer.offset);
+      const tip=(i+1)/steps;
+      ctx.strokeStyle=`rgba(205,230,242,${fade*layer.alpha*Math.pow(tip,1.35)})`;
+      ctx.lineWidth=layer.width*(0.32+tip*0.68);
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
 function drawPlayer(sx,sy,e){
   const g=e.gender||'m';
   const base=SPRITES['player_'+g]||SPRITES.player_m;
@@ -3361,18 +3429,8 @@ function drawPlayer(sx,sy,e){
     const fr=t<0.35?0:(t<0.72?1:2);
     const FA=160,DA=FA*k;
     ctx.drawImage(atkS,fr*FA,row*FA,FA,FA,-DA/2,(3-4*k)-150*k,DA,DA);
-    if(t>0.32&&t<0.85){  // 斬撃の軌跡
-      const side=(e.dir==='left')?-1:1;
-      const p=(t-0.32)/0.53;
-      const a=0.6*(1-p);
-      ctx.save();ctx.scale(side,1);
-      ctx.strokeStyle=`rgba(240,242,255,${a})`;
-      ctx.lineWidth=3;ctx.lineCap='round';
-      ctx.beginPath();ctx.arc(4,-18,19,-1.5,-1.5+2.6*Math.min(1,p*1.3));ctx.stroke();
-      ctx.strokeStyle=`rgba(190,220,255,${a*0.5})`;ctx.lineWidth=6;
-      ctx.beginPath();ctx.arc(4,-18,15,-1.3,-1.3+2.2*Math.min(1,p*1.3));ctx.stroke();
-      ctx.restore();
-    }
+    // 大きな円弧ではなく、刀身の進行方向に沿う短い残光だけを出す。
+    drawSwordSlashTrail(e,t);
   }else if(e.hitT>0&&hitS){
     // 被弾: のけぞり+赤フラッシュ
     ctx.drawImage(hitS,0,0,F,F,-D/2,-D+3,D,D);
@@ -3384,6 +3442,7 @@ function drawPlayer(sx,sy,e){
     // 歩行: 実際に進んだ距離(walkT)に同期してコマ送り(足滑り防止)
     const fr=Math.floor((e.walkT||0)*2.6)%4;
     ctx.drawImage(walkS,fr*F,row*F,F,F,-D/2,-D+3,D,D);
+    drawHeldWeapon(e,fr);
   }else{
     const swingMax=e.swingMax||0.25;
     const t2=e.swing>0?clamp(1-e.swing/swingMax,0,1):-1;   // 印・道具を使う身振り
@@ -3394,6 +3453,7 @@ function drawPlayer(sx,sy,e){
     }
     if(base)ctx.drawImage(base,row*F,0,F,F,-D/2,-D+3,D,D);
     else ctx.drawImage(walkS,F,row*F,F,F,-D/2,-D+3,D,D);
+    drawHeldWeapon(e,1);
   }
   ctx.restore();
 }
@@ -5007,6 +5067,7 @@ window.EnmaGameBridge={
       dead:player.dead,
       attackSeq:player.attackSeq,
       attackKind:player.attackKind,
+      weaponId:player.eq.weapon,
       targetX:player.actionTargetX,
       targetY:player.actionTargetY,
     };
@@ -5104,6 +5165,7 @@ window.EnmaGameBridge={
       e.dir=['up','down','left','right'].includes(raw.dir)?raw.dir:e.dir;
       e.remoteMoving=!!raw.moving;e.dead=!!raw.dead;
       e.gender=raw.gender==='f'?'f':'m';
+      e.weaponId=ITEMS[raw.weaponId]?.slot==='weapon'?raw.weaponId:'dagger';
       e.name=String(raw.displayName||'ナナシ').slice(0,16);
       e.level=Math.max(1,raw.level|0);
       e.zone=raw.zone;e.lastSeen=now;
