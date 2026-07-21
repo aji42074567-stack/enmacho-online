@@ -1552,6 +1552,28 @@ const QUESTS=[
   {id:'q_gashao', name:'骨の王の鎮魂',    desc:'無縁塚の最深部で骨の王ガシャオウを鎮める',type:'kill', mob:['gashao'], n:1, rw:{gold:1200,xp:2000,item:'kiyome_bukuro'}},
 ];
 const questById=id=>QUESTS.find(q=>q.id===id);
+const emptyQuestBoard=()=>({active:{},done:{}});
+const questIsActive=id=>Object.prototype.hasOwnProperty.call(player.qb.active,id);
+const questProg=id=>questIsActive(id)?Math.max(0,player.qb.active[id]|0):0;
+const activeQuests=()=>QUESTS.filter(q=>questIsActive(q.id));
+function normalizeQuestBoard(raw){
+  const board=emptyQuestBoard();
+  if(!raw||typeof raw!=='object')return board;
+  if(raw.done&&typeof raw.done==='object')for(const [id,done] of Object.entries(raw.done)){
+    if(done&&questById(id))board.done[id]=true;
+  }
+  // v1〜v9は active=クエストID、prog=単一進捗。v10以降は active={ID:進捗}。
+  if(typeof raw.active==='string'){
+    const q=questById(raw.active);
+    if(q&&!board.done[q.id])board.active[q.id]=clamp(raw.prog|0,0,Math.max(0,q.n-1));
+  }else if(raw.active&&typeof raw.active==='object'){
+    for(const [id,prog] of Object.entries(raw.active)){
+      const q=questById(id);
+      if(q&&!board.done[id])board.active[id]=clamp(prog|0,0,Math.max(0,q.n-1));
+    }
+  }
+  return board;
+}
 const JUDGE_COMMENTS=[
   '審査記録: 無謀は勇気ではない。だが、挑んだという事実は徳として記録した。',
   '審査記録: 準備を怠った者から順に倒れる。生前も、死後も、それは同じである。',
@@ -1740,7 +1762,7 @@ const player={
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   quickItems:['heal_s','haste','crit'],quickPage:0,
   name:'',quests:{trial:0},
-  qb:{active:null,prog:0,done:{}},          // クエスト掲示板
+  qb:emptyQuestBoard(),                     // 受注中 {クエストID:進捗} / 達成済み
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
@@ -1804,7 +1826,7 @@ function save(){
   try{
     const savedAt=Date.now();
     const serialized=JSON.stringify({
-      v:9,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:10,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
@@ -1827,7 +1849,7 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>9)return false;
+    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>10)return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -1876,10 +1898,7 @@ function load(){
       player.statPts+=migrationStatGrant;
     }
     player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
-    player.qb=(d.qb&&typeof d.qb==='object')
-      ?{active:(d.qb.active&&questById(d.qb.active))?d.qb.active:null,
-        prog:d.qb.prog|0,done:d.qb.done&&typeof d.qb.done==='object'?d.qb.done:{}}
-      :{active:null,prog:0,done:{}};
+    player.qb=normalizeQuestBoard(d.qb);
     const oldKazuDone=d.v<4&&!!player.qb.done.q_tokkuri;
     const st=d.story&&typeof d.story==='object'?d.story:{};
     player.story={
@@ -1896,7 +1915,7 @@ function load(){
       player.story.kazuStage=Math.max(1,player.story.kazuStage);
       delete player.qb.done.q_tokkuri;
     }
-    if(player.qb.active==='q_tokkuri')player.qb.prog=player.story.kazuStage;
+    if(questIsActive('q_tokkuri'))player.qb.active.q_tokkuri=player.story.kazuStage;
     player.ferrymanCoin=!!d.ferrymanCoin||!!player.qb.done.q_tokkuri;
     player.friends=Array.isArray(d.friends)
       ?d.friends.filter(f=>f&&typeof f.id==='string'&&f.id)
@@ -2278,7 +2297,7 @@ function gainItem(id){
 /* ================= クエスト進行 ================= */
 function completeQuest(q){
   player.qb.done[q.id]=true;
-  player.qb.active=null;player.qb.prog=0;
+  delete player.qb.active[q.id];
   player.gold+=q.rw.gold;gainXp(q.rw.xp);
   if(q.rw.key==='ferrymanCoin'&&!player.ferrymanCoin){
     player.ferrymanCoin=true;
@@ -2290,17 +2309,20 @@ function completeQuest(q){
   sfx.coin();
 }
 function questProgress(type,tag){
-  if(!player.qb.active)return;
-  const q=questById(player.qb.active);
-  if(!q||q.type!==type)return;
-  if((type==='kill'||type==='talk')&&!q.mob.includes(tag))return;
-  player.qb.prog++;
-  if(player.qb.prog>=q.n){
-    completeQuest(q);
-  }else{
-    addFloat(player.x,player.y-1.0,`${q.name} ${player.qb.prog}/${q.n}`,'#ffe27a');
+  let changed=false,floatOffset=0;
+  for(const q of activeQuests()){
+    if(q.type!==type)continue;
+    if((type==='kill'||type==='talk')&&!q.mob.includes(tag))continue;
+    const next=Math.min(q.n,questProg(q.id)+1);
+    player.qb.active[q.id]=next;changed=true;
+    if(next>=q.n){
+      completeQuest(q);
+    }else{
+      addFloat(player.x,player.y-1.0-floatOffset,`${q.name} ${next}/${q.n}`,'#ffe27a');
+      floatOffset+=0.25;
+    }
   }
-  save();
+  if(changed)save();
 }
 
 /* ================= 戦闘 ================= */
@@ -2828,6 +2850,12 @@ function renderTavern(){
 }
 
 /* ---- クエスト掲示板 ---- */
+function acceptQuest(id){
+  const q=questById(id);
+  if(!q||player.qb.done[id]||questIsActive(id))return null;
+  player.qb.active[id]=id==='q_tokkuri'?player.story.kazuStage:0;
+  return q;
+}
 function renderKessha(){
   const host=$('kesshaBody');
   const intro='<div class="suggest-note">「ここは結社の窓口。亡者同士が助け合う結社——<b>講</b>の記帳を担っております」<br>'
@@ -2984,31 +3012,39 @@ function renderRepose(){
   });
 }
 function renderBoard(){
-  let html='';
+  const available=QUESTS.filter(q=>!player.qb.done[q.id]&&!questIsActive(q.id));
+  let html=`<div class="itemrow"><span class="nm">受注中 ${activeQuests().length}件
+      <span class="fx">頼み事はすべて同時に進められる</span></span>
+      <button class="buyb" data-qtake-all ${available.length?'':'disabled'}>未受注をすべて受ける</button></div>`;
   for(const q of QUESTS){
     const done=!!player.qb.done[q.id];
-    const active=player.qb.active===q.id;
+    const active=questIsActive(q.id);
     const rw=`${q.rw.gold}モン+${q.rw.xp}徳`;
     let btn;
     if(done)btn=`<button class="buyb" disabled>済</button>`;
     else if(active)btn=`<button class="buyb on" data-qcancel="${q.id}">やめる</button>`;
-    else btn=`<button class="buyb" data-qtake="${q.id}" ${player.qb.active?'disabled':''}>受ける</button>`;
-    const prog=active&&q.n>1?` <b>${player.qb.prog}/${q.n}</b>`:'';
+    else btn=`<button class="buyb" data-qtake="${q.id}">受ける</button>`;
+    const prog=active&&q.n>1?` <b>${questProg(q.id)}/${q.n}</b>`:'';
     html+=`<div class="itemrow"><span class="nm">${q.name}${prog} <span class="fx">${q.desc} — 礼: ${rw}</span></span>${btn}</div>`;
   }
   $('boardList').innerHTML=html;
+  $('boardList').querySelector('[data-qtake-all]')?.addEventListener('click',()=>{
+    const accepted=QUESTS.map(q=>acceptQuest(q.id)).filter(Boolean);
+    if(!accepted.length)return;
+    log(`未受注のクエスト${accepted.length}件をすべて受けた`,'sys');
+    sfx.click();save();renderBoard();
+  });
   for(const b of $('boardList').querySelectorAll('[data-qtake]')){
     b.addEventListener('click',()=>{
-      player.qb.active=b.getAttribute('data-qtake');
-      player.qb.prog=player.qb.active==='q_tokkuri'?player.story.kazuStage:0;
-      const q=questById(player.qb.active);
+      const q=acceptQuest(b.getAttribute('data-qtake'));
+      if(!q)return;
       log(`クエスト「${q.name}」を受けた`,'sys');
       sfx.click();save();renderBoard();
     });
   }
   for(const b of $('boardList').querySelectorAll('[data-qcancel]')){
     b.addEventListener('click',()=>{
-      player.qb.active=null;player.qb.prog=0;
+      delete player.qb.active[b.getAttribute('data-qcancel')];
       sfx.click();save();renderBoard();
     });
   }
@@ -3439,7 +3475,7 @@ function kazuDialogue(){
     if(!player.story.chapter1Seen)pendingChapterEnd=true;
     return '「渡し船は桟橋に着いてる。渡し守の六文銭はなくすなよ。あれは船賃じゃない、次の審査区へ渡る資格の証だ。次に会う時、お前がどんな役目を選んだか聞かせてくれ」';
   }
-  if(player.qb.active!=='q_tokkuri'){
+  if(!questIsActive('q_tokkuri')){
     return '「俺の昔話を聞く気なら、クエストの『酔客の因果話』を受けてきな。酔言かどうかは、お前が歩いた道で確かめりゃいい」';
   }
   const idx=clamp(player.story.kazuStage|0,0,KAZU_STORY.length);
@@ -3450,13 +3486,13 @@ function kazuDialogue(){
   const beat=KAZU_STORY[idx];
   if(!beat.unlock())return beat.wait;
   player.story.kazuStage=idx+1;
-  player.qb.prog=player.story.kazuStage;
-  if(player.qb.prog>=q.n){
+  player.qb.active[q.id]=player.story.kazuStage;
+  if(questProg(q.id)>=q.n){
     completeQuest(q);
     pendingChapterEnd=!player.story.chapter1Seen;
   }else{
-    addFloat(player.x,player.y-1.0,`${q.name} ${player.qb.prog}/${q.n}`,'#ffe27a');
-    log(`カズーの因果話 ${player.qb.prog}/${q.n}`,'sys');
+    addFloat(player.x,player.y-1.0,`${q.name} ${questProg(q.id)}/${q.n}`,'#ffe27a');
+    log(`カズーの因果話 ${questProg(q.id)}/${q.n}`,'sys');
   }
   save();
   return beat.line;
@@ -3505,10 +3541,10 @@ function openNpc(npc){
   else if(npc.kind==='guest'){
     setTalkPortrait('guest');
     $('talkTitle').textContent='カズー';
-    $('talkSub').textContent=player.qb.active==='q_tokkuri'
+    $('talkSub').textContent=questIsActive('q_tokkuri')
       ?`千本亭の常連客・因果話 ${Math.min(player.story.kazuStage+1,KAZU_STORY.length)}/${KAZU_STORY.length}`
       :'千本亭の常連客';
-    $('talkText').textContent=player.qb.active==='q_tokkuri'||player.qb.done.q_tokkuri
+    $('talkText').textContent=questIsActive('q_tokkuri')||player.qb.done.q_tokkuri
       ?kazuDialogue()
       :GUEST_AMBIENT_LINES[guestIdx++%GUEST_AMBIENT_LINES.length]+'　クエストに、俺の話を聞けって頼みが出てるぜ。';
     $('talk').classList.remove('hidden');
@@ -5387,7 +5423,7 @@ function drawKosatsu(sx,sy){
     ctx.restore();
   }
   // 未受注の頼み事があれば「!」
-  const avail=QUESTS.some(q=>!player.qb.done[q.id]&&player.qb.active!==q.id);
+  const avail=QUESTS.some(q=>!player.qb.done[q.id]&&!questIsActive(q.id));
   if(avail){
     const puls=0.6+Math.sin(time*3)*0.4;
     ctx.fillStyle=`rgba(255,225,120,${puls})`;
@@ -6032,9 +6068,11 @@ function hud(){
   $('quickPageBtn').setAttribute('aria-label',
     `アイテムページ${player.quickPage+1}。押すとページ${(player.quickPage+1)%3+1}`);
   el.pt.textContent=player.statPts>0?player.statPts:'';
-  if(player.qb.active){
-    const q=questById(player.qb.active);
-    el.goal.textContent=q.n>1?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
+  const tracking=activeQuests();
+  if(tracking.length){
+    const q=tracking[Math.floor(time/4)%tracking.length];
+    const progress=q.n>1?`${q.name} ${questProg(q.id)}/${q.n}`:q.name;
+    el.goal.textContent=tracking.length>1?`受注中${tracking.length}件｜${progress}`:progress;
   }else{
     el.goal.textContent=player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
       :player.story.dragonCleared?'クエストを受け、カズーの因果話を聞こう'
@@ -7109,7 +7147,7 @@ window.EnmaGameBridge={
   },
   importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
-      payload.v<1||payload.v>9)throw new Error('対応していない記録です');
+      payload.v<1||payload.v>10)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
