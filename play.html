@@ -97,7 +97,7 @@
   #chatBadge[hidden]{display:none}
   #chatBox{width:min(320px,calc(100vw - 24px));background:rgba(16,13,9,.94);
     border:1px solid var(--panel-edge);border-radius:6px;overflow:hidden;
-    box-shadow:0 6px 24px rgba(0,0,0,.5)}
+    box-shadow:0 6px 24px rgba(0,0,0,.5);contain:layout paint}
   #chatBox[hidden]{display:none}
   #chatTabs{display:flex;align-items:center;border-bottom:1px solid #2a2115;background:#171209}
   .chatTab{flex:0 0 auto;background:none;border:none;color:var(--dim);cursor:pointer;
@@ -112,7 +112,7 @@
   #chatClose{margin-left:auto;background:none;border:none;color:var(--dim);
     cursor:pointer;font-size:12px;padding:8px 9px}
   #chatLog{height:168px;overflow-y:auto;padding:8px;display:flex;
-    flex-direction:column;gap:6px;scrollbar-width:thin}
+    flex-direction:column;gap:6px;scrollbar-width:thin;overscroll-behavior:contain}
   #chatLog[hidden]{display:none}
   .chatMsg{max-width:84%;align-self:flex-start;background:#241d13;
     border:1px solid #3a2f1c;border-left:3px solid var(--chatc,#c9a24a);
@@ -153,7 +153,7 @@
   @media (pointer:coarse){#chatIn{font-size:16px}}
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
-    letter-spacing:.1em;padding:0 13px;cursor:pointer}
+    letter-spacing:.1em;padding:0 13px;cursor:pointer;touch-action:manipulation}
   #chatSend:hover{border-color:#6b5730}
   #chatSend:disabled{opacity:.45;cursor:default}
   @media (max-width:860px){
@@ -871,15 +871,33 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 let W=0,H=0,DPR=1;
 let MOBILE_RENDER=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
-function resize(){
+let resizeFrame=0,deferredResize=false;
+const textInputFocused=()=>{
+  const el=document.activeElement;
+  return !!el&&el.matches('textarea,input:not([type]),input[type="text"],input[type="email"],input[type="password"],input[type="search"],input[type="tel"],input[type="url"],input[type="number"]');
+};
+function resize(force=false){
   // スマホは高DPI Canvasの塗りつぶし量が大きいため、見た目を保てる1.5倍で抑える。
-  MOBILE_RENDER=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
-  DPR=Math.min(MOBILE_RENDER?1.5:2,window.devicePixelRatio||1);
-  W=canvas.clientWidth; H=canvas.clientHeight;
-  canvas.width=W*DPR; canvas.height=H*DPR;
+  const nextMobile=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
+  // ソフトウェアキーボードの開閉中はresize通知が連続する。Canvas再確保は入力終了後に1回だけ行う。
+  if(!force&&nextMobile&&textInputFocused()){deferredResize=true;return;}
+  const nextDpr=Math.min(nextMobile?1.5:2,window.devicePixelRatio||1);
+  const nextW=Math.max(1,Math.round(canvas.clientWidth));
+  const nextH=Math.max(1,Math.round(canvas.clientHeight));
+  MOBILE_RENDER=nextMobile;deferredResize=false;
+  if(W===nextW&&H===nextH&&DPR===nextDpr)return;
+  W=nextW;H=nextH;DPR=nextDpr;
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
 }
-window.addEventListener('resize',resize);
+function queueResize(){
+  deferredResize=true;
+  if(resizeFrame)return;
+  resizeFrame=requestAnimationFrame(()=>{resizeFrame=0;resize();});
+}
+window.addEventListener('resize',queueResize,{passive:true});
+window.visualViewport?.addEventListener('resize',queueResize,{passive:true});
+document.addEventListener('focusout',()=>{if(deferredResize)queueResize();});
 const worldViewScale=()=>MOBILE_RENDER?MOBILE_VIEW_SCALE:1;
 
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
@@ -4703,6 +4721,8 @@ const CHAT_CHANNELS={
 };
 const chat={open:false,tab:'general',online:false,worldOnline:false,
   outbox:[],history:[],unread:0,lastSentAt:0};
+const chatMessageDomLimit=()=>MOBILE_RENDER?36:80;
+const chatLogDomLimit=()=>MOBILE_RENDER?60:150;
 function chatMsgNode(m){
   const d=document.createElement('div');
   if(m.channel==='sys'){d.className='chatMsg sysmsg';d.textContent=m.text;return d;}
@@ -4722,13 +4742,16 @@ function logLineNode(entry){
 }
 function renderChatLog(){
   const el=$('chatLog');
-  el.innerHTML='';
+  const fragment=document.createDocumentFragment();
   if(chat.tab==='log'){
-    for(const entry of gameLogHistory)el.appendChild(logLineNode(entry));
+    for(const entry of gameLogHistory.slice(-chatLogDomLimit()))
+      fragment.appendChild(logLineNode(entry));
   }else{
-    for(const m of chat.history)
-      if(m.channel===chat.tab||m.channel==='sys')el.appendChild(chatMsgNode(m));
+    const visible=chat.history.filter(m=>m.channel===chat.tab||m.channel==='sys')
+      .slice(-chatMessageDomLimit());
+    for(const m of visible)fragment.appendChild(chatMsgNode(m));
   }
+  el.replaceChildren(fragment);
   el.scrollTop=el.scrollHeight;
 }
 // 戦闘・取得ログをログタブへ流す(log()はチャット初期化前にも呼ばれ得るため、フックで受ける)
@@ -4736,7 +4759,7 @@ window.__chatMirrorLog=(txt,cls)=>{
   if(!chat.open||chat.tab!=='log')return;
   const el=$('chatLog');
   el.appendChild(logLineNode({text:txt,cls:cls||''}));
-  while(el.children.length>150)el.removeChild(el.firstChild);
+  while(el.children.length>chatLogDomLimit())el.removeChild(el.firstChild);
   el.scrollTop=el.scrollHeight;
 };
 function updateChatBadge(){
@@ -4773,7 +4796,7 @@ function addChatMessage(m){
     if(m.channel===chat.tab||m.channel==='sys'){
       const el=$('chatLog');
       el.appendChild(chatMsgNode(m));
-      while(el.children.length>80)el.removeChild(el.firstChild);
+      while(el.children.length>chatMessageDomLimit())el.removeChild(el.firstChild);
       el.scrollTop=el.scrollHeight;
     }
   }else if(m.channel!=='sys'){
@@ -4856,11 +4879,15 @@ $('chatToggle').addEventListener('click',()=>{
   sfx.click();
 });
 $('chatClose').addEventListener('click',()=>{closeChat();sfx.click();});
+$('chatSend').addEventListener('pointerdown',ev=>{
+  // 送信ボタンで入力欄のフォーカスを奪わず、キーボード開閉による画面再構築を防ぐ。
+  if(MOBILE_RENDER&&document.activeElement===$('chatIn'))ev.preventDefault();
+});
 $('chatSend').addEventListener('click',sendChat);
 $('chatIn').addEventListener('keydown',ev=>{
   ev.stopPropagation();  // 入力中にE/R/F等のスキルが暴発しないように
   if(ev.isComposing||ev.keyCode===229)return;  // 日本語変換確定のEnterは無視
-  if(ev.key==='Enter')sendChat();
+  if(ev.key==='Enter'){ev.preventDefault();sendChat();}
   else if(ev.key==='Escape')closeChat();
 });
 for(const b of document.querySelectorAll('.chatTab'))
@@ -5336,8 +5363,9 @@ function frame(t){
   requestAnimationFrame(frame);
   // タイトル・魂籍画面の裏でゲーム全景を描き続けず、スマホの起動負荷を抑える。
   if(!started)return;
-  // 通信・描画が同時に走る実機では30fpsに抑え、入力と認証UIの応答余力を残す。
-  if(MOBILE_RENDER&&t-lastFrameAt<32)return;
+  // 通信・描画が同時に走る実機では30fps、文字入力中は20fpsに抑えてIMEの応答を優先する。
+  const mobileFrameGap=MOBILE_RENDER?(textInputFocused()?50:32):0;
+  if(mobileFrameGap&&t-lastFrameAt<mobileFrameGap)return;
   lastFrameAt=t;
   let dt=Math.min(0.05,(t-last)/1000||0.016);
   last=t;
