@@ -503,6 +503,15 @@
   .account-grid .account-email{font-size:9.5px}
   .account-profile-form{padding-top:3px}
   .account-cloud{text-align:left}
+  .account-cloud small{display:block;margin-top:5px;color:var(--dim);
+    font:9.5px/1.6 var(--sans)}
+  .account-sync-status{padding:8px 10px;border:1px solid #4b4029;border-radius:3px;
+    background:#13110c;color:var(--parchment)!important}
+  .account-sync-status.synced{border-color:#405a39;color:#a9d39c!important;background:#11180f}
+  .account-sync-status.saving,.account-sync-status.loading{border-color:#765f2e;
+    color:#efd17a!important}
+  .account-sync-status.retrying,.account-sync-status.paused{border-color:#754438;
+    color:#e5a99e!important;background:#211310}
   .account-actions{display:flex;gap:7px;margin-top:10px}
   .account-actions .buyb{flex:1;padding-inline:7px}
   .account-device-save,.account-save-state{margin:0 0 14px;padding:11px 12px;
@@ -1709,8 +1718,9 @@ let resetting=false,migrationStatGrant=0;  // 転生リセット中は自動セ�
 function save(){
   if(resetting)return;
   try{
+    const savedAt=Date.now();
     const serialized=JSON.stringify({
-      v:8,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:8,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
@@ -1727,6 +1737,7 @@ function save(){
     localStorage.setItem(SAVE_KEY,serialized);
     const ownerId=localStorage.getItem(SAVE_OWNER_KEY);
     if(ownerId)localStorage.setItem(accountSaveKey(ownerId),serialized);
+    document.dispatchEvent(new CustomEvent('enma:local-save',{detail:{savedAt}}));
   }catch(e){}
 }
 function load(){
@@ -7004,6 +7015,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721q"></script>
+<script type="module" src="online/account.js?v=20260722a"></script>
 </body>
 </html>

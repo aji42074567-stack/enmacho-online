@@ -26,9 +26,11 @@ const state = {
   profile: null,
   preferences: null,
   cloudSave: null,
+  autoSyncState: 'checking',
+  autoSyncMessage: 'クラウド記録を確認しています…',
   configured: Boolean(config.supabaseUrl && config.supabasePublishableKey),
   message: importedCloudLevel
-    ? `クラウド記録を読み込みました（徳位${importedCloudLevel}）。ゲーム画面へ進めます`
+    ? `最新のクラウド記録を自動同期しました（徳位${importedCloudLevel}）`
     : '',
   error: '',
   busy: false,
@@ -41,6 +43,11 @@ let accountLoadRevision = 0;
 let presenceController = null;
 let worldController = null;
 let socialController = null;
+let cloudSaveTimer = 0;
+let cloudSaveInFlight = false;
+let cloudSaveQueued = false;
+let cloudSaveUserId = '';
+let cloudReloadTimer = 0;
 const reportedSystemEvents = new Map();
 
 async function reportSystemEvent(detail = {}, retry = false) {
@@ -152,6 +159,50 @@ function saveBinding() {
   if (local.ownerId === userId) return { kind: 'match', local };
   if (local.ownerId) return { kind: 'other', local };
   return { kind: 'unclaimed', local };
+}
+
+const payloadSignature = payload => {
+  try {
+    if (!payload || typeof payload !== 'object') return JSON.stringify(payload || null);
+    // 保存時刻だけの更新は「進行が変わった」と扱わず、不要な通信や競合を避ける。
+    const { savedAt: _savedAt, ...progress } = payload;
+    return JSON.stringify(progress);
+  } catch { return ''; }
+};
+
+const payloadSavedAt = (payload, fallback = '') => {
+  const direct = Number(payload?.savedAt);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const parsed = Date.parse(fallback || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+function setAutoSyncState(kind, message) {
+  state.autoSyncState = kind;
+  state.autoSyncMessage = message;
+  const status = document.getElementById('accountCloudState');
+  if (status) {
+    status.className = `account-sync-status ${kind}`;
+    status.textContent = message;
+  }
+  const cloudLevel = document.getElementById('accountCloudLevel');
+  if (cloudLevel) cloudLevel.textContent = state.cloudSave?.payload?.lv ?? '同期前';
+}
+
+function scheduleAccountReload(delay = 10_000) {
+  window.clearTimeout(cloudReloadTimer);
+  cloudReloadTimer = window.setTimeout(() => {
+    cloudReloadTimer = 0;
+    if (!state.client || !state.session?.user?.id) return;
+    void loadAccountData().catch(error => {
+      setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
+      void reportSystemEvent({
+        source: 'account', code: 'cloud_autoload_failed', severity: 'warning',
+        message: error?.message || 'cloud autoload failed',
+      });
+      scheduleAccountReload();
+    });
+  }, delay);
 }
 
 function bindLegacySaveIfSafe() {
@@ -297,7 +348,7 @@ function renderSignedIn() {
     <div class="account-grid">
       <div><span>魂名</span><b>${esc(profile.display_name || 'ナナシ')}</b></div>
       <div><span>身分</span><b>${esc(stageLabel(profile.soul_stage || localProfile.soulStage))}</b></div>
-      <div><span>クラウド徳位</span><b>${esc(cloud?.payload?.lv ?? '未保存')}</b></div>
+      <div><span>同期中の徳位</span><b id="accountCloudLevel">${esc(cloud?.payload?.lv ?? '同期前')}</b></div>
       <div><span>メール</span><b class="account-email">${esc(state.session?.user?.email || '')}</b></div>
     </div>
     <div class="account-save-state ${conflict ? 'conflict' : 'match'}">
@@ -314,7 +365,7 @@ function renderSignedIn() {
     ${conflict ? `<div class="account-save-warning">
       <b>記録の混在を止めています</b>
       <p>${cloud
-        ? '下の「この魂籍の記録へ切り替える」で、現在ログイン中のクラウド記録を読み込めます。'
+        ? '別の魂籍か確認できない端末記録があるため、自動同期を一時停止しています。現在の魂籍へ切り替えると自動同期を再開します。'
         : bound
           ? `この端末に「${esc(bound.name || 'ナナシ')}・徳位${esc(bound.lv || 1)}」の記録が残っています。そこへ戻せます。`
         : binding.kind === 'unclaimed'
@@ -330,18 +381,12 @@ function renderSignedIn() {
     </form>
     <div class="account-divider"><span>魂の記録</span></div>
     <div class="account-cloud">
-      <p>${cloud
-        ? `クラウド記録：徳位${esc(cloud.payload?.lv ?? '—')}・v${esc(cloud.save_version)}・${esc(new Date(cloud.updated_at).toLocaleString('ja-JP'))}`
-        : 'クラウド記録はまだありません'}</p>
-      <div class="account-actions">
-        <button class="buyb" id="cloudUpload" type="button"
-          ${state.busy || conflict ? 'disabled' : ''}>端末 → クラウドへ保存</button>
-        <button class="buyb" id="cloudDownload" type="button"
-          ${state.busy || !cloud ? 'disabled' : ''}>${conflict
-            ? 'この魂籍の記録へ切り替える'
-            : 'クラウド → この端末へ読込'}</button>
-      </div>
+      <p id="accountCloudState" class="account-sync-status ${esc(state.autoSyncState)}">${esc(state.autoSyncMessage)}</p>
+      <small>ログイン中は進行を端末とクラウドへ自動保存します。別端末では最新の記録が自動で開きます。</small>
     </div>
+    ${conflict && cloud
+      ? '<div class="account-switch-actions"><button class="buyb" id="cloudDownload" type="button">この魂籍の記録へ切り替える</button></div>'
+      : ''}
     ${conflict && !cloud ? `<div class="account-switch-actions">
       ${bound
         ? '<button class="buyb" id="restoreBoundSave" type="button">この魂籍の端末記録へ切り替える</button>'
@@ -356,7 +401,6 @@ function renderSignedIn() {
     <p class="account-logout-note">他のスマホ・PCはログインしたままです。端末記録も消えません。</p>`;
 
   document.getElementById('soulProfileForm')?.addEventListener('submit', updateProfile);
-  document.getElementById('cloudUpload')?.addEventListener('click', uploadCloudSave);
   document.getElementById('cloudDownload')?.addEventListener('click', downloadCloudSave);
   document.getElementById('claimLocalSave')?.addEventListener('click', claimLocalSave);
   document.getElementById('restoreBoundSave')?.addEventListener('click', restoreBoundSave);
@@ -380,7 +424,7 @@ async function fetchAccountData(userId) {
     state.client.from('profiles').select('*').eq('id', userId).single(),
     state.client.from('account_preferences').select('newsletter_opt_in')
       .eq('user_id', userId).single(),
-    state.client.from('game_saves').select('save_version,revision,updated_at,payload')
+    state.client.from('game_saves').select('save_version,revision,client_updated_at,updated_at,payload')
       .eq('user_id', userId).maybeSingle(),
   ]);
   return { profileResult, preferencesResult, cloudSaveResult };
@@ -389,6 +433,12 @@ async function fetchAccountData(userId) {
 async function loadAccountData() {
   const revision = ++accountLoadRevision;
   if (!state.session || !state.client) {
+    window.clearTimeout(cloudReloadTimer);
+    cloudReloadTimer = 0;
+    window.clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = 0;
+    cloudSaveQueued = false;
+    cloudSaveUserId = '';
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
@@ -397,6 +447,9 @@ async function loadAccountData() {
     return;
   }
   const userId = state.session.user.id;
+  window.clearTimeout(cloudReloadTimer);
+  cloudReloadTimer = 0;
+  cloudSaveUserId = '';
   let results;
   try {
     results = await withTimeout(
@@ -409,6 +462,9 @@ async function loadAccountData() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    cloudSaveUserId = '';
+    setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
+    scheduleAccountReload();
     setFeedback('', `${error.message}。ゲームはそのまま開始できます`);
     syncOnlineControllers(state.session, null);
     render();
@@ -434,6 +490,8 @@ async function loadAccountData() {
     } catch (retryError) {
       if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
       setFeedback('', `${retryError.message}。ゲームはそのまま開始できます`);
+      setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
+      scheduleAccountReload();
       syncOnlineControllers(state.session, state.profile);
       render();
       return;
@@ -456,10 +514,14 @@ async function loadAccountData() {
       ? '認証情報の時刻を同期できませんでした。数秒待ってアカウント画面を開き直してください'
       : `メール設定を読めませんでした：${preferencesError.message}`);
   } else if (saveError) {
+    cloudSaveUserId = '';
+    setAutoSyncState('retrying', 'クラウド記録を確認できません。自動保存を一時停止しています');
+    scheduleAccountReload();
     setFeedback('', isJwtClockSkew(saveError)
       ? '認証情報の時刻を同期できませんでした。数秒待ってアカウント画面を開き直してください'
       : `クラウド記録を確認できませんでした：${saveError.message}`);
   } else {
+    cloudSaveUserId = userId;
     state.error = '';
   }
   state.profile = profile;
@@ -471,7 +533,10 @@ async function loadAccountData() {
     void state.client.from('profiles').update({ last_seen_at: lastSeenAt })
       .eq('id', userId).then(() => {});
   }
-  bindLegacySaveIfSafe();
+  if (!saveError) {
+    const syncReady = await reconcileCloudSave();
+    if (!syncReady) return;
+  }
   syncOnlineControllers(state.session, state.profile);
   render();
 }
@@ -594,27 +659,150 @@ async function updateProfile(event) {
   });
 }
 
-async function uploadCloudSave() {
-  await withBusy(async () => {
-    const payload = window.EnmaGameBridge?.exportSave?.();
-    if (!payload) throw new Error('この端末に保存記録がありません');
-    const binding = saveBinding();
-    if (binding.kind === 'other')
-      throw new Error('別の魂籍の端末記録は保存できません。先に記録を切り替えてください');
-    if (binding.kind === 'unclaimed')
-      window.EnmaGameBridge?.claimSave?.(state.session.user.id);
-    const { data, error } = await state.client.from('game_saves').upsert({
-      user_id: state.session.user.id,
+function scheduleCloudSave(delay = 600) {
+  if (!state.client || !state.session?.user?.id
+    || cloudSaveUserId !== state.session.user.id) return;
+  if (cloudSaveInFlight) {
+    cloudSaveQueued = true;
+    return;
+  }
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => void flushCloudSave(), delay);
+}
+
+async function fetchLatestCloudSave() {
+  const { data, error } = await state.client.from('game_saves')
+    .select('save_version,revision,client_updated_at,updated_at,payload')
+    .eq('user_id', state.session.user.id).maybeSingle();
+  if (error) throw error;
+  state.cloudSave = data;
+  cloudSaveUserId = state.session.user.id;
+  return data;
+}
+
+async function reconcileCloudSave() {
+  if (!state.client || !state.session?.user?.id) return true;
+  bindLegacySaveIfSafe();
+  const binding = saveBinding();
+  const local = binding.local;
+  const cloud = state.cloudSave;
+
+  // 記録が無い端末、または別魂籍の端末ではログイン中の魂籍を自動で開く。
+  // importSaveは別魂籍の端末記録を専用領域へ退避してから切り替える。
+  if (cloud && (binding.kind === 'empty' || binding.kind === 'other')) {
+    setAutoSyncState('loading', '最新のクラウド記録へ自動で切り替えています…');
+    window.EnmaGameBridge?.importSave?.(cloud.payload, { ownerId: state.session.user.id });
+    return false;
+  }
+
+  if (!cloud && binding.kind === 'empty') {
+    // まっさらな魂籍は、最初のゲーム保存が起きる前にこの端末へ紐付けておく。
+    window.EnmaGameBridge?.claimSave?.(state.session.user.id);
+    setAutoSyncState('synced', 'プレイ開始後から自動保存します');
+    return true;
+  }
+
+  if (binding.kind !== 'match') {
+    setAutoSyncState('paused', '魂籍の確認が必要なため、自動同期を一時停止しています');
+    return true;
+  }
+  if (!local.payload) return true;
+  if (!cloud) {
+    setAutoSyncState('saving', '最初のクラウド記録を自動保存しています…');
+    scheduleCloudSave(0);
+    return true;
+  }
+
+  const localSignature = payloadSignature(local.payload);
+  const cloudSignature = payloadSignature(cloud.payload);
+  if (localSignature === cloudSignature) {
+    const syncedAt = new Date(cloud.updated_at).toLocaleTimeString('ja-JP', {
+      hour: '2-digit', minute: '2-digit',
+    });
+    setAutoSyncState('synced', `自動保存済み（${syncedAt}）`);
+    return true;
+  }
+
+  const localAt = payloadSavedAt(local.payload);
+  const cloudAt = payloadSavedAt(cloud.payload, cloud.client_updated_at || cloud.updated_at);
+  if (cloudAt > localAt) {
+    setAutoSyncState('loading', '別端末の新しい記録を自動で読み込んでいます…');
+    window.EnmaGameBridge?.importSave?.(cloud.payload, { ownerId: state.session.user.id });
+    return false;
+  }
+
+  setAutoSyncState('saving', 'この端末の進行をクラウドへ自動保存しています…');
+  scheduleCloudSave(0);
+  return true;
+}
+
+async function flushCloudSave() {
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = 0;
+  if (!state.client || !state.session?.user?.id) return;
+  if (cloudSaveInFlight) {
+    cloudSaveQueued = true;
+    return;
+  }
+  const binding = saveBinding();
+  const payload = binding.local.payload;
+  if (binding.kind !== 'match' || !payload) return;
+  if (state.cloudSave && payloadSignature(payload) === payloadSignature(state.cloudSave.payload)) {
+    setAutoSyncState('synced', 'クラウドへ自動保存済み');
+    return;
+  }
+
+  cloudSaveInFlight = true;
+  cloudSaveQueued = false;
+  let retryDelay = 0;
+  setAutoSyncState('saving', 'クラウドへ自動保存中…');
+  try {
+    const savedAt = payloadSavedAt(payload) || Date.now();
+    const values = {
       save_version: Number(payload.v) || 1,
       payload,
       revision: (state.cloudSave?.revision || 0) + 1,
-      client_updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-      .select('save_version,revision,updated_at,payload').single();
-    if (error) throw error;
-    state.cloudSave = data;
-    setFeedback('この端末の記録をクラウドへ保存しました');
-  });
+      client_updated_at: new Date(savedAt).toISOString(),
+    };
+    let result;
+    if (state.cloudSave) {
+      result = await state.client.from('game_saves').update(values)
+        .eq('user_id', state.session.user.id)
+        .eq('revision', state.cloudSave.revision)
+        .select('save_version,revision,client_updated_at,updated_at,payload').maybeSingle();
+    } else {
+      result = await state.client.from('game_saves').insert({
+        user_id: state.session.user.id,
+        ...values,
+      }).select('save_version,revision,client_updated_at,updated_at,payload').single();
+    }
+
+    // ほかの端末が先に更新した場合は、上書きせず最新記録を取り直して比較する。
+    if (result.error || !result.data) {
+      if (result.error && result.error.code !== '23505') throw result.error;
+      await fetchLatestCloudSave();
+      await reconcileCloudSave();
+      return;
+    }
+    state.cloudSave = result.data;
+    setAutoSyncState('synced', 'クラウドへ自動保存済み');
+  } catch (error) {
+    setAutoSyncState('retrying', '通信が戻り次第、自動保存を再試行します');
+    void reportSystemEvent({
+      source: 'account', code: 'cloud_autosave_failed', severity: 'warning',
+      message: error?.message || 'cloud autosave failed',
+    });
+    retryDelay = 10_000;
+  } finally {
+    cloudSaveInFlight = false;
+    if (retryDelay) {
+      cloudSaveQueued = false;
+      scheduleCloudSave(retryDelay);
+    } else if (cloudSaveQueued) {
+      cloudSaveQueued = false;
+      scheduleCloudSave(500);
+    }
+  }
 }
 
 async function downloadCloudSave() {
@@ -634,7 +822,8 @@ async function claimLocalSave() {
   if (!local.payload || !state.session) return;
   if (!confirm(`端末の「${local.name}・徳位${local.level}」を、現在の魂籍の記録として使いますか？`)) return;
   window.EnmaGameBridge?.claimSave?.(state.session.user.id);
-  setFeedback('端末記録を現在の魂籍へ紐付けました。クラウドへ保存できます');
+  setFeedback('端末記録を現在の魂籍へ紐付けました。自動同期を開始します');
+  scheduleCloudSave(0);
   render();
 }
 
@@ -665,6 +854,13 @@ async function signOut() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    window.clearTimeout(cloudSaveTimer);
+    window.clearTimeout(cloudReloadTimer);
+    cloudSaveTimer = 0;
+    cloudReloadTimer = 0;
+    cloudSaveQueued = false;
+    cloudSaveUserId = '';
+    setAutoSyncState('offline', 'ログインすると自動同期します');
     syncOnlineControllers(null, null);
     state.authMode = 'login';
     state.sessionSource = 'manual';
@@ -731,4 +927,8 @@ async function initialize(attempt = 0) {
 }
 
 document.addEventListener('enma-account-open', render);
+document.addEventListener('enma:local-save', () => scheduleCloudSave(600));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) scheduleCloudSave(0);
+});
 initialize();
