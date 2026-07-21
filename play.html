@@ -1315,8 +1315,8 @@ const ENMA_SOUL_VOICES=[
 ];
 const ENMA_SOUL_LAYOUT={
   1:[[37,41,0],[40,35,1],[33,36,2],[29,29,3],[24,24,4]],
-  2:[[36,40,5],[35,36,6],[39,29,7],[30,28,8],[24,23,9]],
-  3:[[37,40,10],[40,33,11],[33,35,12],[28,29,13],[25,24,14]],
+  2:[[36,40,5],[35,36,6],[33,31,7],[30,28,8],[24,23,9]],
+  3:[[37,40,10],[37,35,11],[33,35,12],[28,29,13],[25,24,14]],
 };
 const KAZU_STORY=[
   {
@@ -3495,14 +3495,17 @@ function buildEnmaHall(){
     blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
     tileKind=new Uint8Array(MAP*MAP);
     props=[];npcs=[];mobs=[];
-    const carve=(x0,y0,x1,y1)=>{
-      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    // 背景の中央通路・前後の階段だけを歩行可能にする。
+    // x-y が画面上の左右、x+y が画面上の奥行きに対応する。
+    for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+      const depth=x+y,side=Math.abs(x-y);
+      const aisle=depth>=43&&depth<=83&&side<=6;
+      const frontSteps=depth>83&&depth<=90&&side<=4;
+      const upperSteps=depth>=37&&depth<43&&side<=5;
+      if(aisle||frontSteps||upperSteps){
         blocked[y*MAP+x]=0;tileKind[y*MAP+x]=6;
       }
-    };
-    carve(22,22,42,42);   // 中央の大広間
-    carve(18,18,26,26);   // 奥の階段・壇上
-    carve(39,39,45,45);   // 正面の階段・踊り場
+    }
     for(const L of ENMA_LINKS){
       if(L.from===zn&&L.label)
         props.push({x:L.at.x,y:L.at.y,kind:'hallportal',label:L.label,tone:L.tone});
@@ -3617,24 +3620,37 @@ function switchZone(z,px,py){
 // 読み込みに失敗したら従来のコード描画にフォールバックする
 const SPRITES={};
 const SPRITE_SOURCES=[];
+const SPRITE_PENDING=new Map();
 let spriteAssetsStarted=false;
 function loadSprite(key,src){
   SPRITE_SOURCES.push([key,src]);
+}
+function startOneSprite(key,src,attempt=0){
+  const img=new Image();
+  SPRITE_PENDING.set(key,img);   // 読込中も参照を保持し、スマホで破棄されにくくする
+  img.onload=()=>{
+    if(SPRITE_PENDING.get(key)!==img)return;
+    SPRITE_PENDING.delete(key);
+    SPRITES[key]=img;
+    const W2={map_enmacho_1f:ENMA1,map_enmacho_2f:ENMA2,map_enmacho_3f:ENMA3}[key];
+    if(W2){
+      W2.ground._groundReady=false;
+      if(started&&ground===W2.ground)renderGroundEnma(W2);
+    }
+  };
+  img.onerror=()=>{
+    if(SPRITE_PENDING.get(key)!==img)return;
+    if(key.startsWith('map_enmacho_')&&attempt<2){
+      setTimeout(()=>startOneSprite(key,src,attempt+1),500*(attempt+1));
+    }else SPRITE_PENDING.delete(key);
+  };
+  img.src=attempt?`${src}${src.includes('?')?'&':'?'}retry=${attempt}`:src;
 }
 function startSpriteAssets(){
   if(spriteAssetsStarted)return;
   spriteAssetsStarted=true;
   for(const [key,src] of SPRITE_SOURCES){
-    const img=new Image();
-    img.onload=()=>{
-      SPRITES[key]=img;
-      const W2={map_enmacho_1f:ENMA1,map_enmacho_2f:ENMA2,map_enmacho_3f:ENMA3}[key];
-      if(W2){
-        W2.ground._groundReady=false;
-        if(started&&ground===W2.ground)renderGroundEnma(W2);
-      }
-    };
-    img.src=src;
+    startOneSprite(key,src);
   }
 }
 function startGameplayAssets(){
@@ -3690,9 +3706,9 @@ loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
 loadSprite('map_smithy','assets/map_smithy.png');
 loadSprite('map_enmacho_hall','assets/map_enmacho_hall.png');
-loadSprite('map_enmacho_1f','assets/map_enmacho_1f.jpg');
-loadSprite('map_enmacho_2f','assets/map_enmacho_2f.jpg');
-loadSprite('map_enmacho_3f','assets/map_enmacho_3f.jpg');
+loadSprite('map_enmacho_1f',MOBILE_RENDER?'assets/map_enmacho_1f_mobile.jpg':'assets/map_enmacho_1f.jpg');
+loadSprite('map_enmacho_2f',MOBILE_RENDER?'assets/map_enmacho_2f_mobile.jpg':'assets/map_enmacho_2f.jpg');
+loadSprite('map_enmacho_3f',MOBILE_RENDER?'assets/map_enmacho_3f_mobile.jpg':'assets/map_enmacho_3f.jpg');
 loadSprite('npc_enma','assets/npc_enma.png');
 loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
 loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
