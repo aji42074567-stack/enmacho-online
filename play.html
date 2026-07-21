@@ -1065,6 +1065,7 @@ const AUTO_RANGE=8;
 const COMBAT_HOLD_SECONDS=4;
 const MOB_RESPAWN_SECONDS=45;
 const BOSS_RESPAWN_SECONDS=120;
+const DRAKE_RESPAWN_SECONDS=30*60;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -1633,7 +1634,7 @@ function save(){
   if(resetting)return;
   try{
     const serialized=JSON.stringify({
-      v:7,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:8,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
@@ -1655,7 +1656,7 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6&&d.v!==7))return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3&&d.v!==4&&d.v!==5&&d.v!==6&&d.v!==7&&d.v!==8))return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -1726,7 +1727,9 @@ function load(){
       :[];
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
-    player.smithIntro=!!d.smithIntro;player.drakeKilledAt=d.drakeKilledAt||0;
+    player.smithIntro=!!d.smithIntro;
+    // v7以前は2時間の出現枠を記録していたため、更新時は討伐待ちを解除する。
+    player.drakeKilledAt=d.v>=8?Math.max(0,Number(d.drakeKilledAt)||0):0;
     const cfg=d.settings&&typeof d.settings==='object'?d.settings:{};
     settings.bgm=clamp(Number.isFinite(+cfg.bgm)?+cfg.bgm:55,0,100);
     settings.sfx=clamp(Number.isFinite(+cfg.sfx)?+cfg.sfx:100,0,100);
@@ -2035,7 +2038,8 @@ function damageMob(m,dmg,crit,kind='melee'){
   if(m.state==='idle'){m.state='chase';m.repath=0;}
   if(m.hp<=0)killMob(m);else (crit?sfx.crit:sfx.hit)();
 }
-function markMobDead(m,respawn=m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS){
+function markMobDead(m,respawn=m.type==='drake'?DRAKE_RESPAWN_SECONDS:
+  m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS){
   m.deadUntil=Math.max(m.deadUntil||0,performance.now()+respawn*1000);
   if(m.dead){m.respawn=respawn;return false;}
   m.dead=true;m.hp=0;m.respawn=respawn;
@@ -2102,7 +2106,7 @@ function grantMobReward(m){
     log('カズーが話していた因果の続きが聞けそうだ','sys');
   }
   if(m.type==='drake'){
-    player.drakeKilledAt=drakeWindow();
+    player.drakeKilledAt=Date.now();
     if(!player.story.dragonCleared){
       player.story.dragonCleared=true;
       log('島を閉ざしていた海霧が晴れ、桟橋に渡し船が現れた','gain');
@@ -2112,7 +2116,7 @@ function grantMobReward(m){
   if(Math.random()<0.04)log('[系統] 徳パラメータ更新…記録完了','glitch');
   sfx.kill();burst(m.x,m.y,'#d9c07a',14);
   if(m.def.boss){banner={txt:m.def.name+'鎮魂！',age:0};addShake(7,0.35);
-    log(m.type==='drake'?'竜の巣が静まりかえった…(次の竜は偶数時0分に現れる)':'洞窟の最深部が静まりかえった…(120秒後にまた迷い出る)','sys');}
+    log(m.type==='drake'?'竜の巣が静まりかえった…(ゴウリュウは30分後に再び現れる)':'洞窟の最深部が静まりかえった…(120秒後にまた迷い出る)','sys');}
   questProgress('kill',m.type);
   if(m.type==='oni_blue'&&player.quests.trial<2){
     player.quests.trial=2;
@@ -3180,7 +3184,6 @@ function update(dt){
       continue;
     }
     if(m.dead){
-      if(m.type==='drake')continue;   // 竜の再出現は偶数時0分の窓で管理
       m.respawn-=dt;
       if(m.respawn<=0){
         m.dead=false;m.hp=m.maxHp;m.x=m.home.x;m.y=m.home.y;
@@ -3755,7 +3758,7 @@ function buildDragonCaves(){
     for(const L of CAVE_LINKS)if(L.from===zn&&L.kind)props.push({x:L.at.x,y:L.at.y,kind:L.kind});
     for(const m of def.mobs)spawnMob(...m);
     if(f===4){
-      spawnMob('drake',44,30);   // 最深部の主。出現は偶数時0分の窓で管理
+      spawnMob('drake',44,30);   // 最深部の主。初回出現は下の30分周期管理で行う
       const dk=mobs.find(m=>m.type==='drake');
       if(dk)dk.dead=true;
     }
@@ -3764,15 +3767,17 @@ function buildDragonCaves(){
     DGW.push(w);
   }
 }
-/* ---- ゴウリュウの出現管理(偶数時0分の窓・同時に1体まで) ---- */
-const drakeWindow=()=>{const d=new Date();d.setMinutes(0,0,0);if(d.getHours()%2)d.setHours(d.getHours()-1);return d.getTime();};
+/* ---- ゴウリュウの出現管理(討伐から30分・同時に1体まで) ---- */
 function checkDrake(){
   if(sharedWorld.connected&&sharedWorld.zone==='dg5')return;  // 竜の巣は現世同期中サーバー管理
   const w=DGW[4];if(!w)return;
   const m=w.mobs.find(x=>x.type==='drake');
   if(!m||!m.dead)return;
-  if(player.drakeKilledAt===drakeWindow())return;   // この出現枠では討伐済み
+  const remaining=player.drakeKilledAt
+    ?DRAKE_RESPAWN_SECONDS-(Date.now()-player.drakeKilledAt)/1000:0;
+  if(remaining>0){m.respawn=remaining;return;}
   m.dead=false;m.hp=m.maxHp;m.x=m.home.x;m.y=m.home.y;m.state='idle';m.path=[];
+  m.deadUntil=0;m.respawn=0;m.spawnT=0.8;
   if(started)log('地の底から咆哮が響いた…ゴウリュウが現れた','sys');
 }
 function switchZone(z,px,py){
@@ -6283,8 +6288,9 @@ window.EnmaGameBridge={
     const spawns=w.mobs.map(m=>{
       types[m.type]=true;
       return{type:m.type,x:Math.round(m.home.x),y:Math.round(m.home.y),
-        respawnMs:(m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS)*1000,
-        schedule:m.type==='drake'?'even2h':''};
+        respawnMs:(m.type==='drake'?DRAKE_RESPAWN_SECONDS:
+          m.def.boss?BOSS_RESPAWN_SECONDS:MOB_RESPAWN_SECONDS)*1000,
+        schedule:m.type==='drake'?'dragon30m':''};
     });
     const defs={};
     for(const t of Object.keys(types)){

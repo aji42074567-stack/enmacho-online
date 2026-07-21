@@ -3,6 +3,7 @@ const TICK_MS = 100;
 // 差分だけを送りつつ、移動は10fpsで届かせて補間の遅れを抑える。
 const SNAPSHOT_MS = 100;
 const RESPAWN_MS = 45_000;
+const DRAKE_RESPAWN_MS = 30 * 60_000;
 const RESPAWN_NEARBY_RADIUS = 5;
 const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
@@ -78,15 +79,6 @@ function onIsland(x, y) {
   return x >= 2 && y >= 2 && x <= 69 && y <= 69 && islandDistance(x, y) <= 1.7;
 }
 
-// ゴウリュウの出現枠: 偶数時0分(日本時間)を起点にした2時間窓
-function evenWindowStart(now) {
-  const HOUR = 3_600_000;
-  const jst = now + 9 * HOUR;
-  let start = Math.floor(jst / HOUR) * HOUR;
-  if (Math.floor(jst / HOUR) % 2) start -= HOUR;
-  return start - 9 * HOUR;
-}
-
 // クライアントの敵配置が更新されたら部屋データを差し替えるための署名
 function zoneSignature(data) {
   const text = JSON.stringify([data.spawns, data.defs, data.walls]);
@@ -129,12 +121,16 @@ function validateZoneInit(zone, data) {
     if (!raw || typeof raw !== 'object' || !defs[raw.type]) return null;
     const x = clamp(Math.round(finite(raw.x, 0)), 1, MAP - 2);
     const y = clamp(Math.round(finite(raw.y, 0)), 1, MAP - 2);
+    const isDrake = zone === 'dg5' && raw.type === 'drake';
     spawns.push({
       type: raw.type,
       x,
       y,
-      respawnMs: clamp(Math.trunc(finite(raw.respawnMs, RESPAWN_MS)), 5_000, 3_600_000),
-      schedule: raw.schedule === 'even2h' ? 'even2h' : '',
+      // 旧キャッシュのクライアントから2時間設定が届いても、サーバー側で30分へ固定する。
+      respawnMs: isDrake
+        ? DRAKE_RESPAWN_MS
+        : clamp(Math.trunc(finite(raw.respawnMs, RESPAWN_MS)), 5_000, 3_600_000),
+      schedule: isDrake ? 'dragon30m' : '',
     });
   }
 
@@ -188,6 +184,7 @@ export default {
         service: 'enmacho-world',
         version: WORLD_VERSION,
         respawnSeconds: RESPAWN_MS / 1_000,
+        dragonRespawnSeconds: DRAKE_RESPAWN_MS / 1_000,
       });
     }
     const zoneMatch = url.pathname.match(/^\/world\/([a-z0-9]+)$/);
@@ -201,8 +198,9 @@ export default {
     const identity = await authenticate(request, env);
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
-    // fieldは既存部屋名(field-v1)を継続利用し、他ゾーンはゾーン名ごとの部屋
-    const roomId = env.WORLD_ROOMS.idFromName(zone === 'field' ? 'field-v1' : `${zone}-v1`);
+    // dg5だけ新しい部屋へ切り替え、今回の更新時にゴウリュウを即時復活させる。
+    const roomName = zone === 'field' ? 'field-v1' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
+    const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
     headers.set('x-enma-display-name', identity.displayName);
@@ -439,7 +437,6 @@ export class WorldRoom {
       monster.dead = true;
       monster.respawnAt = now + (monster.respawnMs || RESPAWN_MS);
       monster.forceRespawnAt = now + (monster.respawnMs || RESPAWN_MS) * 2;
-      if (monster.schedule === 'even2h') monster.killedWindow = evenWindowStart(now);
       monster.targetId = '';
       monster.state = 'dead';
       monster.moving = false;
@@ -483,9 +480,9 @@ export class WorldRoom {
     for (const monster of this.mobs) {
       monster.moving = false;
       if (monster.dead) {
-        if (monster.schedule === 'even2h') {
-          // ゴウリュウは偶数時0分の新しい出現枠が来たら現れる
-          if (evenWindowStart(now) !== monster.killedWindow) this.respawn(monster, now);
+        if (monster.schedule === 'dragon30m') {
+          // ゴウリュウは討伐から30分後、付近のプレイヤー有無にかかわらず復活する。
+          if (now >= monster.respawnAt) this.respawn(monster, now);
           continue;
         }
         if (now >= monster.respawnAt) {
@@ -630,9 +627,7 @@ export class WorldRoom {
   reconcileRespawns(now) {
     for (const monster of this.mobs) {
       if (!monster.dead) continue;
-      if (monster.schedule === 'even2h') {
-        if (evenWindowStart(now) !== monster.killedWindow) this.respawn(monster, now);
-      } else if (now >= monster.respawnAt) {
+      if (now >= monster.respawnAt) {
         this.respawn(monster, now);
       }
     }
@@ -648,8 +643,7 @@ export class WorldRoom {
       maxHp: monster.maxHp,
       dead: monster.dead,
       respawn: monster.dead
-        ? Math.max(0, ((monster.schedule === 'even2h'
-          ? evenWindowStart(now) + 7_200_000 : monster.respawnAt) - now) / 1_000)
+        ? Math.max(0, (monster.respawnAt - now) / 1_000)
         : 0,
       state: monster.state,
       moving: monster.moving,
