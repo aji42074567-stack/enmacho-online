@@ -1392,12 +1392,12 @@ const KAZU_STORY=[
   {
     unlock:()=>player.story.oniKingCleared,
     wait:'「試練の洞窟は青鬼で終わりじゃねえ。地下三層の奥まで行き、オニオウを鎮めてみな」',
-    line:'「因果応報ってのは罰の札じゃねえ。蒔いた種を刈り取ることだ。刈り終えれば、また新しい種を選べる。閻魔庁の仕事は、その機会を残すことさ」',
+    line:'「因果応報ってのは罰の札じゃねえ。蒔いた種を刈り取れば、また新しい種を選べる。オニオウを鎮めたなら、次は南西の浜はずれにある無縁塚へ行け。骨の王ガシャオウを鎮めて、初めて竜への道が開く」',
   },
   {
     unlock:()=>player.story.gashaoCleared||player.story.dragonCleared,
     wait:'「南西の浜はずれに無縁塚がある。誰にも弔われず、忘れられた骨の吹き溜まりだ。地の底で骨の王ガシャオウが唸ってる。竜に挑む前に、あいつらを鎮めてやってくれ」',
-    line:'「人はな、二度死ぬんだ。体が滅んだ時と、みんなから忘れられた時だ。無縁塚の連中は二度目の死に飲まれかけて化けた。鎮めるってのはな、覚えていてやるってことだ」',
+    line:'「人はな、二度死ぬんだ。体が滅んだ時と、みんなから忘れられた時だ。無縁塚の連中は二度目の死に飲まれかけて化けた。鎮めるってのは、覚えていてやるってことだ。これで北西の竜の洞窟へ進める」',
   },
   {
     unlock:()=>player.story.dragonCaveReached,
@@ -2210,13 +2210,19 @@ function grantMobReward(m){
     xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
-    log('カズーが話していた因果の続きが聞けそうだ','sys');
+    if(player.story.gashaoCleared)
+      log('二つの鎮魂記録がそろい、北西の竜の洞窟を塞ぐ骨が崩れた','gain');
+    else
+      log('カズーが次の鎮魂先を知っているようだ。千本亭へ戻ろう','sys');
   }
   if(m.type==='gashao'&&!player.story.gashaoCleared){
     player.story.gashaoCleared=true;
     log('無数の魂が白い光の粒になって、静かに昇っていった…','gain');
     log('[系統] 無縁データ群 保全完了…参照回復…転生キューへ再接続','glitch');
-    log('北西の竜の洞窟を塞いでいた骨が、音を立てて崩れたようだ','sys');
+    if(player.story.oniKingCleared)
+      log('二つの鎮魂記録がそろい、北西の竜の洞窟を塞ぐ骨が崩れた','gain');
+    else
+      log('竜への道には、試練の洞窟のオニオウの鎮魂記録も必要だ','sys');
   }
   if(m.type==='drake'){
     player.drakeKilledAt=Date.now();
@@ -3397,6 +3403,8 @@ const GROUND_TILE_SOURCES=[
   ['sea','assets/map_tile_sea.png'],
   ['cavefloor','assets/map_cave_floor.png'],
   ['cavewall','assets/map_cave_wall.png'],
+  ['muenfloor','assets/map_muen_floor.png'],
+  ['muenwall','assets/map_muen_wall.png'],
 ];
 function scheduleActiveGroundRender(){
   if(!started||groundRenderQueued)return;
@@ -3668,10 +3676,14 @@ function renderGround(){
 function renderGroundCave(world){
   const tgt=world?world.ground:ground;   // 画像の遅延読み込み後も洞窟側へ描く
   const tkC=world?world.tileKind:tileKind;
+  const caveZone=world?.zone||zone;
+  const isMuen=caveZone.startsWith('muen');
   const prepared=prepareGroundCanvas(tgt);
   const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
-  const fp=groundTiles.cavefloor?g.createPattern(groundTiles.cavefloor,'repeat'):null;
-  const wp=groundTiles.cavewall?g.createPattern(groundTiles.cavewall,'repeat'):null;
+  const floorImg=isMuen?groundTiles.muenfloor:groundTiles.cavefloor;
+  const wallImg=isMuen?groundTiles.muenwall:groundTiles.cavewall;
+  const fp=floorImg?g.createPattern(floorImg,'repeat'):null;
+  const wp=wallImg?g.createPattern(wallImg,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   function hash2(x,y){const n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
@@ -3693,7 +3705,7 @@ function renderGroundCave(world){
       g.fillStyle=`rgb(${36+v*10|0},${33+v*9|0},${31+v*8|0})`;
       dia(x,y);g.fill();
     }
-    if(v>0.9){g.fillStyle='rgba(90,150,180,0.13)';
+    if(v>(isMuen?0.82:0.9)){g.fillStyle=isMuen?'rgba(70,175,165,0.16)':'rgba(90,150,180,0.13)';
       g.beginPath();g.ellipse(GX(x,y),GY(x,y),10,4,0,0,6.29);g.fill();}
   }
   // 壁のふち(床に接する岩)
@@ -3711,7 +3723,7 @@ function renderGroundCave(world){
       g.fillStyle=`rgb(${18+v*7|0},${18+v*6|0},${22+v*7|0})`;
       dia(x,y);g.fill();
     }
-    g.fillStyle='rgba(70,72,84,0.25)';
+    g.fillStyle=isMuen?'rgba(72,112,105,0.20)':'rgba(70,72,84,0.25)';
     g.beginPath();g.ellipse(GX(x,y),GY(x,y)-8,14,6,0,0,6.29);g.fill();
   }
   tgt._groundReady=true;
@@ -3908,7 +3920,7 @@ function buildBoneCaves(){
     for(const m of def.mobs)spawnMob(...m);
     if(f===2)spawnMob('gashao',51,30);   // 最深部の主・骨の王
     ground=document.createElement('canvas');
-    MUENW.push({blocked,tileKind,props,npcs,mobs,ground});
+    MUENW.push({blocked,tileKind,props,npcs,mobs,ground,zone:zn});
   }
 }
 /* ---- ゴウリュウの出現管理(討伐から30分・同時に1体まで) ---- */
@@ -3924,8 +3936,8 @@ function checkDrake(){
   m.deadUntil=0;m.respawn=0;m.spawnT=0.8;
   if(started)log('地の底から咆哮が響いた…ゴウリュウが現れた','sys');
 }
-/* ---- 竜の洞窟の封鎖(ガシャオウ討伐まで。到達済みプレイヤーはそのまま通れる) ---- */
-const canEnterDragonCave=()=>player.story.gashaoCleared||player.story.dragonCaveReached
+/* ---- 竜の洞窟の封鎖(オニオウとガシャオウ、二つの鎮魂記録が必要) ---- */
+const canEnterDragonCave=()=>(player.story.oniKingCleared&&player.story.gashaoCleared)
   ||player.story.dragonCleared||player.drakeKilledAt>0;
 let dragonGateMsgT=0;
 function blockDragonGate(){
@@ -3934,7 +3946,13 @@ function blockDragonGate(){
   if(time>dragonGateMsgT){
     dragonGateMsgT=time+4;
     log('洞窟の入口は、うずたかく積もった白い骨に塞がれている…','sys');
-    log('骨の奥から声がする——「先に、南西の無縁塚の主を鎮めよ」','sys');
+    const missingOni=!player.story.oniKingCleared;
+    const missingMuen=!player.story.gashaoCleared;
+    const order=missingOni&&missingMuen
+      ?'試練の洞窟のオニオウと、南西の無縁塚のガシャオウを鎮めよ'
+      :missingOni?'先に、試練の洞窟最深部のオニオウを鎮めよ'
+      :'先に、南西の無縁塚のガシャオウを鎮めよ';
+    log(`骨の奥から声がする——「${order}」`,'sys');
   }
 }
 function switchZone(z,px,py){
@@ -4076,6 +4094,7 @@ loadSprite('beach_4','assets/beach_4.png');
 loadSprite('pier','assets/pier.png');
 loadSprite('ferry','assets/map_ferry.png');
 loadSprite('map_cave_entrance','assets/map_cave_entrance.png');
+loadSprite('map_muen_entrance','assets/map_muen_entrance.png');
 loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
@@ -4905,6 +4924,20 @@ function drawCaveEntrance(sx,sy,label='試練の洞窟'){
   ctx.fillText(label,0,18);
   ctx.restore();
 }
+function drawMuenEntrance(sx,sy){
+  const img=SPRITES.map_muen_entrance;
+  if(!img){drawCaveEntrance(sx,sy,'無縁塚');return;}
+  const w=196,h=w*img.height/img.width;
+  const y=sy-h+28;
+  const pulse=0.6+Math.sin(time*2.2)*0.18;
+  const glow=ctx.createRadialGradient(sx-5,sy-h*0.48,0,sx-5,sy-h*0.48,54);
+  glow.addColorStop(0,`rgba(65,210,195,${0.14*pulse})`);
+  glow.addColorStop(1,'rgba(65,210,195,0)');
+  ctx.fillStyle=glow;ctx.fillRect(sx-65,sy-h*0.8,130,100);
+  ctx.drawImage(img,sx-w/2,y,w,h);
+  ctx.fillStyle='#d8cfb4';ctx.font='9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('無縁塚',sx,sy+38);
+}
 function drawTorch(sx,sy){
   ctx.save();ctx.translate(sx,sy);
   ctx.strokeStyle='#4a3a26';ctx.lineWidth=3;
@@ -5250,7 +5283,7 @@ function render(){
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
       case 'dcave':drawCaveEntrance(sx,sy,'竜の洞窟');break;
-      case 'muen':drawCaveEntrance(sx,sy,'無縁塚');break;
+      case 'muen':drawMuenEntrance(sx,sy);break;
       case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'palm':drawPalm(sx,sy,it.o);break;
       case 'sundry':drawSundry(sx,sy,it.o);break;
@@ -5442,6 +5475,8 @@ function hud(){
       :player.story.dragonCleared?'高札の頼みを受け、カズーの因果話を聞こう'
       :player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
+      :!player.story.oniKingCleared?'試練の洞窟 最深部のオニオウを鎮めよ'
+      :!player.story.gashaoCleared?'カズーの話を聞き、南西の無縁塚へ'
       :'北西の竜の洞窟 最深部のゴウリュウを鎮めよ';
   }
   let bf='';
