@@ -141,6 +141,83 @@
   .chatFloatMsg.drop{border-left-color:#ffd97a;color:#ffe9b8;
     box-shadow:0 2px 8px rgba(0,0,0,.45),0 0 12px rgba(201,162,74,.25)}
   .chatFloatMsg.drop::before{content:'✦ ';color:#ffd97a}
+
+  /* ---- チームバー(チームタブ上部) ---- */
+  #teamBar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    padding:7px 8px;border-bottom:1px solid #2a2115;background:#14100a}
+  #teamBar[hidden]{display:none}
+  .teamChip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;
+    background:#1c2433;border:1px solid #3b598a;border-radius:10px;
+    font-size:10.5px;color:#cfe0f8;letter-spacing:.03em}
+  .teamChip .zone{color:#7d92b5;font-size:9px}
+  .teamChip.self{border-color:#6ea8e8}
+  #teamLeave{margin-left:auto;background:none;border:1px solid #4a3b22;border-radius:3px;
+    color:var(--dim);font-size:10px;padding:3px 8px;cursor:pointer}
+  #teamLeave:hover{border-color:#8a4a3a;color:#e0937c}
+
+  /* ---- フレンド一覧の行 ---- */
+  .friendRow{display:flex;align-items:center;gap:8px;padding:6px 8px;
+    background:#241d13;border:1px solid #3a2f1c;border-radius:4px;font-size:11.5px;color:#e8dcc4}
+  .friendRow .dot{width:7px;height:7px;border-radius:50%;background:#5a5244;flex:0 0 auto}
+  .friendRow.online .dot{background:#75c36c;box-shadow:0 0 5px rgba(117,195,108,.8)}
+  .friendRow .fname{font-weight:600;letter-spacing:.03em}
+  .friendRow .fmeta{color:var(--dim);font-size:10px;margin-left:auto}
+  .friendRow button{background:none;border:none;color:#6b604a;cursor:pointer;
+    font-size:11px;padding:2px 4px}
+  .friendRow button:hover{color:#e0937c}
+
+  /* ---- プレイヤーカード ---- */
+  #playerCard{position:absolute;left:50%;bottom:110px;transform:translateX(-50%);
+    z-index:8;width:min(280px,calc(100vw - 28px));box-sizing:border-box;
+    background:linear-gradient(168deg,rgba(26,20,12,.97),rgba(12,10,7,.97));
+    border:1px solid #6b5730;border-radius:8px;padding:14px 14px 12px;
+    box-shadow:0 10px 34px rgba(0,0,0,.65),0 0 18px rgba(201,162,74,.12);
+    font-family:var(--sans)}
+  #playerCard[hidden]{display:none}
+  #pcClose{position:absolute;top:4px;right:6px;background:none;border:none;
+    color:var(--dim);font-size:13px;cursor:pointer;padding:5px}
+  .pc-head{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  #pcPortrait{flex:0 0 56px;height:56px;border:1px solid #3a2f1c;border-radius:6px;
+    background-color:#12100b;background-repeat:no-repeat;
+    background-size:400% 100%;background-position:0 0;image-rendering:pixelated}
+  .pc-id{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .pc-id b{font-family:var(--serif);font-size:16px;letter-spacing:.1em;color:var(--parchment)}
+  .pc-id span{font-size:10.5px;color:var(--dim)}
+  .pc-title{color:var(--gold)!important;font-family:var(--serif);letter-spacing:.08em}
+  .pc-ach{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;
+    border-top:1px solid #2a2115;padding-top:9px}
+  .pc-ach-row{display:flex;justify-content:space-between;font-size:11px;color:#b3a586}
+  .pc-ach-row b{color:var(--parchment);font-variant-numeric:tabular-nums}
+  .pc-ach-row b.done{color:#8fd49a}
+  .pc-actions{display:flex;gap:8px}
+  .pc-actions button{flex:1;padding:9px 4px;border-radius:4px;cursor:pointer;
+    font-family:var(--serif);font-size:12px;letter-spacing:.08em;
+    border:1px solid var(--panel-edge);color:var(--parchment);
+    background:linear-gradient(180deg,#2a2318,#181310)}
+  .pc-actions button:hover{border-color:#6b5730}
+  .pc-actions button:disabled{opacity:.45;cursor:default}
+  #pcTeamBtn{border-color:#3b598a;color:#cfe0f8}
+  #pcFriendBtn{border-color:#3f6b3a;color:#d6efcf}
+  .pc-hint{margin:8px 0 0;font-size:10px;color:var(--dim);text-align:center}
+  .pc-hint[hidden]{display:none}
+
+  /* ---- 招待の受信カード ---- */
+  #invitePop{position:absolute;top:64px;left:50%;transform:translateX(-50%);
+    z-index:9;width:min(300px,calc(100vw - 28px));box-sizing:border-box;
+    background:linear-gradient(168deg,rgba(20,24,32,.97),rgba(10,12,17,.97));
+    border:1px solid #3b598a;border-radius:8px;padding:13px 14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 16px rgba(110,168,232,.15);
+    font-family:var(--sans);animation:chatIn .2s ease-out}
+  #invitePop[hidden]{display:none}
+  #invitePop p{margin:0 0 10px;font-size:12px;line-height:1.7;color:#dbe6f5}
+  #invitePop p b{color:#8fc4ff}
+  .invite-actions{display:flex;gap:8px}
+  .invite-actions button{flex:1;padding:8px 4px;border-radius:4px;cursor:pointer;
+    font-family:var(--serif);font-size:12px;letter-spacing:.1em;
+    border:1px solid #3b598a;color:#cfe0f8;background:linear-gradient(180deg,#233046,#161d2b)}
+  .invite-actions button:hover{filter:brightness(1.2)}
+  #inviteDecline{border-color:#4a3b22;color:var(--dim);
+    background:linear-gradient(180deg,#241f16,#15120c)}
   #chatNotice{padding:20px 14px;font-size:11.5px;color:var(--dim);
     line-height:1.9;text-align:center}
   #chatNotice[hidden]{display:none}
@@ -616,6 +693,10 @@
         <button class="chatTab" data-ch="log" role="tab">ログ</button>
         <button id="chatClose" aria-label="チャットを閉じる">✕</button>
       </div>
+      <div id="teamBar" hidden>
+        <div id="teamMembers"></div>
+        <button id="teamLeave">抜ける</button>
+      </div>
       <div id="chatLog" aria-live="polite"></div>
       <div id="chatNotice" hidden></div>
       <div id="chatInputRow">
@@ -630,6 +711,37 @@
   </div>
 
   <div id="buffs"></div>
+
+  <div id="playerCard" hidden>
+    <button id="pcClose" aria-label="閉じる">✕</button>
+    <div class="pc-head">
+      <i id="pcPortrait"></i>
+      <div class="pc-id">
+        <b id="pcName">ナナシ</b>
+        <span id="pcMeta">徳位1・亡者</span>
+        <span id="pcTitle" class="pc-title">新入りの亡者</span>
+      </div>
+    </div>
+    <div class="pc-ach">
+      <div class="pc-ach-row"><span>成仏させた魂</span><b id="pcKills">—</b></div>
+      <div class="pc-ach-row"><span>試練の主 アオオニ</span><b id="pcTrial">—</b></div>
+      <div class="pc-ach-row"><span>王鬼</span><b id="pcOniKing">—</b></div>
+      <div class="pc-ach-row"><span>業竜 ゴウリュウ</span><b id="pcDragon">—</b></div>
+    </div>
+    <div class="pc-actions">
+      <button id="pcTeamBtn">チームに誘う</button>
+      <button id="pcFriendBtn">フレンド申請</button>
+    </div>
+    <p id="pcHint" class="pc-hint" hidden></p>
+  </div>
+
+  <div id="invitePop" hidden>
+    <p id="inviteText"></p>
+    <div class="invite-actions">
+      <button id="inviteAccept">受ける</button>
+      <button id="inviteDecline">断る</button>
+    </div>
+  </div>
 
   <div id="dock">
     <div id="vitals">
@@ -1356,6 +1468,7 @@ const player={
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
+  friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
@@ -1416,7 +1529,8 @@ function save(){
       quests:player.quests,qb:player.qb,plus:player.plus,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
-      story:player.story,ferrymanCoin:player.ferrymanCoin,settings
+      story:player.story,ferrymanCoin:player.ferrymanCoin,
+      friends:player.friends,settings
     });
     localStorage.setItem(SAVE_KEY,serialized);
     const ownerId=localStorage.getItem(SAVE_OWNER_KEY);
@@ -1490,6 +1604,11 @@ function load(){
     }
     if(player.qb.active==='q_tokkuri')player.qb.prog=player.story.kazuStage;
     player.ferrymanCoin=!!d.ferrymanCoin||!!player.qb.done.q_tokkuri;
+    player.friends=Array.isArray(d.friends)
+      ?d.friends.filter(f=>f&&typeof f.id==='string'&&f.id)
+        .map(f=>({id:f.id,name:String(f.name||'ナナシ').slice(0,16),
+          lv:Math.max(1,f.lv|0),at:f.at|0})).slice(0,50)
+      :[];
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     player.smithIntro=!!d.smithIntro;player.drakeKilledAt=d.drakeKilledAt||0;
@@ -3549,7 +3668,10 @@ function drawRemotePlayerLabel(sx,sy,e){
   ctx.font=`bold ${11/labelScale}px sans-serif`;ctx.textAlign='center';
   ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3/labelScale;
   ctx.strokeText(name,sx,labelY,maxW);
-  ctx.fillStyle='#bfe7d0';ctx.fillText(name,sx,labelY,maxW);
+  // チームの仲間は青、フレンドは緑がかった名前で見分けられる
+  ctx.fillStyle=partyHas(e.userId)?'#8fc4ff'
+    :isFriend(e.userId)?'#a8e7b6':'#bfe7d0';
+  ctx.fillText(name,sx,labelY,maxW);
 }
 const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8'};
 function drawChatBubbleFx(sx,sy,fx){
@@ -4733,6 +4855,18 @@ canvas.addEventListener('pointerdown',ev=>{
     sfx.click();
     return;
   }
+  // 近くの亡者(他プレイヤー)クリック → プレイヤーカード
+  let hitPlayer=null,bestPlayer=1e9;
+  for(const e of remotePlayers.values()){
+    if(e.zone!==zone||e.dead)continue;
+    const px=isoX(e.x,e.y)-camX+W/2;
+    const py=isoY(e.x,e.y)-camY+H/2
+      -(zone==='field'?ELEV_PX*elevF(e.x,e.y):0)-20;
+    const d=Math.hypot(px-sx,py-sy);
+    if(d<30&&d<bestPlayer){bestPlayer=d;hitPlayer=e;}
+  }
+  if(hitPlayer){openPlayerCard(hitPlayer);return;}
+  if(playerCard.userId)closePlayerCard();  // 地面タップでカードを閉じる
   // 地面クリック → 移動
   const wx=((sx-W/2+camX)/(TW/2)+(sy-H/2+camY)/(TH/2))/2;
   const wy=((sy-H/2+camY)/(TH/2)-(sx-W/2+camX)/(TW/2))/2;
@@ -4750,7 +4884,7 @@ const CHAT_CHANNELS={
   team:{label:'チーム',color:'#6ea8e8'},
   log:{label:'ログ',color:'#8fb2d9'},
 };
-const chat={open:false,tab:'general',online:false,worldOnline:false,
+const chat={open:false,tab:'general',online:false,worldOnline:false,teamOnline:false,
   outbox:[],history:[],unread:0,lastSentAt:0};
 const chatMessageDomLimit=()=>MOBILE_RENDER?36:80;
 const chatLogDomLimit=()=>MOBILE_RENDER?60:150;
@@ -4777,6 +4911,15 @@ function renderChatLog(){
   if(chat.tab==='log'){
     for(const entry of gameLogHistory.slice(-chatLogDomLimit()))
       fragment.appendChild(logLineNode(entry));
+  }else if(chat.tab==='friend'){
+    if(!player.friends.length){
+      const d=document.createElement('div');
+      d.className='chatMsg sysmsg';
+      d.textContent='まだフレンドがいない。近くの魂をタップして申請してみよう';
+      fragment.appendChild(d);
+    }else{
+      for(const f of player.friends)fragment.appendChild(friendRowNode(f));
+    }
   }else{
     const visible=chat.history.filter(m=>m.channel===chat.tab||m.channel==='sys')
       .slice(-chatMessageDomLimit());
@@ -4837,27 +4980,30 @@ function addChatMessage(m){
   if(m.channel!=='sys')setChatBubble(m);
 }
 function updateChatInputState(){
-  // 送信できるのは一般(付近)と全体。未ログインでも入力自体は可にし、送信時に案内を出す
-  const t=chat.tab,canSend=t==='general'||t==='world';
+  // 送信できるのは一般(付近)・全体・チーム(結成時)。未ログインでも入力可にし、送信時に案内を出す
+  const t=chat.tab,canSend=t==='general'||t==='world'||(t==='team'&&!!party.id);
   $('chatIn').disabled=!canSend;
   $('chatSend').disabled=!canSend;
   $('chatIn').placeholder=
     t==='general'?(chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要')
     :t==='world'?(chat.worldOnline?'冥府全体へ話す (Enter)':'話すには魂籍ログインが必要')
+    :t==='team'?(party.id?(chat.teamOnline?'チームへ話す (Enter)':'チーム回線を接続中…'):'チーム未結成')
     :t==='log'?'戦闘・取得のログ(閲覧のみ)'
-    :`${CHAT_CHANNELS[t].label}は準備中`;
+    :'フレンド一覧';
 }
 function renderChatTab(){
   for(const b of document.querySelectorAll('.chatTab'))
     b.classList.toggle('on',b.dataset.ch===chat.tab);
-  const t=chat.tab,hasList=t==='general'||t==='world'||t==='log';
+  const t=chat.tab;
+  const hasList=t==='general'||t==='world'||t==='log'||t==='friend'
+    ||(t==='team'&&!!party.id);
   $('chatNotice').hidden=hasList;
   $('chatLog').hidden=!hasList;
   if(!hasList){
-    $('chatNotice').textContent=t==='friend'
-      ?'フレンド機能は準備中。いずれ遠くの魂とも言葉を交わせるようになる。'
-      :'チーム機能は準備中。いずれ徒党を組んで冥府の深部に挑めるようになる。';
+    $('chatNotice').textContent=
+      'チームは未結成。近くの魂をタップして「チームに誘う」と結成できる。';
   }
+  renderTeamUI();
   updateChatInputState();
   if(hasList)renderChatLog();
 }
@@ -4881,8 +5027,9 @@ function sendChat(){
   const input=$('chatIn');
   const ch=chat.tab;
   const text=input.value.replace(/\s+/g,' ').trim().slice(0,60);
-  if(!text||(ch!=='general'&&ch!=='world'))return;
-  const connected=ch==='general'?chat.online:chat.worldOnline;
+  if(!text||(ch!=='general'&&ch!=='world'&&ch!=='team'))return;
+  if(ch==='team'&&!party.id)return;
+  const connected=ch==='general'?chat.online:ch==='world'?chat.worldOnline:chat.teamOnline;
   if(!connected){
     // 入力内容は消さず、届け方を案内する
     addChatMessage({channel:'sys',
@@ -4925,6 +5072,204 @@ for(const b of document.querySelectorAll('.chatTab'))
   b.addEventListener('click',()=>{chat.tab=b.dataset.ch;renderChatTab();sfx.click();});
 updateChatInputState();
 
+/* ================= チーム・フレンド・プレイヤーカード ================= */
+const party={id:null,members:[]};
+const netOutbox=[];               // チーム勧誘・フレンド申請の送信キュー(presence.jsが回収)
+const globalOnline=new Map();     // userId -> {displayName,level,zone} 全体在席(フレンドの在否表示)
+const playerCard={userId:''};
+const pendingInvites=[];
+let activeInvite=null,inviteTimer=0;
+const genPartyId=()=>globalThis.crypto?.randomUUID
+  ?crypto.randomUUID()
+  :`${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,10)}`;
+const ZONE_LABELS={field:'賽の森',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
+  dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5'};
+const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
+const STAGE_LABELS={deceased:'亡者',rebirth_candidate:'転生候補者',reincarnated:'転生者'};
+function playerTitle(ach,level){
+  if(!ach)return '流離いの魂';
+  if(ach.dragon)return '業竜を鎮めし者';
+  if(ach.oniKing)return '王鬼を討ちし者';
+  if(ach.trial)return '試練を越えし者';
+  if((ach.kills|0)>=100)return '成仏請負人';
+  if((level|0)>=10)return '駆け出しの亡者';
+  return '新入りの亡者';
+}
+const partyHas=id=>party.members.some(m=>m.userId===id&&!m.self);
+const isFriend=id=>player.friends.some(f=>f.id===id);
+
+/* ---- プレイヤーカード ---- */
+function setAchMark(id,done){
+  const el=$(id);
+  el.textContent=done?'討伐済':'—';
+  el.classList.toggle('done',!!done);
+}
+function updatePlayerCardButtons(){
+  const id=playerCard.userId;
+  if(!id)return;
+  const teamBtn=$('pcTeamBtn'),friendBtn=$('pcFriendBtn'),hint=$('pcHint');
+  const inParty=partyHas(id),friend=isFriend(id);
+  teamBtn.textContent=inParty?'チーム同行中':'チームに誘う';
+  friendBtn.textContent=friend?'フレンド ✓':'フレンド申請';
+  teamBtn.disabled=inParty||!chat.online;
+  friendBtn.disabled=friend||!chat.online;
+  hint.hidden=chat.online;
+  if(!chat.online)hint.textContent='誘い・申請には魂籍ログインが必要';
+}
+function openPlayerCard(e){
+  if(!e||!e.userId)return;
+  playerCard.userId=e.userId;
+  $('pcPortrait').style.backgroundImage=
+    `url(assets/char_player_${e.gender==='f'?'f':'m'}.png)`;
+  $('pcName').textContent=e.name||'ナナシ';
+  $('pcMeta').textContent=
+    `徳位${e.level||1}・${STAGE_LABELS[e.ach?.stage]||'亡者'}・${zoneLabel(e.zone)}`;
+  $('pcTitle').textContent=playerTitle(e.ach,e.level);
+  $('pcKills').textContent=e.ach?String(e.ach.kills):'—';
+  setAchMark('pcTrial',e.ach?.trial);
+  setAchMark('pcOniKing',e.ach?.oniKing);
+  setAchMark('pcDragon',e.ach?.dragon);
+  updatePlayerCardButtons();
+  $('playerCard').hidden=false;
+  sfx.click();
+}
+function closePlayerCard(){
+  playerCard.userId='';
+  $('playerCard').hidden=true;
+}
+$('pcClose').addEventListener('click',()=>{closePlayerCard();sfx.click();});
+$('pcTeamBtn').addEventListener('click',()=>{
+  const e=remotePlayers.get(playerCard.userId);
+  if(!e){closePlayerCard();return;}
+  if(!party.id){party.id=genPartyId();renderTeamUI();}
+  netOutbox.push({type:'invite',kind:'team',targetUserId:playerCard.userId,partyId:party.id});
+  addChatMessage({channel:'sys',text:`${e.name} をチームに誘った`,ts:Date.now()});
+  closePlayerCard();
+  sfx.click();
+});
+$('pcFriendBtn').addEventListener('click',()=>{
+  const e=remotePlayers.get(playerCard.userId);
+  if(!e){closePlayerCard();return;}
+  netOutbox.push({type:'invite',kind:'friend',targetUserId:playerCard.userId});
+  addChatMessage({channel:'sys',text:`${e.name} にフレンド申請を送った`,ts:Date.now()});
+  closePlayerCard();
+  sfx.click();
+});
+
+/* ---- 招待の受信 ---- */
+function queueInvite(invite){
+  pendingInvites.push(invite);
+  while(pendingInvites.length>4)pendingInvites.shift();
+  if(!activeInvite)showNextInvite();
+}
+function showNextInvite(){
+  clearTimeout(inviteTimer);
+  activeInvite=pendingInvites.shift()||null;
+  const pop=$('invitePop');
+  if(!activeInvite){pop.hidden=true;return;}
+  const {kind,from}=activeInvite;
+  const p=$('inviteText');
+  p.textContent='';
+  const b=document.createElement('b');
+  b.textContent=`${from.displayName}（徳位${from.level}）`;
+  p.appendChild(b);
+  p.appendChild(document.createTextNode(
+    kind==='team'?' がチームに誘っています':' からフレンド申請が届きました'));
+  pop.hidden=false;
+  sfx.click();
+  inviteTimer=setTimeout(()=>{activeInvite=null;showNextInvite();},30000);
+}
+$('inviteAccept').addEventListener('click',()=>{
+  const inv=activeInvite;
+  if(!inv)return;
+  if(inv.kind==='team'){
+    party.id=inv.partyId;party.members=[];
+    netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
+      targetUserId:inv.from.userId,partyId:inv.partyId});
+    addChatMessage({channel:'sys',text:`${inv.from.displayName} のチームに加わった`,ts:Date.now()});
+    chat.tab='team';
+    if(chat.open)renderChatTab();else openChat(false);
+  }else{
+    friendAdd({id:inv.from.userId,name:inv.from.displayName,lv:inv.from.level});
+    netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,
+      targetUserId:inv.from.userId});
+    addChatMessage({channel:'sys',text:`${inv.from.displayName} とフレンドになった！`,ts:Date.now()});
+  }
+  activeInvite=null;showNextInvite();
+  sfx.click();
+});
+$('inviteDecline').addEventListener('click',()=>{
+  const inv=activeInvite;
+  if(!inv)return;
+  netOutbox.push({type:'invite_reply',kind:inv.kind,accepted:false,
+    targetUserId:inv.from.userId,partyId:inv.partyId||''});
+  activeInvite=null;showNextInvite();
+  sfx.click();
+});
+
+/* ---- フレンド ---- */
+function friendAdd(f){
+  if(!f||!f.id||isFriend(f.id))return;
+  player.friends.push({id:String(f.id),name:String(f.name||'ナナシ').slice(0,16),
+    lv:Math.max(1,f.lv|0),at:Date.now()});
+  while(player.friends.length>50)player.friends.shift();
+  save();
+  if(chat.open&&chat.tab==='friend')renderChatLog();
+  updatePlayerCardButtons();
+}
+function friendRemove(id){
+  player.friends=player.friends.filter(f=>f.id!==id);
+  save();
+  if(chat.open&&chat.tab==='friend')renderChatLog();
+}
+function friendRowNode(f){
+  const live=globalOnline.get(f.id);
+  const row=document.createElement('div');
+  row.className='friendRow'+(live?' online':'');
+  const dot=document.createElement('i');dot.className='dot';
+  const name=document.createElement('span');name.className='fname';
+  name.textContent=live?.displayName||f.name;
+  const meta=document.createElement('span');meta.className='fmeta';
+  meta.textContent=live?`徳位${live.level}・${zoneLabel(live.zone)}`:`徳位${f.lv}・不在`;
+  const del=document.createElement('button');
+  del.textContent='解消';del.title='フレンドを解消';
+  del.addEventListener('click',()=>{
+    if(confirm(`${f.name} とのフレンドを解消する？`))friendRemove(f.id);
+  });
+  row.append(dot,name,meta,del);
+  return row;
+}
+
+/* ---- チーム ---- */
+function renderTeamUI(){
+  const bar=$('teamBar');
+  const show=chat.open&&chat.tab==='team'&&!!party.id;
+  bar.hidden=!show;
+  if(!show)return;
+  const host=$('teamMembers');
+  host.textContent='';
+  const list=party.members.length?party.members
+    :[{self:true,displayName:player.name||'ナナシ',level:player.lv,zone}];
+  for(const m of list){
+    const chip=document.createElement('span');
+    chip.className='teamChip'+(m.self?' self':'');
+    chip.appendChild(document.createTextNode(`${m.self?'自分':m.displayName} 徳${m.level} `));
+    const z=document.createElement('span');
+    z.className='zone';
+    z.textContent=zoneLabel(m.zone);
+    chip.appendChild(z);
+    host.appendChild(chip);
+  }
+}
+function leaveParty(announce){
+  if(!party.id)return;
+  party.id=null;party.members=[];
+  chat.teamOnline=false;
+  if(announce)addChatMessage({channel:'sys',text:'チームを抜けた',ts:Date.now()});
+  if(chat.open)renderChatTab();
+}
+$('teamLeave').addEventListener('click',()=>{leaveParty(true);sfx.click();});
+
 window.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
     ev.preventDefault();
@@ -4939,6 +5284,11 @@ window.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'&&$('resetConfirm').open){
     ev.preventDefault();
     closeResetConfirm();
+    return;
+  }
+  if(ev.key==='Escape'&&!$('playerCard').hidden){
+    ev.preventDefault();
+    closePlayerCard();
     return;
   }
   if(ev.key==='Escape'&&chat.open){
@@ -5251,6 +5601,13 @@ window.EnmaGameBridge={
       weaponId:player.eq.weapon,
       targetX:player.actionTargetX,
       targetY:player.actionTargetY,
+      ach:{
+        kills,
+        trial:player.quests.trial>=2,
+        oniKing:player.story.oniKingCleared,
+        dragon:player.story.dragonCleared,
+        stage:player.story.dragonCleared?'rebirth_candidate':'deceased',
+      },
     };
   },
   getSharedWorldPlayer(){
@@ -5349,9 +5706,13 @@ window.EnmaGameBridge={
       e.weaponId=ITEMS[raw.weaponId]?.slot==='weapon'?raw.weaponId:'dagger';
       e.name=String(raw.displayName||'ナナシ').slice(0,16);
       e.level=Math.max(1,raw.level|0);
+      e.userId=id;
+      if(raw.ach&&typeof raw.ach==='object')e.ach=raw.ach;  // presence.jsで正規化済み
       e.zone=raw.zone;e.lastSeen=now;
     }
     for(const id of remotePlayers.keys())if(!seen.has(id))remotePlayers.delete(id);
+    // カード表示中の相手が離脱したら閉じる
+    if(playerCard.userId&&!remotePlayers.has(playerCard.userId))closePlayerCard();
   },
   drainChatOutbox(){
     return chat.outbox.splice(0,chat.outbox.length);
@@ -5380,6 +5741,51 @@ window.EnmaGameBridge={
     if(next===chat.worldOnline)return;
     chat.worldOnline=next;
     updateChatInputState();
+  },
+  setTeamChatOnline(on){
+    const next=Boolean(on);
+    if(next===chat.teamOnline)return;
+    chat.teamOnline=next;
+    if(chat.tab==='team')updateChatInputState();
+  },
+  drainControlOutbox(){
+    return netOutbox.splice(0,netOutbox.length);
+  },
+  getPartyState(){
+    return{partyId:party.id||''};
+  },
+  setPartyMembers(list){
+    party.members=Array.isArray(list)?list:[];
+    renderTeamUI();
+    updatePlayerCardButtons();
+  },
+  setGlobalOnline(list){
+    globalOnline.clear();
+    for(const p of Array.isArray(list)?list:[])
+      if(p&&p.userId)globalOnline.set(p.userId,p);
+    if(chat.open&&chat.tab==='friend')renderChatLog();
+  },
+  receiveInvite(invite){
+    if(!invite||!invite.from)return;
+    queueInvite(invite);
+  },
+  receiveInviteReply(reply){
+    if(!reply||!reply.from)return;
+    if(reply.kind==='friend'){
+      if(reply.accepted){
+        friendAdd({id:reply.from.userId,name:reply.from.displayName,lv:reply.from.level});
+        addChatMessage({channel:'sys',
+          text:`${reply.from.displayName} とフレンドになった！`,ts:Date.now()});
+      }else{
+        addChatMessage({channel:'sys',
+          text:`${reply.from.displayName} は静かに首を振った`,ts:Date.now()});
+      }
+    }else{
+      addChatMessage({channel:'sys',
+        text:reply.accepted
+          ?`${reply.from.displayName} がチームに加わった`
+          :`${reply.from.displayName} は誘いを断った`,ts:Date.now()});
+    }
   },
   receiveDropNotice(msg){
     if(!msg||typeof msg!=='object')return;
@@ -5465,8 +5871,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721f"></script>
+<script src="online/config.js?v=20260721g"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721f"></script>
+<script type="module" src="online/account.js?v=20260721g"></script>
 </body>
 </html>

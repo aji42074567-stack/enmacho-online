@@ -7,13 +7,29 @@ const VALID_ATTACK_KIND = new Set([
   'melee', 'bolt', 'fire', 'heal',
   'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
 ]);
-// フレンド・チームは未実装。実装したらここへ追加する。
-const VALID_CHAT_CHANNEL = new Set(['general', 'world']);
+const VALID_CHAT_CHANNEL = new Set(['general', 'world', 'team']);
 const CHAT_MIN_INTERVAL_MS = 600;
 const CHAT_MAX_LENGTH = 60;
 // 全体チャンネルのトピック。RLSポリシー(game:zone:%)に合わせた命名で、
-// 'world'は実在ゾーン名と衝突しない。
+// 'world'は実在ゾーン名と衝突しない。個人受信箱(u:)とパーティ(party:)も同じ流儀。
 const WORLD_TOPIC = 'game:zone:world';
+const inboxTopic = userId => `game:zone:u:${userId}`;
+const partyTopic = partyId => `game:zone:party:${partyId}`;
+const VALID_UUID = /^[0-9a-f-]{16,64}$/i;
+const VALID_INVITE_KIND = new Set(['team', 'friend']);
+const VALID_STAGE = new Set(['deceased', 'rebirth_candidate', 'reincarnated']);
+
+// 実績サマリー(プレイヤーカード表示用)。位置ペイロードに同乗する
+function normalizeAch(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    kills: Math.max(0, Math.min(999999, Math.trunc(cleanNumber(raw.kills, 0)))),
+    trial: Boolean(raw.trial),
+    oniKing: Boolean(raw.oniKing),
+    dragon: Boolean(raw.dragon),
+    stage: VALID_STAGE.has(raw.stage) ? raw.stage : 'deceased',
+  };
+}
 
 const newSessionId = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -63,8 +79,49 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     targetX,
     targetY,
     seq: Math.max(0, Math.trunc(cleanNumber(raw.seq, 0))),
+    ach: normalizeAch(raw.ach),
     lastSeen: Date.now(),
   };
+}
+
+function normalizeInvite(raw, ownSessionId) {
+  const identity = chatIdentity(raw, ownSessionId);
+  if (!identity) return null;
+  if (!VALID_INVITE_KIND.has(raw.kind)) return null;
+  const partyId = cleanText(raw.partyId, 64);
+  if (raw.kind === 'team' && !VALID_UUID.test(partyId)) return null;
+  return { kind: raw.kind, partyId: raw.kind === 'team' ? partyId : '', from: identity };
+}
+
+function normalizeInviteReply(raw, ownSessionId) {
+  const identity = chatIdentity(raw, ownSessionId);
+  if (!identity) return null;
+  if (!VALID_INVITE_KIND.has(raw.kind)) return null;
+  return {
+    kind: raw.kind,
+    accepted: Boolean(raw.accepted),
+    partyId: cleanText(raw.partyId, 64),
+    from: identity,
+  };
+}
+
+function normalizePartyMember(raw, ownSessionId) {
+  if (!raw || typeof raw !== 'object') return null;
+  const userId = cleanText(raw.userId, 64);
+  const sessionId = cleanText(raw.sessionId, 96);
+  if (!userId || !sessionId) return null;
+  return {
+    userId,
+    sessionId,
+    self: sessionId === ownSessionId,
+    displayName: cleanText(raw.displayName, 16) || 'ナナシ',
+    level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(raw.level, 1)))),
+    zone: cleanText(raw.zone, 16),
+  };
+}
+
+function normalizeGlobalPlayer(raw, ownSessionId) {
+  return normalizePartyMember(raw, ownSessionId);
 }
 
 function chatIdentity(raw, ownSessionId) {
@@ -128,6 +185,17 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   let worldSubscribed = false;
   let worldOpening = false;
   let worldRetryAt = 0;
+  let worldTrackedKey = '';
+  let inboxChannel = null;
+  let inboxOpening = false;
+  let inboxRetryAt = 0;
+  let inboxUserId = '';
+  let partyChannel = null;
+  let partySubscribed = false;
+  let partyOpening = false;
+  let partyRetryAt = 0;
+  let partyId = '';
+  let partyTrackedKey = '';
 
   function identityFor(snapshot = {}) {
     return {
@@ -143,6 +211,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   function payloadFor(snapshot = {}) {
     return {
       ...identityFor(snapshot),
+      ach: normalizeAch(snapshot.ach) || undefined,
       zone: cleanText(snapshot.zone, 16),
       x: Math.round(cleanNumber(snapshot.x) * 1000) / 1000,
       y: Math.round(cleanNumber(snapshot.y) * 1000) / 1000,
@@ -226,13 +295,38 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     publishRemotes();
   }
 
+  function memberPayload(snapshot = {}) {
+    return {
+      ...identityFor(snapshot),
+      zone: cleanText(snapshot.zone, 16),
+      sentAt: Date.now(),
+    };
+  }
+
+  function syncWorldPresence(activeChannel) {
+    if (activeChannel !== worldChannel) return;
+    const byUser = new Map();
+    for (const entries of Object.values(activeChannel.presenceState())) {
+      for (const entry of entries || []) {
+        const player = normalizeGlobalPlayer(entry, sessionId);
+        if (player && !player.self) byUser.set(player.userId, player);
+      }
+    }
+    bridge?.setGlobalOnline?.([...byUser.values()]);
+  }
+
   async function closeWorldChannel() {
     const oldChannel = worldChannel;
     worldChannel = null;
     worldSubscribed = false;
     worldOpening = false;
+    worldTrackedKey = '';
     bridge?.setWorldChatOnline?.(false);
+    bridge?.setGlobalOnline?.([]);
     if (!oldChannel) return;
+    try {
+      await oldChannel.untrack();
+    } catch {}
     try {
       await client.removeChannel(oldChannel);
     } catch {}
@@ -242,10 +336,15 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (worldChannel || worldOpening || !session) return;
     worldOpening = true;
     const activeChannel = client.channel(WORLD_TOPIC, {
-      config: { private: true, broadcast: { self: false, ack: false } },
+      config: {
+        private: true,
+        presence: { key: sessionId },
+        broadcast: { self: false, ack: false },
+      },
     });
     worldChannel = activeChannel;
     activeChannel
+      .on('presence', { event: 'sync' }, () => syncWorldPresence(activeChannel))
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         if (activeChannel !== worldChannel) return;
         const message = normalizeWorldChat(payload, sessionId);
@@ -256,17 +355,146 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         const notice = normalizeDropNotice(payload, sessionId);
         if (notice) bridge?.receiveDropNotice?.(notice);
       })
-      .subscribe(status => {
+      .subscribe(async status => {
         if (activeChannel !== worldChannel) return;
         worldOpening = false;
         if (status === 'SUBSCRIBED') {
           worldSubscribed = true;
           bridge?.setWorldChatOnline?.(true);
+          const snapshot = bridge?.getRealtimeState?.() || {};
+          try {
+            await activeChannel.track(memberPayload(snapshot));
+            worldTrackedKey = cleanText(snapshot.zone, 16);
+          } catch {}
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           worldSubscribed = false;
           worldRetryAt = Date.now() + 5_000;
           void closeWorldChannel();
         }
+      });
+  }
+
+  /* ---- 個人受信箱: チーム勧誘・フレンド申請が届く ---- */
+  async function closeInboxChannel() {
+    const oldChannel = inboxChannel;
+    inboxChannel = null;
+    inboxOpening = false;
+    inboxUserId = '';
+    if (!oldChannel) return;
+    try {
+      await client.removeChannel(oldChannel);
+    } catch {}
+  }
+
+  function openInboxChannel() {
+    const userId = session?.user?.id || '';
+    if (inboxChannel || inboxOpening || !userId) return;
+    inboxOpening = true;
+    inboxUserId = userId;
+    const activeChannel = client.channel(inboxTopic(userId), {
+      config: { private: true, broadcast: { self: false, ack: false } },
+    });
+    inboxChannel = activeChannel;
+    activeChannel
+      .on('broadcast', { event: 'invite' }, ({ payload }) => {
+        if (activeChannel !== inboxChannel) return;
+        const invite = normalizeInvite(payload, sessionId);
+        if (invite) bridge?.receiveInvite?.(invite);
+      })
+      .on('broadcast', { event: 'invite_reply' }, ({ payload }) => {
+        if (activeChannel !== inboxChannel) return;
+        const reply = normalizeInviteReply(payload, sessionId);
+        if (reply) bridge?.receiveInviteReply?.(reply);
+      })
+      .subscribe(status => {
+        if (activeChannel !== inboxChannel) return;
+        inboxOpening = false;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          inboxRetryAt = Date.now() + 5_000;
+          void closeInboxChannel();
+        }
+      });
+  }
+
+  /* ---- パーティ(チーム)チャンネル: 在席がメンバー一覧、broadcastがチームチャット ---- */
+  function syncPartyPresence(activeChannel) {
+    if (activeChannel !== partyChannel) return;
+    const byUser = new Map();
+    for (const entries of Object.values(activeChannel.presenceState())) {
+      for (const entry of entries || []) {
+        const member = normalizePartyMember(entry, sessionId);
+        if (member) byUser.set(member.userId, member);
+      }
+    }
+    bridge?.setPartyMembers?.([...byUser.values()]);
+  }
+
+  async function closePartyChannel() {
+    const oldChannel = partyChannel;
+    partyChannel = null;
+    partySubscribed = false;
+    partyOpening = false;
+    partyTrackedKey = '';
+    bridge?.setTeamChatOnline?.(false);
+    bridge?.setPartyMembers?.([]);
+    if (!oldChannel) return;
+    try {
+      await oldChannel.untrack();
+    } catch {}
+    try {
+      await client.removeChannel(oldChannel);
+    } catch {}
+  }
+
+  function openPartyChannel(id) {
+    if (partyChannel || partyOpening || !session || !VALID_UUID.test(id)) return;
+    partyOpening = true;
+    const activeChannel = client.channel(partyTopic(id), {
+      config: {
+        private: true,
+        presence: { key: sessionId },
+        broadcast: { self: false, ack: false },
+      },
+    });
+    partyChannel = activeChannel;
+    activeChannel
+      .on('presence', { event: 'sync' }, () => syncPartyPresence(activeChannel))
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (activeChannel !== partyChannel) return;
+        const identity = chatIdentity(payload, sessionId);
+        const text = cleanText(payload?.text, CHAT_MAX_LENGTH);
+        if (!identity || !text) return;
+        bridge?.receiveChatMessage?.({ ...identity, channel: 'team', text });
+      })
+      .subscribe(async status => {
+        if (activeChannel !== partyChannel) return;
+        partyOpening = false;
+        if (status === 'SUBSCRIBED') {
+          partySubscribed = true;
+          bridge?.setTeamChatOnline?.(true);
+          const snapshot = bridge?.getRealtimeState?.() || {};
+          try {
+            await activeChannel.track(memberPayload(snapshot));
+            partyTrackedKey = cleanText(snapshot.zone, 16);
+          } catch {}
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          partySubscribed = false;
+          partyRetryAt = Date.now() + 5_000;
+          void closePartyChannel();
+        }
+      });
+  }
+
+  // 相手の受信箱へ1回だけ届ける(未購読チャンネルのsendはHTTP経由で送られる)
+  function sendToInbox(targetUserId, event, payload) {
+    if (!VALID_UUID.test(targetUserId)) return;
+    const sender = client.channel(inboxTopic(targetUserId), {
+      config: { private: true, broadcast: { self: false, ack: false } },
+    });
+    sender.send({ type: 'broadcast', event, payload })
+      .catch(() => {})
+      .finally(() => {
+        try { client.removeChannel(sender); } catch {}
       });
   }
 
@@ -445,6 +673,42 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           event: 'chat',
           payload: { ...identityFor(snapshot), channel: 'world', text, sentAt: now },
         }).catch(() => {});
+      } else if (item.channel === 'team') {
+        if (!partyChannel || !partySubscribed) continue;
+        lastChatSentAt = now;
+        partyChannel.send({
+          type: 'broadcast',
+          event: 'chat',
+          payload: { ...identityFor(snapshot), channel: 'team', text, sentAt: now },
+        }).catch(() => {});
+      }
+    }
+  }
+
+  // チーム勧誘・フレンド申請と、その返事を相手の受信箱へ送る
+  function sendControlOutbox(snapshot) {
+    const outbox = bridge?.drainControlOutbox?.();
+    if (!Array.isArray(outbox) || !outbox.length) return;
+    for (const item of outbox.slice(0, 4)) {
+      const targetUserId = cleanText(item?.targetUserId, 64);
+      if (!VALID_UUID.test(targetUserId)) continue;
+      if (item.type === 'invite' && VALID_INVITE_KIND.has(item.kind)) {
+        const payload = {
+          ...identityFor(snapshot),
+          kind: item.kind,
+          partyId: cleanText(item.partyId, 64),
+          sentAt: Date.now(),
+        };
+        if (item.kind === 'team' && !VALID_UUID.test(payload.partyId)) continue;
+        sendToInbox(targetUserId, 'invite', payload);
+      } else if (item.type === 'invite_reply' && VALID_INVITE_KIND.has(item.kind)) {
+        sendToInbox(targetUserId, 'invite_reply', {
+          ...identityFor(snapshot),
+          kind: item.kind,
+          accepted: Boolean(item.accepted),
+          partyId: cleanText(item.partyId, 64),
+          sentAt: Date.now(),
+        });
       }
     }
   }
@@ -454,10 +718,35 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     const nextZone = session && snapshot?.active && !document.hidden
       && VALID_ZONE.test(snapshot.zone) ? snapshot.zone : '';
 
-    // 全体チャンネルはゾーンに依存せず、プレイ中ずっと接続する
+    // 全体チャンネル・受信箱はゾーンに依存せず、プレイ中ずっと接続する
     const wantWorld = Boolean(session && snapshot?.active && !document.hidden);
     if (wantWorld && !worldChannel && Date.now() >= worldRetryAt) openWorldChannel();
     else if (!wantWorld && worldChannel) void closeWorldChannel();
+    if (wantWorld && !inboxChannel && Date.now() >= inboxRetryAt) openInboxChannel();
+    else if (!wantWorld && inboxChannel) void closeInboxChannel();
+
+    // パーティはゲーム側の意思(getPartyState)に追従する
+    const wantedPartyId = wantWorld
+      ? cleanText(bridge?.getPartyState?.()?.partyId, 64) : '';
+    if (wantedPartyId !== partyId) {
+      partyId = wantedPartyId;
+      void closePartyChannel().then(() => {
+        if (partyId && VALID_UUID.test(partyId)) openPartyChannel(partyId);
+      });
+    } else if (partyId && !partyChannel && !partyOpening && Date.now() >= partyRetryAt) {
+      openPartyChannel(partyId);
+    }
+
+    // ゾーン移動を全体/パーティの在席情報に反映(フレンド一覧などで見える)
+    const zoneNow = cleanText(snapshot?.zone, 16);
+    if (worldChannel && worldSubscribed && zoneNow && zoneNow !== worldTrackedKey) {
+      worldTrackedKey = zoneNow;
+      worldChannel.track(memberPayload(snapshot)).catch(() => {});
+    }
+    if (partyChannel && partySubscribed && zoneNow && zoneNow !== partyTrackedKey) {
+      partyTrackedKey = zoneNow;
+      partyChannel.track(memberPayload(snapshot)).catch(() => {});
+    }
 
     if (nextZone !== channelZone) {
       void switchChannel(nextZone, snapshot || {});
@@ -466,6 +755,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (nextZone) {
       sendPosition(snapshot);
       sendChatOutbox(snapshot);
+      sendControlOutbox(snapshot);
     }
 
     const staleBefore = Date.now() - IDLE_HEARTBEAT_MS * 4;
@@ -494,6 +784,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (!session || previousUserId !== nextUserId) {
       await closeChannel();
       await closeWorldChannel();
+      await closeInboxChannel();
+      await closePartyChannel();
     }
     tick();
   }
@@ -502,16 +794,22 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (document.hidden) {
       void closeChannel();
       void closeWorldChannel();
+      void closeInboxChannel();
+      void closePartyChannel();
     } else tick();
   });
   window.addEventListener('pagehide', () => {
     void closeChannel();
     void closeWorldChannel();
+    void closeInboxChannel();
+    void closePartyChannel();
   });
 
   setIndicator(false);
   return {
     setAccount,
-    stop: () => Promise.allSettled([closeChannel(), closeWorldChannel()]),
+    stop: () => Promise.allSettled([
+      closeChannel(), closeWorldChannel(), closeInboxChannel(), closePartyChannel(),
+    ]),
   };
 }
