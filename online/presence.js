@@ -121,6 +121,10 @@ function normalizePartyMember(raw, ownSessionId) {
     displayName: cleanText(raw.displayName, 16) || 'ナナシ',
     level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(raw.level, 1)))),
     zone: cleanText(raw.zone, 16),
+    hp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.hp, 0)))),
+    maxHp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.maxHp, 0)))),
+    mp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.mp, 0)))),
+    maxMp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.maxMp, 0)))),
   };
 }
 
@@ -307,6 +311,10 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     return {
       ...identityFor(snapshot),
       zone: cleanText(snapshot.zone, 16),
+      hp: Math.max(0, Math.trunc(cleanNumber(snapshot.hp, 0))),
+      maxHp: Math.max(0, Math.trunc(cleanNumber(snapshot.maxHp, 0))),
+      mp: Math.max(0, Math.trunc(cleanNumber(snapshot.mp, 0))),
+      maxMp: Math.max(0, Math.trunc(cleanNumber(snapshot.maxMp, 0))),
       sentAt: Date.now(),
     };
   }
@@ -515,7 +523,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           const snapshot = bridge?.getRealtimeState?.() || {};
           try {
             await activeChannel.track(memberPayload(snapshot));
-            partyTrackedKey = cleanText(snapshot.zone, 16);
+            partyTrackedKey = '';  // 次のtickでHP/MP込みのキーを確定させる
           } catch {}
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           partySubscribed = false;
@@ -806,8 +814,13 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       worldTrackedKey = zoneNow;
       worldChannel.track(memberPayload(snapshot)).catch(() => {});
     }
-    if (partyChannel && partySubscribed && zoneNow && zoneNow !== partyTrackedKey) {
-      partyTrackedKey = zoneNow;
+    const partyKeyNow = zoneNow
+      ? [zoneNow,
+        Math.round(cleanNumber(snapshot?.hp) / 5),
+        Math.round(cleanNumber(snapshot?.mp) / 5)].join('|')
+      : '';
+    if (partyChannel && partySubscribed && partyKeyNow && partyKeyNow !== partyTrackedKey) {
+      partyTrackedKey = partyKeyNow;
       partyChannel.track(memberPayload(snapshot)).catch(() => {});
     }
 

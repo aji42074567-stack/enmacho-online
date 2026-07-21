@@ -38,6 +38,23 @@
   #xpbar i{background:var(--xp)}
   #plate .gold{color:var(--gold)}
 
+  /* ---- party frames (top-left, plate直下) ---- */
+  #partyFrames{position:absolute;left:12px;top:106px;display:flex;
+    flex-direction:column;gap:6px;pointer-events:none;z-index:4}
+  #partyFrames[hidden]{display:none}
+  .pframe{min-width:150px;background:var(--panel);border:1px solid #3b598a;
+    border-radius:4px;padding:5px 9px 6px}
+  .pframe .row1{display:flex;align-items:baseline;gap:6px;font-family:var(--sans)}
+  .pframe .nm{font-size:11.5px;color:#8fc4ff;font-weight:600;letter-spacing:.03em}
+  .pframe .lvz{font-size:9px;color:var(--dim);margin-left:auto;white-space:nowrap}
+  .pframe .lvz.dead-tag{color:#e0937c}
+  .pframe .bar{height:4px;border-radius:2px;background:#0d0b08;margin-top:3px;
+    overflow:hidden;border:1px solid #241c11}
+  .pframe .bar i{display:block;height:100%}
+  .pframe .hp i{background:linear-gradient(180deg,#d6553f,#b5372b)}
+  .pframe .mp i{background:linear-gradient(180deg,#5b8fd0,#2e66a8)}
+  .pframe.away{opacity:.7}
+
   /* ---- quest (top-right) ---- */
   #quest{position:absolute;top:12px;right:12px;background:var(--panel);
     border:1px solid var(--panel-edge);border-radius:4px;padding:8px 14px;text-align:right;pointer-events:none}
@@ -601,6 +618,8 @@
 
   @media (max-width:640px){
     #plate{min-width:126px;padding:8px 10px}
+    #partyFrames{top:92px}
+    .pframe{min-width:122px;padding:4px 8px 5px}
     #plate .name{display:none}
     #plate .lv{margin-left:0}
     #log{bottom:150px;font-size:10.5px}
@@ -669,6 +688,8 @@
       <span>防御 <span class="v" id="defv">1</span></span>
       <span style="margin-left:auto" class="gold"><span id="gold">0</span> モン</span></div>
   </div>
+
+  <div id="partyFrames" hidden aria-label="チームの仲間"></div>
 
   <div id="quest">
     <div class="goal">賽の森のゴウリュウを鎮めよ</div>
@@ -4984,6 +5005,10 @@ const el={
   goal:document.querySelector('#quest .goal')
 };
 function hud(){
+  if(performance.now()-partyFramesAt>300){
+    partyFramesAt=performance.now();
+    renderPartyFrames();
+  }
   el.lv.textContent=player.lv;
   el.gold.textContent=player.gold;
   el.atkv.textContent=atkTotal();
@@ -5532,6 +5557,49 @@ function renderTeamUI(){
     host.appendChild(chip);
   }
 }
+let partyFramesKey='',partyFramesAt=0;
+function renderPartyFrames(force){
+  const el=$('partyFrames');
+  const others=party.id?party.members.filter(m=>!m.self):[];
+  if(!others.length){
+    if(!el.hidden){el.hidden=true;el.textContent='';partyFramesKey='';}
+    return;
+  }
+  // 同じ区域ならリアルタイム同期(200ms)、別区域ならチーム在席のHP/MPを使う
+  const rows=others.map(m=>{
+    const live=remotePlayers.get(m.userId);
+    const sameZone=Boolean(live&&live.zone===zone);
+    return{
+      name:m.displayName,level:m.level,zone:m.zone,away:!sameZone,
+      hp:sameZone?live.hp:m.hp,maxHp:sameZone?live.maxHp:m.maxHp,
+      mp:sameZone?live.mp:m.mp,maxMp:sameZone?live.maxMp:m.maxMp,
+      dead:sameZone?Boolean(live.dead):false,
+    };
+  });
+  const key=JSON.stringify(rows);
+  if(!force&&key===partyFramesKey)return;
+  partyFramesKey=key;
+  el.hidden=false;
+  el.textContent='';
+  for(const r of rows){
+    const f=document.createElement('div');
+    f.className='pframe'+(r.away?' away':'');
+    const row1=document.createElement('div');row1.className='row1';
+    const nm=document.createElement('span');nm.className='nm';nm.textContent=r.name;
+    const lvz=document.createElement('span');
+    lvz.className='lvz'+(r.dead?' dead-tag':'');
+    lvz.textContent=r.dead?'魂散…':`徳${r.level}${r.away?'・'+zoneLabel(r.zone):''}`;
+    row1.append(nm,lvz);
+    f.appendChild(row1);
+    for(const [cls,v,mx] of [['hp',r.hp,r.maxHp],['mp',r.mp,r.maxMp]]){
+      const b=document.createElement('div');b.className='bar '+cls;
+      const i=document.createElement('i');
+      i.style.width=(mx>0?clamp(v/mx,0,1)*100:0)+'%';
+      b.appendChild(i);f.appendChild(b);
+    }
+    el.appendChild(f);
+  }
+}
 function leaveParty(announce){
   if(!party.id)return;
   party.id=null;party.members=[];
@@ -6068,6 +6136,7 @@ window.EnmaGameBridge={
   setPartyMembers(list){
     party.members=Array.isArray(list)?list:[];
     renderTeamUI();
+    renderPartyFrames(true);
     updatePlayerCardButtons();
   },
   setGlobalOnline(list){
@@ -6221,8 +6290,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721i"></script>
+<script src="online/config.js?v=20260721j"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721i"></script>
+<script type="module" src="online/account.js?v=20260721j"></script>
 </body>
 </html>
