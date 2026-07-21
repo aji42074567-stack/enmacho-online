@@ -1580,6 +1580,7 @@ const player={
     dragonCleared:false,chapter1Seen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
+  giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
   partySupportT:0,                          // 回向支援の余韻(この間はチーム討伐の徳が全額入る)
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
@@ -1646,7 +1647,7 @@ function save(){
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
-      friends:player.friends,settings
+      friends:player.friends,giftsUsed:player.giftsUsed,settings
     });
     localStorage.setItem(SAVE_KEY,serialized);
     const ownerId=localStorage.getItem(SAVE_OWNER_KEY);
@@ -1725,6 +1726,7 @@ function load(){
         .map(f=>({id:f.id,name:String(f.name||'ナナシ').slice(0,16),
           lv:Math.max(1,f.lv|0),at:f.at|0})).slice(0,50)
       :[];
+    player.giftsUsed=(d.giftsUsed&&typeof d.giftsUsed==='object')?d.giftsUsed:{};
     player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     player.smithIntro=!!d.smithIntro;
@@ -6159,6 +6161,30 @@ for(const [zn,w] of [['cave',CAVE],['cave2',CAVE2],['cave3',CAVE3],
   w?.mobs?.forEach((mob,i)=>{mob.id=`${zn}-${i}`;});
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
+// 運営ギフト: ?gift=コード 付きで開くと一度だけ授かる。コードはハッシュでしか持たない
+(async()=>{
+  try{
+    const GIFTS={'2d84cd7d0e4640b1f37a93d15de2755396c911eb086ee3fa6890820cf040d924':
+      {id:'beta_ener_1',lv:20,gold:20000}};
+    const code=new URLSearchParams(location.search).get('gift');
+    if(!code||!crypto?.subtle)return;
+    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code));
+    const hex=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    const gift=GIFTS[hex];
+    if(!gift||player.giftsUsed[gift.id])return;
+    player.giftsUsed[gift.id]=true;
+    if(gift.lv>player.lv){
+      player.statPts+=Math.max(0,gift.lv-player.lv);  // 徳位ごとの資質ポイントぶん
+      player.lv=gift.lv;player.xp=0;
+    }
+    player.gold+=gift.gold;
+    recalcMax();player.hp=player.maxHp;player.mp=player.maxMp;
+    save();
+    hasSaveData=true;
+    $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
+    log(`閻魔庁より授かり物 — 徳位${gift.lv}・${gift.gold}モン`,'gain');
+  }catch(e){}
+})();
 applyVisualSettings();
 renderSettings();
 window.EnmaGameBridge={
