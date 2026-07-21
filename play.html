@@ -1180,6 +1180,11 @@ const ITEMS={
   oni_kote:    {slot:'arms',  name:'鬼鉄の籠手',  def:3, price:280,icon:'items/arms_onitetsu_kote.png'},
   waraji:      {slot:'feet',  name:'白緒の草鞋',  def:1, price:70, icon:'items/feet_shirao_waraji.png'},
   suneate:     {slot:'feet',  name:'冥鉄の脛当て',def:3, price:300,icon:'items/feet_meitetsu_suneate.png'},
+  kuchinuno_mask:{slot:'head',name:'朽布の覆面',  def:2, price:0,source:'森限定',icon:'items/head_kuchinuno_mask.png'},
+  kuchinuno_kote:{slot:'arms',name:'朽布の巻籠手',def:2, price:0,source:'森限定',icon:'items/arms_kuchinuno_makigote.png'},
+  kawa_boots:  {slot:'feet',  name:'獣革の長靴',  def:2, price:0,source:'森限定',icon:'items/feet_kawa_nagagutsu.png'},
+  rokumon_black:{slot:'body', name:'六文の黒衣',  def:5, price:0,source:'森限定',icon:'items/armor_rokumon_black.png'},
+  kifuda_gofu: {slot:'acc',   name:'森守りの木札',hpb:15,mpb:15,price:0,source:'森限定',icon:'items/acc_kifuda_gofu.png'},
   kagenui:     {slot:'head',  name:'影縫いの頭巾',  def:2, price:0,  icon:'items/head_kagenui_hood.png'},
   jukotsu_crown:{slot:'head', name:'獣骨の呪冠',  def:7, price:0,rare:true,icon:'items/head_jukotsu_crown.png'},
   gokusotsu:   {slot:'body',  name:'獄卒の綿鎧',  def:8, price:0,  icon:'items/armor_gokusotsu_padded.png'},
@@ -1198,6 +1203,7 @@ function itemFx(it){
   const p=[];
   if(it.atk)p.push(`攻+${it.atk}`);if(it.def)p.push(`防+${it.def}`);
   if(it.hpb)p.push(`HP+${it.hpb}`);if(it.mpb)p.push(`MP+${it.mpb}`);
+  if(it.source)p.push(`【${it.source}】`);
   return p.join(' ');
 }
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
@@ -1866,7 +1872,9 @@ const MOBS={
   gashao:  {name:'ガシャオウ',  lv:30,hp:6800,dmg:[52,92],xp:2000,gold:[450,650],speed:2.0,aggro:6.0,atkCd:1.9,size:2.6,bar:220,boss:true},
   drake:   {name:'ゴウリュウ',  lv:50,hp:13600,dmg:[80,180],xp:700,gold:[200,320],speed:2.1,aggro:5,atkCd:2.1,size:1.5,renderScale:7,bar:720,boss:true}
 };
-const DROPS={wolf:['leather',0.08],orc:['bastard',0.06],skeleton:['chain',0.10],drake:['drake_slayer',1],
+const FOREST_DROPS={goblin:['kuchinuno_mask',0.06],goblin_red:['kuchinuno_kote',0.05],
+  wolf:['kawa_boots',0.06],orc:['rokumon_black',0.05],skeleton:['kifuda_gofu',0.06]};
+const DROPS={drake:['drake_slayer',1],
   dark_dog:['kagenui',0.08],oni_bone:['gokusotsu',0.07],gozu:['kusarifuji',0.08],oni_king:['jukotsu_crown',0.35],
   shira_bone:['saso_tabi',0.07],kyokotsu:['jukotsu_kote',0.07],oo_dokuro:['gaimen_hood',0.07],gashao:['shion_mofuku',0.35]};
 const DRAGON_BLOOD_DROP_RATE=0.07;
@@ -2235,7 +2243,9 @@ function grantMobReward(m){
   player.gold+=gold;
   gainXp(m.def.xp);
   log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
-  const drop=DROPS[m.type];
+  const candidateDrop=(zone==='field'?FOREST_DROPS[m.type]:null)||DROPS[m.type];
+  // 店で買える装備は敵から落とさない。設定を誤っても抽選と全体告知の両方を止める。
+  const drop=candidateDrop&&!SHOP_STOCK.includes(candidateDrop[0])?candidateDrop:null;
   // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
   const lootTo=()=>{
     if(!party.id)return null;
