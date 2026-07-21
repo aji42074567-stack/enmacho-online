@@ -1,0 +1,5 @@
+# Cloudflare Pages のキャッシュ制御。
+# online/ 配下のJSは更新が多いため、毎回サーバーへ確認させる(etagで304になるので軽い)。
+# これが無いと既定で4時間キャッシュされ、古いJSと新しいHTMLが混ざって不具合になる。
+/online/*
+  Cache-Control: public, max-age=0, must-revalidate

@@ -5196,8 +5196,9 @@ function frame(t){
 resize();
 requestAnimationFrame(frame);
 </script>
-<script src="online/config.js"></script>
+<!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
+<script src="online/config.js?v=20260721b"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js"></script>
+<script type="module" src="online/account.js?v=20260721b"></script>
 </body>
 </html>
