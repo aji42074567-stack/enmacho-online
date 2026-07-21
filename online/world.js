@@ -38,6 +38,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   let lastMessageAt = 0;
   let socketZone = '';
   let connectFailures = 0;
+  let stopped = false;
 
   function reportEvent(code, message, details = {}) {
     try {
@@ -82,7 +83,9 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     }
   }
 
-  function onMessage(event) {
+  function onMessage(event, sourceSocket, sourceZone) {
+    // 閉じた旧接続のキューに残っていた攻撃を、現在のプレイへ混ぜない。
+    if (stopped || socket !== sourceSocket || socketZone !== sourceZone) return;
     lastMessageAt = Date.now();
     let message;
     try {
@@ -112,7 +115,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   function connect(zone) {
-    if (!session?.access_token || !config.worldServerUrl || socket) return;
+    if (stopped || !session?.access_token || !config.worldServerUrl || socket) return;
     socketZone = zone;
     let nextSocket;
     try {
@@ -136,7 +139,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       publishConnection(true);
       sendPosition(bridge?.getSharedWorldPlayer?.() || {});
     });
-    nextSocket.addEventListener('message', onMessage);
+    nextSocket.addEventListener('message', event => onMessage(event, nextSocket, zone));
     nextSocket.addEventListener('close', event => {
       if (socket !== nextSocket) return;
       const wasConnected = connected;
@@ -201,6 +204,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   function tick() {
+    if (stopped) return;
     const snapshot = bridge?.getSharedWorldPlayer?.();
     const zoneNow = SHARED_ZONES.has(snapshot?.zone) ? snapshot.zone : '';
     const shouldConnect = Boolean(
@@ -228,6 +232,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   async function setAccount(nextSession, nextProfile = profile) {
+    if (stopped) return;
     const oldToken = session?.access_token || '';
     session = nextSession || null;
     profile = nextProfile || null;
@@ -249,20 +254,31 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     });
   }
 
-  document.addEventListener('visibilitychange', () => {
+  function handleVisibilityChange() {
+    if (stopped) return;
     if (document.hidden) closeSocket(false);
     else tick();
-  });
-  window.addEventListener('pagehide', () => closeSocket(false));
+  }
+  function handlePageHide() {
+    if (!stopped) closeSocket(false);
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('pagehide', handlePageHide);
 
   return {
     setAccount,
     hit,
     isConnected: () => connected,
     stop: () => {
+      if (stopped) return;
+      stopped = true;
+      session = null;
+      profile = null;
       if (timer) window.clearInterval(timer);
       timer = 0;
       closeSocket(false);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
     },
   };
 }

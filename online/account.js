@@ -1,6 +1,6 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
 import { createPresenceController } from './presence.js?v=20260722b';
-import { createWorldController } from './world.js?v=20260722b';
+import { createWorldController } from './world.js?v=20260722c';
 import { createSocialController } from './social.js?v=20260722c';
 import { createGuildController } from './guild.js?v=20260722b';
 

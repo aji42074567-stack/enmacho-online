@@ -7295,6 +7295,8 @@ window.EnmaGameBridge={
   applySharedPlayerDamage(result){
     if(!sharedWorldActive()||player.dead)return;
     const mob=worldByZone(sharedWorld.zone)?.mobs?.find(candidate=>candidate.id===String(result?.mobId||''));
+    // 旧接続・旧区域由来の通知や、画面上では既に離れている敵からの幽霊ダメージを拒否する。
+    if(!mob||mob.dead||dist(player,mob)>3.4)return;
     applySharedDamage(result,mob);
   },
   setRemotePlayers(players){
@@ -7618,6 +7620,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722d"></script>
+<script type="module" src="online/account.js?v=20260722e"></script>
 </body>
 </html>
