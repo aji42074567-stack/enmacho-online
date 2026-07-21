@@ -4670,9 +4670,11 @@ function drawNpc(sx,sy,n){
     const bob=isEnma?0:Math.sin(time*(isSoul?1.1:1.5)+(isSoul?n.x+n.y:n.kind==='merchant'?0:2))*(isSoul?0.65:1.2);
     ctx.drawImage(img,0,0,F,F,sx-D/2,sy-D+3+bob,D,D);
     const puls=0.6+Math.sin(time*3)*0.4;
-    ctx.fillStyle=isSoul?`rgba(190,215,235,${0.55+puls*0.3})`:`rgba(255,225,120,${puls})`;
-    ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-    ctx.fillText(isSoul?'…':'!',sx,sy-D-4);
+    ctx.textAlign='center';
+    if(!isSoul){
+      ctx.fillStyle=`rgba(255,225,120,${puls})`;
+      ctx.font='bold 12px sans-serif';ctx.fillText('!',sx,sy-D-4);
+    }
     ctx.fillStyle=isSoul?'#d4dde5':'#ffe9a0';ctx.font='10px sans-serif';
     ctx.fillText(n.name,sx,sy+12);
     return;
@@ -4736,9 +4738,11 @@ function drawNpc(sx,sy,n){
     ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(8,-26);ctx.stroke();
   }
   const puls=0.6+Math.sin(time*3)*0.4;
-  ctx.fillStyle=isSoul?`rgba(190,215,235,${0.55+puls*0.3})`:`rgba(255,225,120,${puls})`;
-  ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-  ctx.fillText(isSoul?'…':'!',0,-40);
+  ctx.textAlign='center';
+  if(!isSoul){
+    ctx.fillStyle=`rgba(255,225,120,${puls})`;
+    ctx.font='bold 12px sans-serif';ctx.fillText('!',0,-40);
+  }
   ctx.fillStyle=isSoul?'#d4dde5':'#ffe9a0';ctx.font='10px sans-serif';
   ctx.fillText(n.name,0,10);
   ctx.restore();
