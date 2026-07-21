@@ -310,6 +310,47 @@
   /* ---- overlays / panels ---- */
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(5,6,9,.82);z-index:10}
+  /* ---- ボス階・映画風カットイン ---- */
+  .boss-cutin{--boss-accent:#d8643f;--boss-glow:rgba(216,100,63,.22);
+    position:absolute;inset:0;z-index:20;overflow:hidden;
+    display:flex;align-items:center;background:
+      radial-gradient(circle at 78% 48%,var(--boss-glow),transparent 38%),
+      linear-gradient(105deg,rgba(3,4,7,.98) 0 38%,rgba(7,8,12,.88) 60%,rgba(2,3,5,.97));
+    cursor:pointer;isolation:isolate}
+  .boss-cutin[data-boss="gashao"]{--boss-accent:#9c80ce;--boss-glow:rgba(156,128,206,.22)}
+  .boss-cutin[data-boss="drake"]{--boss-accent:#d89a3d;--boss-glow:rgba(216,154,61,.22)}
+  .boss-cutin::before,.boss-cutin::after{content:"";position:absolute;left:0;right:0;height:10vh;
+    z-index:5;background:#020203;animation:bossBarIn .45s ease-out both}
+  .boss-cutin::before{top:0}.boss-cutin::after{bottom:0}
+  .boss-cutin-streak{position:absolute;inset:10vh 0;z-index:0;opacity:.24;
+    background:linear-gradient(168deg,transparent 38%,var(--boss-accent) 38.2% 38.6%,transparent 38.8%),
+      repeating-linear-gradient(168deg,transparent 0 28px,rgba(255,255,255,.08) 29px,transparent 31px);
+    animation:bossStreakIn .8s ease-out both}
+  .boss-cutin-copy{position:relative;z-index:3;width:min(52vw,650px);margin-left:8vw;
+    padding:4vh 0;text-shadow:0 3px 9px #000;animation:bossCopyIn .7s .12s ease-out both}
+  .boss-cutin-kicker{font:600 11px/1 var(--sans);color:var(--boss-accent);
+    letter-spacing:.42em;margin-bottom:14px}
+  .boss-cutin h2{margin:0;color:#f4ead8;font:600 clamp(30px,5vw,68px)/1.06 var(--serif);
+    letter-spacing:.12em;text-wrap:balance}
+  .boss-cutin-epithet{display:inline-block;margin-top:15px;padding:5px 12px 5px 14px;
+    border-left:3px solid var(--boss-accent);color:#fff3da;background:rgba(0,0,0,.42);
+    font:600 clamp(13px,1.5vw,19px)/1.4 var(--serif);letter-spacing:.16em}
+  .boss-cutin-message{max-width:620px;margin:22px 0 0;color:#cfc7bc;
+    font:500 clamp(13px,1.4vw,17px)/2 var(--serif);letter-spacing:.06em}
+  .boss-cutin-art{--boss-art-opacity:.86;position:absolute;z-index:2;right:3vw;bottom:8vh;width:min(43vw,560px);
+    height:min(76vh,680px);object-fit:contain;object-position:center bottom;image-rendering:pixelated;
+    filter:brightness(.52) saturate(.75) drop-shadow(0 0 24px var(--boss-accent));
+    opacity:var(--boss-art-opacity);animation:bossArtIn .85s ease-out both}
+  .boss-cutin[data-boss="drake"] .boss-cutin-art{right:-5vw;width:min(68vw,860px);
+    filter:brightness(.44) saturate(.82) drop-shadow(0 0 30px var(--boss-accent))}
+  .boss-cutin-skip{position:absolute;z-index:7;right:max(22px,env(safe-area-inset-right));
+    bottom:max(calc(10vh + 14px),env(safe-area-inset-bottom));border:0;background:none;
+    color:#9f988d;font:11px/1 var(--sans);letter-spacing:.18em;cursor:pointer;padding:10px}
+  .boss-cutin-skip:hover,.boss-cutin-skip:focus-visible{color:#fff;outline:1px solid var(--boss-accent)}
+  @keyframes bossBarIn{from{transform:scaleY(0);transform-origin:center}to{transform:scaleY(1)}}
+  @keyframes bossStreakIn{from{opacity:0;transform:translateX(-16%)}to{opacity:.24;transform:none}}
+  @keyframes bossCopyIn{from{opacity:0;transform:translateX(-70px)}to{opacity:1;transform:none}}
+  @keyframes bossArtIn{from{opacity:0;transform:translateX(110px) scale(1.08)}to{opacity:var(--boss-art-opacity);transform:none}}
   .portrait{width:112px;height:112px;margin:0 auto 10px;
     background-repeat:no-repeat;background-position:center bottom;background-size:contain;
     image-rendering:pixelated;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
@@ -755,6 +796,16 @@
     .account-code strong{font-size:19px}
     .account-form input:not([type="checkbox"]){min-height:44px;font-size:16px}
     .account-auth-tabs button,.account-logout{min-height:44px}
+    .boss-cutin{align-items:flex-end}
+    .boss-cutin-copy{width:auto;margin:0 22px 18vh;padding:0}
+    .boss-cutin-kicker{font-size:9px;margin-bottom:9px}
+    .boss-cutin h2{font-size:clamp(28px,10vw,44px)}
+    .boss-cutin-epithet{margin-top:10px;font-size:12px}
+    .boss-cutin-message{margin-top:14px;font-size:12px;line-height:1.75}
+    .boss-cutin-art,.boss-cutin[data-boss="drake"] .boss-cutin-art{--boss-art-opacity:.36;
+      right:-18vw;bottom:17vh;width:95vw;height:64vh;
+      filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
+    .boss-cutin-skip{bottom:max(calc(10vh + 8px),env(safe-area-inset-bottom));font-size:9px}
   }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
@@ -950,6 +1001,19 @@
       </div>
     </div>
   </dialog>
+
+  <section class="boss-cutin hidden" id="bossCutin" role="dialog" aria-modal="true"
+    aria-labelledby="bossCutinName" aria-describedby="bossCutinMessage" data-boss="oni">
+    <i class="boss-cutin-streak" aria-hidden="true"></i>
+    <div class="boss-cutin-copy">
+      <div class="boss-cutin-kicker" id="bossCutinKicker">因果顕現</div>
+      <h2 id="bossCutinName">鬼王 オニオウ</h2>
+      <div class="boss-cutin-epithet" id="bossCutinEpithet">怒りの成れの果て</div>
+      <p class="boss-cutin-message" id="bossCutinMessage"></p>
+    </div>
+    <img class="boss-cutin-art" id="bossCutinArt" alt="" aria-hidden="true">
+    <button class="boss-cutin-skip" id="bossCutinSkip" type="button">進む ›</button>
+  </section>
 
   <div class="overlay hidden" id="death">
     <div class="scroll">
@@ -1765,7 +1829,8 @@ const player={
   name:'',quests:{trial:0},
   qb:emptyQuestBoard(),                     // 受注中 {クエストID:進捗} / 達成済み
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
-    dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false},
+    dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false,
+    oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
@@ -1910,6 +1975,9 @@ function load(){
       chapter1Seen:!!st.chapter1Seen,
       gashaoCleared:!!st.gashaoCleared,
       muenSeen:!!st.muenSeen,
+      oniIntroSeen:!!st.oniIntroSeen,
+      gashaoIntroSeen:!!st.gashaoIntroSeen,
+      dragonIntroSeen:!!st.dragonIntroSeen,
     };
     // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
     if(oldKazuDone){
@@ -4504,6 +4572,45 @@ function blockDragonGate(){
     log(`骨の奥から声がする——「${order}」`,'sys');
   }
 }
+const BOSS_CUTINS={
+  cave3:{flag:'oniIntroSeen',boss:'oni',kicker:'試練の洞窟 最深部　／　因果顕現',
+    name:'鬼王 オニオウ',epithet:'怒りの成れの果て',art:'assets/mob_orc_blue.png',
+    message:'その怒りは誰かを傷つけた。だが、痛みを越えた者は以前より強くなった。傷つけた罪と、生まれた強さ——因果は善悪だけでは割り切れない。'},
+  muen3:{flag:'gashaoIntroSeen',boss:'gashao',kicker:'無縁塚 最深部　／　因果顕現',
+    name:'骨王 ガシャオウ',epithet:'孤独の成れの果て',art:'assets/mob_skeleton.png',
+    message:'孤独に耐え切れなかった。それだけで悪と呼べるのか。誰の胸にも同じ空洞はある。違ったのは、差し伸べる手がなかったことだけだ。'},
+  dg5:{flag:'dragonIntroSeen',boss:'drake',kicker:'竜の洞窟 最深部　／　因果顕現',
+    name:'業龍 ゴウリュウ',epithet:'災厄にして、最後の守護者',art:'assets/mob_drake.png',
+    message:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。災厄であることと、守護者であることは両立する。'},
+};
+let bossCutinActive=false,bossCutinTimer=0;
+function dismissBossCutin(){
+  if(!bossCutinActive)return;
+  bossCutinActive=false;
+  clearTimeout(bossCutinTimer);bossCutinTimer=0;
+  $('bossCutin').classList.add('hidden');
+}
+function showBossCutinForZone(zoneName){
+  const scene=BOSS_CUTINS[zoneName];
+  if(!scene||player.story[scene.flag])return;
+  player.story[scene.flag]=true;
+  player.path=[];player.target=null;player.talkTarget=null;player.pendingHit=null;
+  player.attackDur=0;player.attackT=0;player.combatT=0;
+  const panel=$('bossCutin');
+  panel.dataset.boss=scene.boss;
+  $('bossCutinKicker').textContent=scene.kicker;
+  $('bossCutinName').textContent=scene.name;
+  $('bossCutinEpithet').textContent=scene.epithet;
+  $('bossCutinMessage').textContent=scene.message;
+  $('bossCutinArt').src=scene.art;
+  bossCutinActive=true;
+  panel.classList.add('hidden');void panel.offsetWidth;panel.classList.remove('hidden');
+  $('bossCutinSkip').focus({preventScroll:true});
+  clearTimeout(bossCutinTimer);
+  bossCutinTimer=setTimeout(dismissBossCutin,7200);
+  save();
+}
+$('bossCutin').addEventListener('click',dismissBossCutin);
 function switchZone(z,px,py){
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
@@ -4557,7 +4664,10 @@ function switchZone(z,px,py){
     dg4:'竜の洞窟 地下四層。骨が散らばっている…',
     dg5:'竜の洞窟 最深部——竜の巣だ',
   };
-  if(started)log(ZMSG[z],'sys');
+  if(started){
+    log(ZMSG[z],'sys');
+    showBossCutinForZone(z);
+  }
 }
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
@@ -6816,6 +6926,10 @@ function leaveParty(announce){
 $('teamLeave').addEventListener('click',()=>{leaveParty(true);sfx.click();});
 
 window.addEventListener('keydown',ev=>{
+  if(bossCutinActive){
+    if(ev.key==='Escape'||ev.key==='Enter'||ev.key===' ')dismissBossCutin();
+    ev.preventDefault();return;
+  }
   if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
     ev.preventDefault();
     closeAccount();
@@ -7613,6 +7727,7 @@ function frame(t){
   lastFrameAt=t;
   let dt=Math.min(0.05,(t-last)/1000||0.016);
   last=t;
+  if(bossCutinActive){render();hud();return;}
   if(hitstop>0){hitstop-=dt;dt*=0.15;}  // ヒットの瞬間だけ時間が止まる
   update(dt);
   render();
