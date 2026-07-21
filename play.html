@@ -2152,7 +2152,7 @@ function castHeal(){
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   const allyNear=party.id&&partyMemberNear(6);
   if(player.hp>=player.maxHp&&!allyNear){log('HPは満タンだ','sys');return;}
-  player.mp-=12;player.cd.heal=3;
+  player.mp-=12;player.cd.heal=1;
   player.swing=0.32;player.swingMax=0.32;player.swingKind='cast';
   signalPlayerAction('heal');
   const n=45+7*player.lv;
