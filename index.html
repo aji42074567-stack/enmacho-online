@@ -72,6 +72,76 @@
   #log div.gain{color:#d9c07a}
   #log div.glitch{color:#7fd8a0;letter-spacing:.05em}
 
+  /* ---- chat (bottom-left) ---- */
+  #chatWrap{position:absolute;left:12px;bottom:14px;z-index:6;display:flex;
+    flex-direction:column;align-items:flex-start;gap:8px;font-family:var(--sans)}
+  #stage.chatOpen #log{bottom:300px}
+  #chatFloat{display:flex;flex-direction:column;align-items:flex-start;gap:5px;
+    pointer-events:none;max-width:min(320px,72vw)}
+  .chatFloatMsg{background:rgba(20,16,11,.9);border:1px solid #4a3b22;
+    border-left:3px solid var(--chatc,#c9a24a);border-radius:3px 10px 10px 10px;
+    padding:5px 10px;font-size:11.5px;color:#e8dcc4;line-height:1.5;
+    box-shadow:0 2px 8px rgba(0,0,0,.45);max-width:100%;overflow-wrap:anywhere;
+    animation:chatIn .18s ease-out,chatOut .6s ease-in 7.4s forwards}
+  .chatFloatMsg b{color:var(--chatc,#c9a24a);font-weight:600;margin-right:6px;font-size:10.5px}
+  @keyframes chatIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes chatOut{to{opacity:0}}
+  #chatToggle{width:40px;height:40px;background:var(--panel);border:1px solid var(--panel-edge);
+    border-radius:4px;color:var(--parchment);cursor:pointer;font-size:17px;
+    position:relative;line-height:1;padding:0}
+  #chatToggle:hover{border-color:#6b5730}
+  #chatBadge{position:absolute;right:-6px;top:-7px;min-width:17px;height:17px;
+    box-sizing:border-box;padding:1px 4px;border-radius:9px;background:#7c3a2d;
+    border:1px solid #d99a7c;color:#ffe9dc;font:700 9px/13px var(--sans);text-align:center;
+    box-shadow:0 1px 5px rgba(0,0,0,.7)}
+  #chatBadge[hidden]{display:none}
+  #chatBox{width:min(320px,calc(100vw - 24px));background:rgba(16,13,9,.94);
+    border:1px solid var(--panel-edge);border-radius:6px;overflow:hidden;
+    box-shadow:0 6px 24px rgba(0,0,0,.5)}
+  #chatBox[hidden]{display:none}
+  #chatTabs{display:flex;align-items:center;border-bottom:1px solid #2a2115;background:#171209}
+  .chatTab{flex:0 0 auto;background:none;border:none;color:var(--dim);cursor:pointer;
+    font-family:var(--serif);font-size:11.5px;letter-spacing:.08em;padding:8px 12px;
+    border-bottom:2px solid transparent}
+  .chatTab[data-ch=general]{--chatc:#c9a24a}
+  .chatTab[data-ch=friend]{--chatc:#75c36c}
+  .chatTab[data-ch=team]{--chatc:#6ea8e8}
+  .chatTab.on{color:var(--chatc);border-bottom-color:var(--chatc)}
+  #chatClose{margin-left:auto;background:none;border:none;color:var(--dim);
+    cursor:pointer;font-size:12px;padding:8px 10px}
+  #chatLog{height:168px;overflow-y:auto;padding:8px;display:flex;
+    flex-direction:column;gap:6px;scrollbar-width:thin}
+  #chatLog[hidden]{display:none}
+  .chatMsg{max-width:84%;align-self:flex-start;background:#241d13;
+    border:1px solid #3a2f1c;border-left:3px solid var(--chatc,#c9a24a);
+    border-radius:2px 9px 9px 9px;padding:5px 9px;font-size:11.5px;color:#e8dcc4;
+    line-height:1.55;overflow-wrap:anywhere}
+  .chatMsg b{display:block;color:var(--chatc,#c9a24a);font-size:10px;
+    font-weight:600;letter-spacing:.04em;margin-bottom:1px}
+  .chatMsg.self{align-self:flex-end;background:#2d2513;border-left:1px solid #3a2f1c;
+    border-right:3px solid var(--chatc,#c9a24a);border-radius:9px 2px 9px 9px}
+  .chatMsg.general{--chatc:#c9a24a}
+  .chatMsg.friend{--chatc:#75c36c}
+  .chatMsg.team{--chatc:#6ea8e8}
+  .chatMsg.sysmsg{align-self:center;background:none;border:none;color:var(--dim);
+    font-size:10.5px;text-align:center;padding:2px}
+  #chatNotice{padding:20px 14px;font-size:11.5px;color:var(--dim);
+    line-height:1.9;text-align:center}
+  #chatNotice[hidden]{display:none}
+  #chatInputRow{display:flex;gap:6px;padding:8px;border-top:1px solid #2a2115}
+  #chatIn{flex:1;min-width:0;background:#0f0c08;border:1px solid #3a2f1c;border-radius:3px;
+    color:var(--parchment);font-family:var(--sans);font-size:12px;padding:7px 9px;outline:none}
+  #chatIn:focus{border-color:#6b5730}
+  #chatIn:disabled{opacity:.5}
+  #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
+    border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
+    letter-spacing:.1em;padding:0 13px;cursor:pointer}
+  #chatSend:hover{border-color:#6b5730}
+  #chatSend:disabled{opacity:.45;cursor:default}
+  @media (max-width:860px){
+    #chatWrap{bottom:96px}
+  }
+
   /* ---- bottom bar ---- */
   #dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
     display:flex;align-items:center;gap:12px;background:var(--panel);
@@ -404,7 +474,11 @@
     #plate{min-width:126px;padding:8px 10px}
     #plate .name{display:none}
     #plate .lv{margin-left:0}
-    #log{bottom:132px;font-size:10.5px}
+    #log{bottom:150px;font-size:10.5px}
+    #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px))}
+    #chatLog{height:132px}
+    #chatIn{font-size:16px}
+    #stage.chatOpen #log{bottom:326px}
     #vitals{display:none}
     #skills{gap:5px}
     .skill{width:42px;height:46px}
@@ -478,6 +552,27 @@
   </button>
 
   <div id="log" aria-live="polite"></div>
+
+  <div id="chatWrap">
+    <div id="chatBox" hidden>
+      <div id="chatTabs" role="tablist">
+        <button class="chatTab on" data-ch="general" role="tab">一般</button>
+        <button class="chatTab" data-ch="friend" role="tab">フレンド</button>
+        <button class="chatTab" data-ch="team" role="tab">チーム</button>
+        <button id="chatClose" aria-label="チャットを閉じる">✕</button>
+      </div>
+      <div id="chatLog" aria-live="polite"></div>
+      <div id="chatNotice" hidden></div>
+      <div id="chatInputRow">
+        <input id="chatIn" maxlength="60" placeholder="付近の魂へ話す (Enter)"
+          autocomplete="off" enterkeyhint="send">
+        <button id="chatSend">送信</button>
+      </div>
+    </div>
+    <div id="chatFloat" aria-live="polite"></div>
+    <button id="chatToggle" title="チャット (Enter)" aria-label="チャットを開く">💬<span
+      id="chatBadge" hidden></span></button>
+  </div>
 
   <div id="buffs"></div>
 
@@ -3310,6 +3405,44 @@ function drawRemotePlayerLabel(sx,sy,e){
   const textWidth=Math.min(128,ctx.measureText(name).width);
   ctx.beginPath();ctx.arc(sx-textWidth/2-5,sy-55,2.3,0,6.29);ctx.fill();
 }
+const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8'};
+function drawChatBubbleFx(sx,sy,fx){
+  const remain=fx.until-performance.now();
+  if(remain<=0)return false;
+  ctx.save();
+  ctx.globalAlpha=Math.min(1,remain/400);  // 消える直前だけすっと薄くなる
+  ctx.font='10px sans-serif';ctx.textAlign='center';
+  const maxW=118,lines=[];
+  let line='',truncated=false;
+  for(const ch of fx.text){
+    const test=line+ch;
+    if(ctx.measureText(test).width>maxW&&line){
+      if(lines.length===2){truncated=true;break;}
+      lines.push(line);line=ch;
+    }else line=test;
+  }
+  if(line)lines.push(line);
+  if(truncated)lines[lines.length-1]+='…';
+  const lh=13,w=Math.min(maxW,Math.max(...lines.map(l=>ctx.measureText(l).width)))+16;
+  const h=lines.length*lh+9,bottom=sy-66,top=bottom-h,r=6;
+  ctx.beginPath();
+  ctx.moveTo(sx-w/2+r,top);
+  ctx.arcTo(sx+w/2,top,sx+w/2,bottom,r);
+  ctx.arcTo(sx+w/2,bottom,sx-w/2,bottom,r);
+  ctx.lineTo(sx+6,bottom);
+  ctx.lineTo(sx,bottom+7);  // しっぽ
+  ctx.lineTo(sx-6,bottom);
+  ctx.arcTo(sx-w/2,bottom,sx-w/2,top,r);
+  ctx.arcTo(sx-w/2,top,sx+w/2,top,r);
+  ctx.closePath();
+  ctx.fillStyle='rgba(244,236,216,.94)';ctx.fill();
+  ctx.strokeStyle=CHAT_BUBBLE_COLOR[fx.channel]||CHAT_BUBBLE_COLOR.general;
+  ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#2a2318';
+  lines.forEach((l,i)=>ctx.fillText(l,sx,top+11.5+i*lh));
+  ctx.restore();
+  return true;
+}
 function drawActionEffect(fx){
   const p=clamp(fx.age/fx.dur,0,1),projectile=fx.kind==='bolt'||fx.kind==='fire';
   const effectX=(x,y)=>isoX(x,y)-camX+W/2;
@@ -4230,6 +4363,12 @@ function render(){
     if(sx<-140-viewExtraX||sx>W+140+viewExtraX
       ||sy<-160-viewExtraY||sy>H+120+viewExtraY)continue;
     drawRemotePlayerLabel(sx,sy,e);
+    if(e.chatFx&&!drawChatBubbleFx(sx,sy,e.chatFx))e.chatFx=null;
+  }
+  if(player.chatFx){
+    const bx=SX(player.x,player.y);
+    const by=SY(player.x,player.y)-(zone==='field'?ELEV_PX*elevF(player.x,player.y):0);
+    if(!drawChatBubbleFx(bx,by,player.chatFx))player.chatFx=null;
   }
   const playerHudWorldX=SX(player.x,player.y);
   const playerHudWorldY=SY(player.x,player.y)
@@ -4457,6 +4596,134 @@ canvas.addEventListener('pointerdown',ev=>{
   player.path=findPath(player.x,player.y,t.x,t.y);
   clickMark={x:t.x,y:t.y,age:0};
 });
+/* ================= チャット ================= */
+const CHAT_CHANNELS={
+  general:{label:'一般',color:'#c9a24a'},
+  friend:{label:'フレンド',color:'#75c36c'},
+  team:{label:'チーム',color:'#6ea8e8'},
+};
+const chat={open:false,tab:'general',online:false,outbox:[],history:[],
+  unread:0,lastSentAt:0};
+function chatMsgNode(m){
+  const d=document.createElement('div');
+  if(m.channel==='sys'){d.className='chatMsg sysmsg';d.textContent=m.text;return d;}
+  d.className=`chatMsg ${m.channel}${m.self?' self':''}`;
+  const b=document.createElement('b');
+  b.textContent=m.self?`${m.name}（自分）`:`${m.name}  徳位${m.level||1}`;
+  d.appendChild(b);
+  d.appendChild(document.createTextNode(m.text));
+  return d;
+}
+function renderChatLog(){
+  const el=$('chatLog');
+  el.innerHTML='';
+  for(const m of chat.history)
+    if(m.channel===chat.tab||m.channel==='sys')el.appendChild(chatMsgNode(m));
+  el.scrollTop=el.scrollHeight;
+}
+function updateChatBadge(){
+  const b=$('chatBadge');
+  b.hidden=chat.unread<=0;
+  b.textContent=chat.unread>9?'9+':String(chat.unread);
+}
+function spawnChatFloat(m){
+  const d=document.createElement('div');
+  d.className='chatFloatMsg';
+  d.style.setProperty('--chatc',(CHAT_CHANNELS[m.channel]||CHAT_CHANNELS.general).color);
+  const b=document.createElement('b');b.textContent=m.name;
+  d.appendChild(b);d.appendChild(document.createTextNode(m.text));
+  const host=$('chatFloat');
+  host.appendChild(d);
+  while(host.children.length>3)host.removeChild(host.firstChild);
+  setTimeout(()=>d.remove(),8200);
+}
+function setChatBubble(m){
+  const fx={text:m.text,channel:m.channel,until:performance.now()+6500};
+  if(m.self){player.chatFx=fx;return;}
+  const e=remotePlayers.get(m.userId||'');
+  if(e)e.chatFx=fx;
+}
+function addChatMessage(m){
+  chat.history.push(m);
+  if(chat.history.length>80)chat.history.shift();
+  if(chat.open){
+    if(m.channel===chat.tab||m.channel==='sys'){
+      const el=$('chatLog');
+      el.appendChild(chatMsgNode(m));
+      while(el.children.length>80)el.removeChild(el.firstChild);
+      el.scrollTop=el.scrollHeight;
+    }
+  }else if(m.channel!=='sys'){
+    chat.unread++;updateChatBadge();
+    spawnChatFloat(m);
+  }
+  if(m.channel!=='sys')setChatBubble(m);
+}
+function updateChatInputState(){
+  const ready=chat.tab==='general',ok=ready&&chat.online;
+  $('chatIn').disabled=!ok;
+  $('chatSend').disabled=!ok;
+  $('chatIn').placeholder=!ready?`${CHAT_CHANNELS[chat.tab].label}は準備中`
+    :chat.online?'付近の魂へ話す (Enter)':'魂籍にログインすると話せる';
+}
+function renderChatTab(){
+  for(const b of document.querySelectorAll('.chatTab'))
+    b.classList.toggle('on',b.dataset.ch===chat.tab);
+  const ready=chat.tab==='general';
+  $('chatNotice').hidden=ready;
+  $('chatLog').hidden=!ready;
+  if(!ready){
+    $('chatNotice').textContent=chat.tab==='friend'
+      ?'フレンド機能は準備中。いずれ遠くの魂とも言葉を交わせるようになる。'
+      :'チーム機能は準備中。いずれ徒党を組んで冥府の深部に挑めるようになる。';
+  }
+  updateChatInputState();
+  if(ready)renderChatLog();
+}
+function openChat(focus=true){
+  chat.open=true;
+  $('chatBox').hidden=false;
+  $('chatFloat').innerHTML='';
+  $('stage').classList.add('chatOpen');
+  chat.unread=0;updateChatBadge();
+  renderChatTab();
+  // スマホは開いた瞬間にキーボードが出ると邪魔なので、入力欄タップで出す
+  if(focus&&!MOBILE_RENDER&&!$('chatIn').disabled)$('chatIn').focus();
+}
+function closeChat(){
+  chat.open=false;
+  $('chatBox').hidden=true;
+  $('stage').classList.remove('chatOpen');
+  $('chatIn').blur();
+}
+function sendChat(){
+  const input=$('chatIn');
+  const text=input.value.replace(/\s+/g,' ').trim().slice(0,60);
+  if(!text||!chat.online||chat.tab!=='general')return;
+  const now=Date.now();
+  if(now-chat.lastSentAt<700)return;  // 連投防止
+  chat.lastSentAt=now;
+  input.value='';
+  chat.outbox.push({channel:'general',text});
+  addChatMessage({channel:'general',text,self:true,
+    name:player.name||'ナナシ',level:player.lv,userId:'',ts:now});
+}
+$('chatToggle').addEventListener('click',()=>{
+  chat.open?closeChat():openChat();
+  sfx.click();
+});
+$('chatClose').addEventListener('click',()=>{closeChat();sfx.click();});
+$('chatSend').addEventListener('click',sendChat);
+$('chatIn').addEventListener('keydown',ev=>{
+  ev.stopPropagation();  // 入力中にE/R/F等のスキルが暴発しないように
+  if(ev.isComposing||ev.keyCode===229)return;  // 日本語変換確定のEnterは無視
+  if(ev.key==='Enter')sendChat();
+  else if(ev.key==='Escape')closeChat();
+});
+for(const b of document.querySelectorAll('.chatTab'))
+  b.addEventListener('click',()=>{chat.tab=b.dataset.ch;renderChatTab();sfx.click();});
+updateChatInputState();
+
 window.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
     ev.preventDefault();
@@ -4473,7 +4740,18 @@ window.addEventListener('keydown',ev=>{
     closeResetConfirm();
     return;
   }
+  if(ev.key==='Escape'&&chat.open){
+    ev.preventDefault();
+    closeChat();
+    return;
+  }
   if(!started)return;
+  // チャット等の入力欄にフォーカス中はゲームのショートカットを無効にする
+  if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='TEXTAREA'))return;
+  if(ev.key==='Enter'&&!chat.open&&!(ev.target instanceof HTMLButtonElement)){
+    openChat();
+    return;
+  }
   const k=ev.key.toLowerCase();
   if(k==='e')castBolt();
   if(k==='r')castHeal();
@@ -4814,6 +5092,28 @@ window.EnmaGameBridge={
       e.zone=raw.zone;e.lastSeen=now;
     }
     for(const id of remotePlayers.keys())if(!seen.has(id))remotePlayers.delete(id);
+  },
+  drainChatOutbox(){
+    return chat.outbox.splice(0,chat.outbox.length);
+  },
+  receiveChatMessage(msg){
+    if(!msg||typeof msg!=='object')return;
+    const text=String(msg.text||'').slice(0,60);
+    if(!text)return;
+    addChatMessage({
+      channel:CHAT_CHANNELS[msg.channel]?msg.channel:'general',
+      text,self:false,
+      name:String(msg.displayName||'ナナシ').slice(0,16),
+      level:Math.max(1,msg.level|0),
+      userId:String(msg.userId||''),
+      ts:Date.now(),
+    });
+  },
+  setChatOnline(on){
+    const next=Boolean(on);
+    if(next===chat.online)return;
+    chat.online=next;
+    updateChatInputState();
   },
   playRemoteAttack(raw){
     const id=String(raw?.userId||''),sessionId=String(raw?.sessionId||'');

@@ -7,6 +7,10 @@ const VALID_ATTACK_KIND = new Set([
   'melee', 'bolt', 'fire', 'heal',
   'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
 ]);
+// フレンド・チームは未実装。実装したらここへ追加する。
+const VALID_CHAT_CHANNEL = new Set(['general']);
+const CHAT_MIN_INTERVAL_MS = 600;
+const CHAT_MAX_LENGTH = 60;
 
 const newSessionId = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -60,6 +64,26 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
   };
 }
 
+function normalizeChatMessage(raw, expectedZone, ownSessionId) {
+  if (!raw || typeof raw !== 'object') return null;
+  const userId = cleanText(raw.userId, 64);
+  const sessionId = cleanText(raw.sessionId, 96);
+  if (!userId || !sessionId || sessionId === ownSessionId) return null;
+  const zone = cleanText(raw.zone, 16);
+  if (zone !== expectedZone || !VALID_ZONE.test(zone)) return null;
+  if (!VALID_CHAT_CHANNEL.has(raw.channel)) return null;
+  const text = cleanText(raw.text, CHAT_MAX_LENGTH);
+  if (!text) return null;
+  return {
+    userId,
+    sessionId,
+    displayName: cleanText(raw.displayName, 16) || 'ナナシ',
+    level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(raw.level, 1)))),
+    channel: raw.channel,
+    text,
+  };
+}
+
 export function createPresenceController(client, bridge = window.EnmaGameBridge) {
   const sessionId = newSessionId();
   const remotes = new Map();
@@ -73,6 +97,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   let lastSentAt = 0;
   let lastSentKey = '';
   let lastSentAttackSeq = 0;
+  let lastChatSentAt = 0;
   let sequence = 0;
 
   function identityFor(snapshot = {}) {
@@ -113,6 +138,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       badge.textContent = String(total);
     }
     button?.classList.toggle('realtime', connected);
+    bridge?.setChatOnline?.(connected);
     if (button && connected) {
       button.title = `魂籍を開く（同じ区域に${total}人）`;
       button.setAttribute('aria-label', `魂籍を開く。同じ区域に${total}人`);
@@ -213,6 +239,11 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           upsertRemote(payload);
           publishRemotes();
         })
+        .on('broadcast', { event: 'chat' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          const message = normalizeChatMessage(payload, channelZone, sessionId);
+          if (message) bridge?.receiveChatMessage?.(message);
+        })
         .on('broadcast', { event: 'attack' }, ({ payload }) => {
           if (activeChannel !== channel) return;
           const action = normalizeRemote(
@@ -298,6 +329,29 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     }).catch(() => {});
   }
 
+  function sendChatOutbox(snapshot) {
+    if (!channel || !subscribed || snapshot.zone !== channelZone) return;
+    if (Date.now() - lastChatSentAt < CHAT_MIN_INTERVAL_MS) return;
+    const outbox = bridge?.drainChatOutbox?.();
+    if (!Array.isArray(outbox) || !outbox.length) return;
+    // ゲーム側も700ms制限で積むため、実質1件ずつ届く
+    const item = outbox[outbox.length - 1];
+    const text = cleanText(item?.text, CHAT_MAX_LENGTH);
+    if (!text || !VALID_CHAT_CHANNEL.has(item?.channel)) return;
+    lastChatSentAt = Date.now();
+    channel.send({
+      type: 'broadcast',
+      event: 'chat',
+      payload: {
+        ...identityFor(snapshot),
+        zone: channelZone,
+        channel: item.channel,
+        text,
+        sentAt: Date.now(),
+      },
+    }).catch(() => {});
+  }
+
   function tick() {
     const snapshot = bridge?.getRealtimeState?.();
     const nextZone = session && snapshot?.active && !document.hidden
@@ -307,7 +361,10 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       void switchChannel(nextZone, snapshot || {});
       return;
     }
-    if (nextZone) sendPosition(snapshot);
+    if (nextZone) {
+      sendPosition(snapshot);
+      sendChatOutbox(snapshot);
+    }
 
     const staleBefore = Date.now() - IDLE_HEARTBEAT_MS * 4;
     let removed = false;
