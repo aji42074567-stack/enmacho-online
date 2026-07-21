@@ -1152,7 +1152,8 @@ const BOSS_HOME={x:10,y:7};
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
     if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<9.2)tileKind[y*MAP+x]=2;   // 宿場町の広場(拡張)
     if(y>=54&&y<=57&&x>=25&&x<=34&&Math.abs(y-55.4)<1.5)tileKind[y*MAP+x]=2;   // 酒場へ続く通り(店前から左へ)
-    if(x>=28&&x<=31&&y>=40&&y<=44)tileKind[y*MAP+x]=2;   // 北門へ続く通り
+    if(x>=31&&x<=34&&y>=40&&y<=47)tileKind[y*MAP+x]=2;   // 閻魔庁の東を回る北門通り
+    if(y>=45&&y<=47&&x>=27&&x<=34)tileKind[y*MAP+x]=2;   // 閻魔庁前の参道
   }
   // 離小島(歪な菱形): 当たり判定は islandF で決定(見た目も同じ関数で滑らかに描く)
   for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
@@ -1164,12 +1165,19 @@ const BOSS_HOME={x:10,y:7};
 })();
 
 /* ================= 構造物・NPC ================= */
-let props=[]; // {x,y,kind,...}  kind: tree/rock/stone/house/shop/smithy/lamp/well/cave/torch/cavexit
+let props=[]; // {x,y,kind,...}  kind: tree/rock/stone/enmacho/house/shop/smithy/lamp/well/cave/torch/cavexit
 function placeBuilding(bx,by,kind,roof1,roof2){
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
   props.push({x:bx+0.5,y:by+0.5,kind,roof1,roof2});
 }
-placeBuilding(27,47,'house','#6e3a2e','#5a2f26');
+function placeLargeBuilding(bx,by,bw,bh,kind){
+  for(let dy=0;dy<bh;dy++)for(let dx=0;dx<bw;dx++)blocked[(by+dy)*MAP+bx+dx]=1;
+  props.push({
+    x:bx+(bw-1)/2,y:by+(bh-1)/2,kind,
+    footprintW:bw,footprintH:bh,
+  });
+}
+placeLargeBuilding(24,40,7,5,'enmacho');           // 町の核となる閻魔庁本殿
 placeBuilding(36,46,'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
 placeBuilding(35,51,'shop','#7a5a2a','#645022');
 placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
@@ -1181,8 +1189,8 @@ props.push({x:31,y:53,kind:'well'});
 props.push({x:29,y:51,kind:'lamp'});
 props.push({x:37,y:49,kind:'lamp'});
 props.push({x:31,y:55.6,kind:'lamp'});   // 酒場前の通り
-props.push({x:29,y:43,kind:'lamp'});     // 北の通り
-props.push({x:31,y:41,kind:'lamp'});
+props.push({x:27,y:46,kind:'lamp'});     // 閻魔庁前の灯籠
+props.push({x:31,y:46,kind:'lamp'});
 
 let npcs=[
   {x:34,y:53,kind:'merchant',name:'オババ'},
@@ -1196,7 +1204,7 @@ let npcs=[
 /* ---- 町を囲う柵と門 ---- */
 const TOWN={x0:21,y0:39,x1:42,y1:57};
 const GATES=[
-  {tiles:[[29,39],[30,39]],open:false,name:'北門'},   // 賽の森への街道
+  {tiles:[[33,39],[34,39]],open:false,name:'北門'},   // 閻魔庁の東を回り賽の森へ
   {tiles:[[42,46],[42,47]],open:false,name:'東門'},   // 試練の洞窟方面
   {tiles:[[39,57],[40,57]],open:false,name:'南門'},   // 浜辺と桟橋へ
 ];
@@ -3477,6 +3485,7 @@ loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
 loadSprite('map_smithy','assets/map_smithy.png');
+loadSprite('map_enmacho_hall','assets/map_enmacho_hall.png');
 loadSprite('map_respawn_statue','assets/map_respawn_statue.png');
 loadSprite('map_pine_tall','assets/map_pine_tall.png');
 loadSprite('map_pine_full','assets/map_pine_full.png');
@@ -4070,6 +4079,27 @@ function drawStone(sx,sy){
   ctx.beginPath();ctx.arc(0,-22,3,0,6.29);ctx.fill();
   ctx.restore();
 }
+function drawEnmachoHall(sx,sy,p){
+  const img=SPRITES.map_enmacho_hall;
+  if(!img){
+    drawHouse(sx,sy,{...p,kind:'house',roof1:'#211c1c',roof2:'#15171d'});
+    return;
+  }
+  const w=430,h=w*img.height/img.width;
+  const frontOffset=((p.footprintW-1)+(p.footprintH-1))*TH/4;
+  const baseY=sy+frontOffset+8;
+  ctx.drawImage(img,sx-w/2,baseY-h,w,h);
+
+  // 小さな画面でも庁舎と分かるよう、中央正面に金文字の官庁札を重ねる。
+  const plaqueY=baseY-h*0.49;
+  ctx.fillStyle='rgba(17,12,9,0.92)';
+  ctx.fillRect(sx-31,plaqueY-10,62,19);
+  ctx.strokeStyle='#9f7838';ctx.lineWidth=1.5;
+  ctx.strokeRect(sx-31,plaqueY-10,62,19);
+  ctx.fillStyle='#e0bd67';
+  ctx.font='bold 13px "Yu Mincho",serif';ctx.textAlign='center';
+  ctx.fillText('閻魔庁',sx,plaqueY+4);
+}
 function drawHouse(sx,sy,p){
   const key=p.kind==='smithy'?'map_smithy'
     :p.kind==='shop'?'map_shop_green'
@@ -4583,6 +4613,7 @@ function render(){
       case 'stairdown':drawStairs(sx,sy,true);break;
       case 'stairup':drawStairs(sx,sy,false);break;
       case 'stone':drawStone(sx,sy);break;
+      case 'enmacho':drawEnmachoHall(sx,sy,it.o);break;
       case 'house':case 'shop':case 'smithy':case 'tavern':drawHouse(sx,sy,it.o);break;
       case 'fence':drawFence(sx,sy,it.o);break;
       case 'gate':drawGate(sx,sy,it.o);break;
@@ -4863,7 +4894,7 @@ canvas.addEventListener('pointerdown',ev=>{
     const py=isoY(e.x,e.y)-camY+H/2
       -(zone==='field'?ELEV_PX*elevF(e.x,e.y):0)-20;
     const d=Math.hypot(px-sx,py-sy);
-    if(d<30&&d<bestPlayer){bestPlayer=d;hitPlayer=e;}
+    if(d<34&&d<bestPlayer){bestPlayer=d;hitPlayer=e;}
   }
   if(hitPlayer){openPlayerCard(hitPlayer);return;}
   if(playerCard.userId)closePlayerCard();  // 地面タップでカードを閉じる
@@ -5074,6 +5105,11 @@ updateChatInputState();
 
 /* ================= チーム・フレンド・プレイヤーカード ================= */
 const party={id:null,members:[]};
+// 画面左のログ(常時見える)とチャットの両方に知らせる
+function notifyNet(text){
+  log(text,'sys');
+  addChatMessage({channel:'sys',text,ts:Date.now()});
+}
 const netOutbox=[];               // チーム勧誘・フレンド申請の送信キュー(presence.jsが回収)
 const globalOnline=new Map();     // userId -> {displayName,level,zone} 全体在席(フレンドの在否表示)
 const playerCard={userId:''};
@@ -5143,7 +5179,7 @@ $('pcTeamBtn').addEventListener('click',()=>{
   if(!e){closePlayerCard();return;}
   if(!party.id){party.id=genPartyId();renderTeamUI();}
   netOutbox.push({type:'invite',kind:'team',targetUserId:playerCard.userId,partyId:party.id});
-  addChatMessage({channel:'sys',text:`${e.name} をチームに誘った`,ts:Date.now()});
+  notifyNet(`${e.name} をチームに誘った。返事を待とう`);
   closePlayerCard();
   sfx.click();
 });
@@ -5151,13 +5187,14 @@ $('pcFriendBtn').addEventListener('click',()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
   netOutbox.push({type:'invite',kind:'friend',targetUserId:playerCard.userId});
-  addChatMessage({channel:'sys',text:`${e.name} にフレンド申請を送った`,ts:Date.now()});
+  notifyNet(`${e.name} にフレンド申請を送った。返事を待とう`);
   closePlayerCard();
   sfx.click();
 });
 
 /* ---- 招待の受信 ---- */
 function queueInvite(invite){
+  log(`${invite.from.displayName} から${invite.kind==='team'?'チームの誘い':'フレンド申請'}が届いた`,'sys');
   pendingInvites.push(invite);
   while(pendingInvites.length>4)pendingInvites.shift();
   if(!activeInvite)showNextInvite();
@@ -5186,14 +5223,14 @@ $('inviteAccept').addEventListener('click',()=>{
     party.id=inv.partyId;party.members=[];
     netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
       targetUserId:inv.from.userId,partyId:inv.partyId});
-    addChatMessage({channel:'sys',text:`${inv.from.displayName} のチームに加わった`,ts:Date.now()});
+    notifyNet(`${inv.from.displayName} のチームに加わった`);
     chat.tab='team';
     if(chat.open)renderChatTab();else openChat(false);
   }else{
     friendAdd({id:inv.from.userId,name:inv.from.displayName,lv:inv.from.level});
     netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,
       targetUserId:inv.from.userId});
-    addChatMessage({channel:'sys',text:`${inv.from.displayName} とフレンドになった！`,ts:Date.now()});
+    notifyNet(`${inv.from.displayName} とフレンドになった！`);
   }
   activeInvite=null;showNextInvite();
   sfx.click();
@@ -5265,7 +5302,7 @@ function leaveParty(announce){
   if(!party.id)return;
   party.id=null;party.members=[];
   chat.teamOnline=false;
-  if(announce)addChatMessage({channel:'sys',text:'チームを抜けた',ts:Date.now()});
+  if(announce)notifyNet('チームを抜けた');
   if(chat.open)renderChatTab();
 }
 $('teamLeave').addEventListener('click',()=>{leaveParty(true);sfx.click();});
@@ -5774,17 +5811,14 @@ window.EnmaGameBridge={
     if(reply.kind==='friend'){
       if(reply.accepted){
         friendAdd({id:reply.from.userId,name:reply.from.displayName,lv:reply.from.level});
-        addChatMessage({channel:'sys',
-          text:`${reply.from.displayName} とフレンドになった！`,ts:Date.now()});
+        notifyNet(`${reply.from.displayName} とフレンドになった！`);
       }else{
-        addChatMessage({channel:'sys',
-          text:`${reply.from.displayName} は静かに首を振った`,ts:Date.now()});
+        notifyNet(`${reply.from.displayName} は静かに首を振った`);
       }
     }else{
-      addChatMessage({channel:'sys',
-        text:reply.accepted
-          ?`${reply.from.displayName} がチームに加わった`
-          :`${reply.from.displayName} は誘いを断った`,ts:Date.now()});
+      notifyNet(reply.accepted
+        ?`${reply.from.displayName} がチームに加わった`
+        :`${reply.from.displayName} は誘いを断った`);
     }
   },
   receiveDropNotice(msg){
