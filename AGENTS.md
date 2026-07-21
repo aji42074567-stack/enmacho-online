@@ -34,7 +34,9 @@
   - workerは**pushでは反映されない**。変更したら `npx wrangler deploy` が必要(このMacは認証済み)
   - `ALLOWED_ORIGINS` に公開ドメインを必ず入れる。2026-07-21、enmacho.com が漏れていて
     独自ドメイン移行後の魔物同期が黙って切れていた(各端末で別々の敵が見えた)
-  - 魔物同期は現状「賽の森(field)」のみ。洞窟・ダンジョンは端末ローカル
+  - 魔物同期は全戦闘ゾーン対応(field/cave1-3/dg1-5/muen1-3)。ゾーンを増やしたら
+    workerの `VALID_ZONE` と、play.html・online/world.js の `SHARED_ZONES` の3箇所に追加し、
+    `npx wrangler deploy` を忘れない
 - 正式公開URL: `https://enmacho.com/`
 - Cloudflare Pages予備URL: `https://enmacho-online.pages.dev/`
 
