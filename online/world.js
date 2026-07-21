@@ -2,6 +2,9 @@ const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 150;
 const IDLE_HEARTBEAT_MS = 2_000;
 const PROTOCOL = 'enma-world-v1';
+const SHARED_ZONES = new Set([
+  'field', 'cave', 'cave2', 'cave3', 'dg1', 'dg2', 'dg3', 'dg4', 'dg5',
+]);
 
 const newSessionId = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -11,10 +14,10 @@ const newSessionId = () => {
 const finite = (value, fallback = 0) => Number.isFinite(Number(value))
   ? Number(value) : fallback;
 
-function websocketUrl(baseUrl, sessionId) {
+function websocketUrl(baseUrl, sessionId, zone) {
   const url = new URL(baseUrl);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.pathname = `${url.pathname.replace(/\/$/, '')}/world/field`;
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/world/${zone}`;
   url.search = new URLSearchParams({ session: sessionId });
   return url.toString();
 }
@@ -31,13 +34,14 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   let lastSentAt = 0;
   let lastSentKey = '';
   let lastMessageAt = 0;
+  let socketZone = '';
 
   function publishConnection(nextConnected) {
     if (connected === nextConnected) return;
     connected = nextConnected;
     bridge?.setSharedWorldConnection?.({
       connected,
-      zone: connected ? 'field' : '',
+      zone: connected ? socketZone : '',
     });
   }
 
@@ -65,10 +69,16 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     } catch {
       return;
     }
-    if (message?.type === 'snapshot' && message.zone === 'field') {
+    if (message?.type === 'snapshot' && message.zone === socketZone) {
       if (Array.isArray(message.monsters) && message.monsters.length) {
-        bridge?.setSharedMonsters?.(message.monsters);
+        bridge?.setSharedMonsters?.(message.monsters, message.zone);
       }
+      return;
+    }
+    if (message?.type === 'need_init') {
+      // このゾーンの部屋が空だった: 敵配置・壁データを渡してサーバー側シムを起こす
+      const init = bridge?.getZoneInit?.(socketZone);
+      if (init && init.zone === socketZone) send({ type: 'zone_init', ...init });
       return;
     }
     if (message?.type === 'reward') {
@@ -80,12 +90,13 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     }
   }
 
-  function connect() {
+  function connect(zone) {
     if (!session?.access_token || !config.worldServerUrl || socket) return;
+    socketZone = zone;
     let nextSocket;
     try {
       nextSocket = new WebSocket(
-        websocketUrl(config.worldServerUrl, sessionId),
+        websocketUrl(config.worldServerUrl, sessionId, zone),
         [PROTOCOL, `auth.${session.access_token}`],
       );
     } catch {
@@ -127,7 +138,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   }
 
   function sendPosition(snapshot) {
-    if (!snapshot?.active || snapshot.zone !== 'field') return;
+    if (!snapshot?.active || snapshot.zone !== socketZone) return;
     const now = Date.now();
     const key = [
       Math.round(finite(snapshot.x) * 100),
@@ -152,10 +163,11 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
 
   function tick() {
     const snapshot = bridge?.getSharedWorldPlayer?.();
+    const zoneNow = SHARED_ZONES.has(snapshot?.zone) ? snapshot.zone : '';
     const shouldConnect = Boolean(
       session?.access_token
       && snapshot?.active
-      && snapshot.zone === 'field'
+      && zoneNow
       && !document.hidden
       && config.worldServerUrl
     );
@@ -163,7 +175,9 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       if (socket) closeSocket(false);
       return;
     }
-    if (!socket && Date.now() >= retryAt) connect();
+    // ゾーン移動したら旧部屋を離れて新しい部屋へ入り直す
+    if (socket && socketZone !== zoneNow) closeSocket(false);
+    if (!socket && Date.now() >= retryAt) connect(zoneNow);
     if (connected && Date.now() - lastMessageAt > 10_000) {
       closeSocket(true);
       return;
