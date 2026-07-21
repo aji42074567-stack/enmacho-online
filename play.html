@@ -299,6 +299,9 @@
   .slotbox img[src*="assets/items/"]{image-rendering:auto;object-fit:contain;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
   #pickRow{display:flex;justify-content:center;gap:14px;margin-bottom:4px}
+  /* キャラ作成後は姿を選び直せない: 選ばなかった方を沈める */
+  #pickRow.locked .pick{cursor:default}
+  #pickRow.locked .pick:not(.on){opacity:.32;filter:grayscale(.7)}
   .pick{width:84px;height:84px;border:1px solid var(--panel-edge);border-radius:6px;
     cursor:pointer;opacity:.45;background:#141009 0 0/400% 100% no-repeat}
   #pickM{background-image:url(assets/char_player_m.png)}
@@ -662,7 +665,7 @@
           <div class="pick" id="pickM" role="button" tabindex="0" aria-label="男の子を選ぶ"></div>
           <div class="pick" id="pickF" role="button" tabindex="0" aria-label="女の子を選ぶ"></div>
         </div>
-        <div style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
+        <div id="genderHint" style="font-family:var(--sans);font-size:10.5px;color:var(--dim);margin-bottom:10px">▲ 魂の姿を選べます</div>
         <input id="nameIn" maxlength="8" placeholder="なまえを入力 (8文字まで)" autocomplete="off">
         <div id="nameFixed" class="hidden"><b></b><small>名は台帳に記された（変更不可）</small></div>
         <div class="rule"></div>
@@ -4971,11 +4974,12 @@ function closeAccount(){
 $('accountBtn').addEventListener('click',openAccount);
 $('accountClose').addEventListener('click',closeAccount);
 function setGender(g){
+  if(hasSaveData)return;  // キャラ作成後は姿(性別)を変えられない
   player.gender=g;
   $('pickM').classList.toggle('on',g==='m');
   $('pickF').classList.toggle('on',g==='f');
   sfx.click();
-  if(started||hasSaveData)save();  // 未開始の新規プレイヤーにセーブを作らない
+  if(started)save();  // 未開始の新規プレイヤーにセーブを作らない
 }
 for(const [id,g] of [['pickM','m'],['pickF','f']]){
   $(id).addEventListener('click',()=>setGender(g));
@@ -5303,6 +5307,13 @@ $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');
+  // 姿(性別)もキャラ作成時のまま固定
+  $('pickRow').classList.add('locked');
+  $('genderHint').textContent='姿は台帳に記された（変更不可）';
+  for(const id of ['pickM','pickF']){
+    $(id).removeAttribute('tabindex');
+    $(id).setAttribute('aria-disabled','true');
+  }
 }
 // 魂籍ゲートの表示判定:
 //  - TOPページから#soul付きで来た/メール確認・再設定リンクで戻った → 開く
