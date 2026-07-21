@@ -1018,6 +1018,7 @@
           <span class="setting-head"><span>効果音音量</span><output id="sfxValue">100%</output></span>
           <input id="sfxVolume" type="range" min="0" max="100" step="5" value="100">
         </label>
+        <button class="btn small" id="sfxTestBtn" type="button">攻撃音を試聴</button>
         <label class="setting-row" for="brightnessSetting">
           <span class="setting-head"><span>画面の明るさ</span><output id="brightnessValue">100%</output></span>
           <input id="brightnessSetting" type="range" min="70" max="130" step="5" value="100">
@@ -1818,45 +1819,112 @@ function log(txt,cls){
 }
 
 /* ================= サウンド ================= */
-let AC=null,bgmStarted=false,bgmGain=null;
+let AC=null,bgmStarted=false,bgmGain=null,sfxMaster=null,sfxLimiter=null,sfxNoiseBuffer=null;
+const BGM_MIX_LEVEL=0.42;
+function setupSfxBus(ac){
+  if(sfxMaster)return;
+  sfxMaster=ac.createGain();
+  sfxMaster.gain.value=settings.sfx/100;
+  sfxLimiter=ac.createDynamicsCompressor();
+  sfxLimiter.threshold.value=-12;
+  sfxLimiter.knee.value=10;
+  sfxLimiter.ratio.value=8;
+  sfxLimiter.attack.value=0.003;
+  sfxLimiter.release.value=0.16;
+  sfxMaster.connect(sfxLimiter).connect(ac.destination);
+  sfxNoiseBuffer=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);
+  const data=sfxNoiseBuffer.getChannelData(0);
+  for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+}
 function audio(){
   if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
-  if(AC&&AC.state==='suspended')AC.resume();
+  if(AC){
+    setupSfxBus(AC);
+    if(AC.state==='suspended')AC.resume().catch(()=>{});
+  }
   return AC;
 }
-function beep(f0,f1,dur,type,gain){
+function unlockAudio(){
+  const ac=audio();
+  if(ac?.state==='suspended')ac.resume().catch(()=>{});
+}
+document.addEventListener('pointerdown',unlockAudio,{capture:true,once:true,passive:true});
+document.addEventListener('keydown',unlockAudio,{capture:true,once:true});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&AC?.state==='suspended')AC.resume().catch(()=>{});
+});
+window.addEventListener('pageshow',()=>{
+  if(AC?.state==='suspended')AC.resume().catch(()=>{});
+});
+function beep(f0,f1,dur,type,gain,delay=0,attack=0.004){
   if(settings.sfx<=0)return;
   const ac=audio();if(!ac)return;
   const o=ac.createOscillator(),g=ac.createGain();
+  const t=ac.currentTime+delay;
   o.type=type||'square';
-  o.frequency.setValueAtTime(f0,ac.currentTime);
-  o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),ac.currentTime+dur);
-  g.gain.setValueAtTime((gain||.05)*(settings.sfx/100),ac.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+dur);
-  o.connect(g).connect(ac.destination);
-  o.start();o.stop(ac.currentTime+dur);
+  o.frequency.setValueAtTime(Math.max(30,f0),t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001,gain||.05),t+Math.min(attack,dur*.25));
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g).connect(sfxMaster);
+  o.start(t);o.stop(t+dur+0.02);
+}
+function noiseBurst(dur,gain,f0,f1=f0,q=0.8,delay=0,filterType='bandpass'){
+  if(settings.sfx<=0)return;
+  const ac=audio();if(!ac||!sfxNoiseBuffer)return;
+  const src=ac.createBufferSource(),filter=ac.createBiquadFilter(),g=ac.createGain();
+  const t=ac.currentTime+delay;
+  src.buffer=sfxNoiseBuffer;
+  filter.type=filterType;filter.Q.value=q;
+  filter.frequency.setValueAtTime(Math.max(40,f0),t);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(gain,t+Math.min(0.012,dur*.2));
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(filter).connect(g).connect(sfxMaster);
+  src.start(t);src.stop(t+dur+0.02);
 }
 const sfx={
-  hit:()=>beep(170,90,.09,'square',.05),
-  crit:()=>beep(240,80,.14,'square',.07),
-  hurt:()=>beep(110,60,.12,'sawtooth',.05),
-  kill:()=>{beep(300,150,.1,'square',.05);setTimeout(()=>beep(450,220,.12,'square',.05),80);},
-  bolt:()=>beep(700,180,.22,'sine',.06),
-  fire:()=>beep(300,60,.35,'sawtooth',.07),
-  heal:()=>beep(500,900,.2,'triangle',.05),
-  potion:()=>beep(400,800,.15,'sine',.05),
-  coin:()=>{beep(900,900,.06,'triangle',.05);setTimeout(()=>beep(1200,1200,.08,'triangle',.05),60);},
-  lvup:()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,f,.16,'triangle',.06),i*90));},
-  click:()=>beep(900,700,.04,'sine',.02),
-  swing:()=>beep(220,60,.16,'sawtooth',.035),
-  miss:()=>beep(500,300,.08,'sine',.03)
+  hit:()=>{
+    noiseBurst(.11,.18,1050,360,.75);
+    beep(135,58,.13,'sine',.16);
+    beep(820,290,.07,'triangle',.055,.006);
+  },
+  crit:()=>{
+    noiseBurst(.17,.24,1800,420,.85);
+    beep(170,48,.2,'sine',.2);
+    beep(1250,360,.16,'triangle',.1,.008);
+    beep(1850,620,.12,'sine',.055,.035);
+  },
+  hurt:()=>{
+    noiseBurst(.13,.13,650,220,.65);
+    beep(125,52,.17,'sawtooth',.12);
+  },
+  kill:()=>{
+    noiseBurst(.16,.19,1200,260,.7);
+    beep(150,45,.2,'sine',.18);
+    beep(360,720,.18,'triangle',.065,.08);
+  },
+  bolt:()=>{noiseBurst(.2,.08,3400,900,1.2);beep(920,190,.24,'sine',.13);},
+  fire:()=>{noiseBurst(.38,.17,1100,140,.55);beep(310,55,.38,'sawtooth',.1);},
+  heal:()=>{beep(460,920,.26,'triangle',.1);beep(690,1280,.3,'sine',.065,.06);},
+  potion:()=>{beep(380,820,.18,'sine',.09);noiseBurst(.1,.045,2400,900,1,.05);},
+  coin:()=>{beep(900,900,.07,'triangle',.1);beep(1200,1200,.09,'triangle',.09,.065);},
+  lvup:()=>{[523,659,784,1046].forEach((f,i)=>beep(f,f,.19,'triangle',.105,i*.09));},
+  click:()=>beep(900,700,.045,'sine',.045),
+  swing:()=>{
+    noiseBurst(.2,.16,3000,620,.65);
+    beep(260,72,.18,'sawtooth',.05,.005);
+  },
+  miss:()=>{noiseBurst(.1,.075,2300,700,.85);beep(520,270,.1,'sine',.055);}
 };
 
 /* ---- BGM(コード生成の和風アンビエント) ---- */
 function startBgm(){
   const ac=audio();if(!ac||bgmStarted)return;
   bgmStarted=true;
-  bgmGain=ac.createGain();bgmGain.gain.value=settings.bgm/100*0.9;
+  bgmGain=ac.createGain();bgmGain.gain.value=settings.bgm/100*BGM_MIX_LEVEL;
   bgmGain.connect(ac.destination);
   // 残響(山寺のような響き)
   const delay=ac.createDelay(1);delay.delayTime.value=0.45;
@@ -1919,7 +1987,7 @@ function loadMusic(){
     musicGain=ac.createGain();
     musicGain.gain.value=0.0001;
     musicGain.connect(ac.destination);
-    musicGain.gain.linearRampToValueAtTime(settings.bgm/100,ac.currentTime+3);
+    musicGain.gain.linearRampToValueAtTime(settings.bgm/100*BGM_MIX_LEVEL,ac.currentTime+3);
     if(bgmGain)bgmGain.gain.linearRampToValueAtTime(0.0001,ac.currentTime+4);  // 琴の生成BGMは静かに退場
     scheduleTrack(0,ac.currentTime+0.2);
   })
@@ -1941,7 +2009,11 @@ function scheduleTrack(i,when){
 }
 function applyAudioSettings(){
   if(!AC)return;
-  const t=AC.currentTime,v=settings.bgm/100;
+  const t=AC.currentTime,v=settings.bgm/100*BGM_MIX_LEVEL;
+  if(sfxMaster){
+    sfxMaster.gain.cancelScheduledValues(t);
+    sfxMaster.gain.setTargetAtTime(settings.sfx/100,t,0.025);
+  }
   if(musicGain){
     musicGain.gain.cancelScheduledValues(t);
     musicGain.gain.setTargetAtTime(v,t,0.04);
@@ -5985,6 +6057,12 @@ $('btnPotion').addEventListener('click',useQuickItem);
 $('quickPageBtn').addEventListener('click',cycleQuickPage);
 $('btnEquip').addEventListener('click',toggleEquip);
 $('btnAuto').addEventListener('click',toggleAuto);
+$('sfxTestBtn').addEventListener('click',()=>{
+  unlockAudio();
+  sfx.swing();
+  setTimeout(()=>sfx.hit(),260);
+  setTimeout(()=>sfx.crit(),620);
+});
 function renderSettings(){
   $('bgmVolume').value=settings.bgm;$('bgmValue').textContent=`${settings.bgm}%`;
   $('sfxVolume').value=settings.sfx;$('sfxValue').textContent=`${settings.sfx}%`;
