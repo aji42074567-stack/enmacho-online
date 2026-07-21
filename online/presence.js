@@ -230,6 +230,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     const oldChannel = worldChannel;
     worldChannel = null;
     worldSubscribed = false;
+    worldOpening = false;
     bridge?.setWorldChatOnline?.(false);
     if (!oldChannel) return;
     try {
@@ -268,6 +269,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         }
       });
   }
+
+  async function closeChannel() {
     const oldChannel = channel;
     channel = null;
     channelZone = '';
