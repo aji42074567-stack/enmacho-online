@@ -1140,10 +1140,11 @@ function itemFx(it){
   return p.join(' ');
 }
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
+const HEAL_POTION_DELAY=1;
 const HEAL_POTIONS={
-  s:{name:'甘露水 S',field:'potions', heal:65, price:30, delay:2.5},
-  m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:4},
-  l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:6},
+  s:{name:'甘露水 S',field:'potions', heal:65, price:30, delay:HEAL_POTION_DELAY},
+  m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:HEAL_POTION_DELAY},
+  l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:HEAL_POTION_DELAY},
 };
 const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','crit'];
 const defaultQuickItems=tier=>[
