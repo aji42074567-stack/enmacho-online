@@ -996,7 +996,7 @@
 
   <div class="overlay hidden" id="board">
     <div class="scroll">
-      <h2>高札</h2>
+      <h2>クエスト</h2>
       <div class="sub">町の亡者からの頼み事</div>
       <div id="boardList"></div>
       <button class="btn small" id="boardClose">立ち去る</button>
@@ -1005,7 +1005,7 @@
 
   <div class="overlay hidden" id="suggest">
     <div class="scroll">
-      <h2>目安箱</h2>
+      <h2>意見箱</h2>
       <div class="sub">ご意見・ご要望をお聞かせください</div>
       <div id="suggestBody"></div>
       <button class="btn small" id="suggestClose">立ち去る</button>
@@ -1353,8 +1353,8 @@ let npcs=[
   {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
   {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
-  {x:34.4,y:42.2,kind:'board',name:'高札'},       // 閻魔庁の東を回る北門通り
-  {x:36.4,y:43.2,kind:'suggest',name:'目安箱'},   // 高札の隣。意見・要望の投書箱
+  {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
+  {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
 ];
 
 /* ---- 町を囲う柵と門 ---- */
@@ -1404,7 +1404,7 @@ const ELDER_LINES=[
 const OKAMI_LINES=[
   '「いらっしゃい。ここは千本亭。転生待ちの亡者が、束の間の憂さを晴らす店だ」',
   '「まかない飯は体にいいぞ。……体なんて、もうないはずなんだけどな。おかしな話だ」',
-  '「高札の頼み事、受けてやってくれよ。この町の亡者は気が弱いのばかりでな」',
+  '「クエストの頼み事、受けてやってくれよ。この町の亡者は気が弱いのばかりでな」',
   '「オキナの旦那は長生きだな。おれがこの店を開いた時にはもう、あの姿だった」',
   '「たまにな、客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどな」',
 ];
@@ -1468,7 +1468,7 @@ const KAZU_STORY=[
     line:'「ゴウリュウが鎮まって海霧が晴れた。じき渡し船が来る。次の生では魂の役目を四つから選ぶことになる。……俺も昔、一度あの船に乗った。だが戻された。今度こそ、お前は先へ行け」',
   },
 ];
-/* ================= クエスト(高札) ================= */
+/* ================= クエスト ================= */
 const QUESTS=[
   {id:'q_gaki',   name:'ガキ退治',        desc:'村の周りのガキを5体成仏させる',    type:'kill', mob:['goblin','goblin_red'], n:5, rw:{gold:80, xp:40}},
   {id:'q_tokkuri',name:'酔客の因果話',    desc:'カズーの話をすべて聞く',            type:'story',n:6, rw:{gold:300,xp:220,key:'ferrymanCoin'}},
@@ -1658,7 +1658,7 @@ const player={
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   quickItems:['heal_s','haste','crit'],quickPage:0,
   name:'',quests:{trial:0},
-  qb:{active:null,prog:0,done:{}},          // 高札クエスト
+  qb:{active:null,prog:0,done:{}},          // クエスト掲示板
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
@@ -2160,7 +2160,7 @@ function gainItem(id){
   save();
 }
 
-/* ================= 高札クエスト進行 ================= */
+/* ================= クエスト進行 ================= */
 function completeQuest(q){
   player.qb.done[q.id]=true;
   player.qb.active=null;player.qb.prog=0;
@@ -2171,7 +2171,7 @@ function completeQuest(q){
   }
   if(q.rw.item)gainItem(q.rw.item);
   banner={txt:`頼み事「${q.name}」達成！`,age:0};
-  log(`高札の頼み事「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
+  log(`クエスト「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
   sfx.coin();
 }
 function questProgress(type,tag){
@@ -2696,8 +2696,8 @@ function renderTavern(){
   });
 }
 
-/* ---- 高札(クエスト掲示板) ---- */
-let suggestSentAt=0;   // 目安箱の連投防止(60秒)
+/* ---- クエスト掲示板 ---- */
+let suggestSentAt=0;   // 意見箱の連投防止(60秒)
 function renderSuggest(){
   const host=$('suggestBody');
   if(!socialState.online){
@@ -2719,8 +2719,8 @@ function renderSuggest(){
       await window.EnmaSocialClient?.submitFeedback?.(text,player.name);
       suggestSentAt=time;
       host.innerHTML='<div class="suggest-note thanks">投書は、確かに閻魔庁へ届けられた。<br><br>'
-        +'「貴重な声、痛み入る。<br>　より良き冥府のため、必ず役立てる」<br><br>――閻魔庁 目安箱係</div>';
-      log('目安箱に投書した','gain');
+        +'「貴重な声、痛み入る。<br>　より良き冥府のため、必ず役立てる」<br><br>――閻魔庁 意見箱係</div>';
+      log('意見箱に投書した','gain');
       sfx.coin();
     }catch(e){
       btn.disabled=false;msg.textContent=e?.message||'送信に失敗しました';
@@ -2746,7 +2746,7 @@ function renderBoard(){
       player.qb.active=b.getAttribute('data-qtake');
       player.qb.prog=player.qb.active==='q_tokkuri'?player.story.kazuStage:0;
       const q=questById(player.qb.active);
-      log(`高札の頼み事「${q.name}」を受けた`,'sys');
+      log(`クエスト「${q.name}」を受けた`,'sys');
       sfx.click();save();renderBoard();
     });
   }
@@ -3048,7 +3048,7 @@ function kazuDialogue(){
     return '「渡し船は桟橋に着いてる。古銭はなくすなよ。次に会う時、お前がどんな役目を選んだか聞かせてくれ」';
   }
   if(player.qb.active!=='q_tokkuri'){
-    return '「俺の昔話を聞く気なら、高札の『酔客の因果話』を受けてきな。酔言かどうかは、お前が歩いた道で確かめりゃいい」';
+    return '「俺の昔話を聞く気なら、クエストの『酔客の因果話』を受けてきな。酔言かどうかは、お前が歩いた道で確かめりゃいい」';
   }
   const idx=clamp(player.story.kazuStage|0,0,KAZU_STORY.length);
   if(idx>=KAZU_STORY.length){
@@ -3097,7 +3097,7 @@ function openNpc(npc){
       :'千本亭の常連客';
     $('talkText').textContent=player.qb.active==='q_tokkuri'||player.qb.done.q_tokkuri
       ?kazuDialogue()
-      :GUEST_AMBIENT_LINES[guestIdx++%GUEST_AMBIENT_LINES.length]+'　高札に、俺の話を聞けって頼みが出てるぜ。';
+      :GUEST_AMBIENT_LINES[guestIdx++%GUEST_AMBIENT_LINES.length]+'　クエストに、俺の話を聞けって頼みが出てるぜ。';
     $('talk').classList.remove('hidden');
   }
   else if(npc.kind==='soul'){
@@ -4213,6 +4213,7 @@ loadSprite('map_stone_well','assets/map_stone_well.png');
 // 酒場まわり(画像が来たら自動で差し替わる仮キー)
 loadSprite('map_tavern','assets/map_tavern.png');
 loadSprite('map_kosatsu','assets/map_kosatsu.png');
+loadSprite('map_suggestion_box','assets/map_suggestion_box.png');
 loadSprite('npc_einer','assets/npc_einer.png');
 loadSprite('npc_kazu','assets/npc_kazu.png');
 loadSprite('map_fence_x','assets/map_fence_x.png');
@@ -4908,18 +4909,26 @@ function drawHouse(sx,sy,p){
   ctx.restore();
 }
 function drawSuggestBox(sx,sy){
-  drawShadow(sx,sy+3,14);
-  ctx.save();ctx.translate(sx,sy);
-  // 柱の上に木箱+投入口。江戸の目安箱風
-  ctx.fillStyle='#4a3a26';ctx.fillRect(-3,-24,6,26);
-  ctx.fillStyle='#8a7448';ctx.fillRect(-15,-42,30,19);
-  ctx.strokeStyle='#5d4a30';ctx.lineWidth=1.5;ctx.strokeRect(-15,-42,30,19);
-  ctx.fillStyle='#6d5a38';ctx.fillRect(-17,-45,34,5);   // ふた
-  ctx.fillStyle='#241b12';ctx.fillRect(-8,-41.5,16,2.5);  // 投入口
-  ctx.fillStyle='#e8dcb8';ctx.fillRect(-6,-37,12,11);     // 「意」の札
-  ctx.fillStyle='#5a3a1a';ctx.font='9px serif';ctx.textAlign='center';
-  ctx.fillText('意',0,-28.5);
-  ctx.restore();
+  const img=SPRITES.map_suggestion_box;
+  drawShadow(sx,sy+3,22);
+  if(img){
+    const w=78,h=w*img.height/img.width;
+    ctx.drawImage(img,sx-w/2,sy-h+7,w,h);
+  }else{
+    ctx.save();ctx.translate(sx,sy);
+    // 読込前も投入口と「意見箱」の札が分かる簡易表示を残す。
+    ctx.fillStyle='#4a3a26';ctx.fillRect(-3,-24,6,26);
+    ctx.fillStyle='#8a7448';ctx.fillRect(-15,-42,30,19);
+    ctx.strokeStyle='#5d4a30';ctx.lineWidth=1.5;ctx.strokeRect(-15,-42,30,19);
+    ctx.fillStyle='#6d5a38';ctx.fillRect(-17,-45,34,5);   // ふた
+    ctx.fillStyle='#241b12';ctx.fillRect(-8,-41.5,16,2.5);  // 投入口
+    ctx.fillStyle='#e8dcb8';ctx.fillRect(-12,-37,24,11);
+    ctx.fillStyle='#5a3a1a';ctx.font='7px serif';ctx.textAlign='center';
+    ctx.fillText('意見箱',0,-28.5);
+    ctx.restore();
+  }
+  ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('意見箱',sx,sy+14);
 }
 function drawKosatsu(sx,sy){
   const img=SPRITES.map_kosatsu;
@@ -4929,7 +4938,7 @@ function drawKosatsu(sx,sy){
   }else{
     drawShadow(sx,sy+3,20);
     ctx.save();ctx.translate(sx,sy);
-    // 柱2本+屋根+札3枚の高札場
+    // 柱2本+屋根+札3枚のクエスト掲示板
     ctx.fillStyle='#4a3a26';
     ctx.fillRect(-24,-40,4,42);ctx.fillRect(20,-40,4,42);
     ctx.fillStyle='#5d4a30';
@@ -4949,7 +4958,7 @@ function drawKosatsu(sx,sy){
     ctx.fillText('!',sx,img?sy-h+4:sy-58);
   }
   ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
-  ctx.fillText('高札',sx,sy+14);
+  ctx.fillText('クエスト',sx,sy+14);
 }
 function drawPalm(sx,sy,p){
   const img=SPRITES['palm_'+p.v];
@@ -5581,7 +5590,7 @@ function hud(){
     el.goal.textContent=q.n>1?`${q.name} ${player.qb.prog}/${q.n}`:q.name;
   }else{
     el.goal.textContent=player.story.chapter1Seen?'第一章「賽の森」完 — 第二章へ続く'
-      :player.story.dragonCleared?'高札の頼みを受け、カズーの因果話を聞こう'
+      :player.story.dragonCleared?'クエストを受け、カズーの因果話を聞こう'
       :player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
       :!player.story.oniKingCleared?'試練の洞窟 最深部のオニオウを鎮めよ'
