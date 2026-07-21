@@ -101,14 +101,16 @@
   #chatBox[hidden]{display:none}
   #chatTabs{display:flex;align-items:center;border-bottom:1px solid #2a2115;background:#171209}
   .chatTab{flex:0 0 auto;background:none;border:none;color:var(--dim);cursor:pointer;
-    font-family:var(--serif);font-size:11.5px;letter-spacing:.08em;padding:8px 12px;
+    font-family:var(--serif);font-size:11px;letter-spacing:.04em;padding:8px 8px;
     border-bottom:2px solid transparent}
   .chatTab[data-ch=general]{--chatc:#c9a24a}
+  .chatTab[data-ch=world]{--chatc:#e0824a}
   .chatTab[data-ch=friend]{--chatc:#75c36c}
   .chatTab[data-ch=team]{--chatc:#6ea8e8}
+  .chatTab[data-ch=log]{--chatc:#8fb2d9}
   .chatTab.on{color:var(--chatc);border-bottom-color:var(--chatc)}
   #chatClose{margin-left:auto;background:none;border:none;color:var(--dim);
-    cursor:pointer;font-size:12px;padding:8px 10px}
+    cursor:pointer;font-size:12px;padding:8px 9px}
   #chatLog{height:168px;overflow-y:auto;padding:8px;display:flex;
     flex-direction:column;gap:6px;scrollbar-width:thin}
   #chatLog[hidden]{display:none}
@@ -121,10 +123,24 @@
   .chatMsg.self{align-self:flex-end;background:#2d2513;border-left:1px solid #3a2f1c;
     border-right:3px solid var(--chatc,#c9a24a);border-radius:9px 2px 9px 9px}
   .chatMsg.general{--chatc:#c9a24a}
+  .chatMsg.world{--chatc:#e0824a}
   .chatMsg.friend{--chatc:#75c36c}
   .chatMsg.team{--chatc:#6ea8e8}
   .chatMsg.sysmsg{align-self:center;background:none;border:none;color:var(--dim);
     font-size:10.5px;text-align:center;padding:2px}
+  .chatMsg.drop{align-self:center;max-width:96%;text-align:center;
+    background:linear-gradient(180deg,#2e2410,#231a0c);border:1px solid #8a6423;
+    border-radius:4px;color:#ffe9b8;font-size:11px;letter-spacing:.03em;
+    box-shadow:0 0 10px rgba(201,162,74,.18)}
+  .chatMsg.drop::before{content:'✦ ';color:#ffd97a}
+  .chatMsg.logline{align-self:stretch;max-width:100%;background:none;border:none;
+    padding:1px 2px;font-size:11px;line-height:1.6;color:#cfc2a0}
+  .chatMsg.logline.sys{color:#8fb2d9}
+  .chatMsg.logline.gain{color:#d9c07a}
+  .chatMsg.logline.glitch{color:#7fd8a0;letter-spacing:.05em}
+  .chatFloatMsg.drop{border-left-color:#ffd97a;color:#ffe9b8;
+    box-shadow:0 2px 8px rgba(0,0,0,.45),0 0 12px rgba(201,162,74,.25)}
+  .chatFloatMsg.drop::before{content:'✦ ';color:#ffd97a}
   #chatNotice{padding:20px 14px;font-size:11.5px;color:var(--dim);
     line-height:1.9;text-align:center}
   #chatNotice[hidden]{display:none}
@@ -566,8 +582,10 @@
     <div id="chatBox" hidden>
       <div id="chatTabs" role="tablist">
         <button class="chatTab on" data-ch="general" role="tab">一般</button>
+        <button class="chatTab" data-ch="world" role="tab">全体</button>
         <button class="chatTab" data-ch="friend" role="tab">フレンド</button>
         <button class="chatTab" data-ch="team" role="tab">チーム</button>
+        <button class="chatTab" data-ch="log" role="tab">ログ</button>
         <button id="chatClose" aria-label="チャットを閉じる">✕</button>
       </div>
       <div id="chatLog" aria-live="polite"></div>
@@ -1496,12 +1514,16 @@ function addActionEffect(kind,x,y,targetX=x,targetY=y){
     age:0,dur:projectile?(kind==='fire'?0.48:0.38):kind==='heal'?1.05:0.82});
 }
 const logEl=document.getElementById('log');
+const gameLogHistory=[];  // チャットパネルのログタブ用(全文保持)
 function log(txt,cls){
   const d=document.createElement('div');
   if(cls)d.className=cls;
   d.textContent=txt;
   logEl.appendChild(d);
   while(logEl.children.length>4)logEl.removeChild(logEl.firstChild);
+  gameLogHistory.push({text:txt,cls:cls||''});
+  if(gameLogHistory.length>150)gameLogHistory.shift();
+  if(window.__chatMirrorLog)window.__chatMirrorLog(txt,cls);
 }
 
 /* ================= サウンド ================= */
@@ -1744,6 +1766,7 @@ function grantMobReward(m){
   const drop=DROPS[m.type];
   if(drop&&Math.random()<dropChance(drop[1])&&!player.items.includes(drop[0])){
     gainItem(drop[0]);
+    announceRareDrop(m.name,ITEMS[drop[0]].name);
   }else if(Math.random()<dropChance(0.28)){
     player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');
   }
@@ -1751,12 +1774,14 @@ function grantMobReward(m){
     player.dragonBlood++;
     addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
     log('希少素材「竜の血」を手に入れた！','gain');
+    announceRareDrop(m.name,'竜の血');
   }
   if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
     const wpn=Math.random()<0.5;
     if(wpn)player.wScrolls++;else player.aScrolls++;
     addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
     log(`超激レア！ ${wpn?'武器':'防具'}強化の巻物を手に入れた！`,'gain');
+    announceRareDrop(m.name,`${wpn?'武器':'防具'}強化の巻物`);
   }
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
@@ -4669,14 +4694,17 @@ canvas.addEventListener('pointerdown',ev=>{
 /* ================= チャット ================= */
 const CHAT_CHANNELS={
   general:{label:'一般',color:'#c9a24a'},
+  world:{label:'全体',color:'#e0824a'},
   friend:{label:'フレンド',color:'#75c36c'},
   team:{label:'チーム',color:'#6ea8e8'},
+  log:{label:'ログ',color:'#8fb2d9'},
 };
-const chat={open:false,tab:'general',online:false,outbox:[],history:[],
-  unread:0,lastSentAt:0};
+const chat={open:false,tab:'general',online:false,worldOnline:false,
+  outbox:[],history:[],unread:0,lastSentAt:0};
 function chatMsgNode(m){
   const d=document.createElement('div');
   if(m.channel==='sys'){d.className='chatMsg sysmsg';d.textContent=m.text;return d;}
+  if(m.kind==='drop'){d.className='chatMsg drop';d.textContent=m.text;return d;}
   d.className=`chatMsg ${m.channel}${m.self?' self':''}`;
   const b=document.createElement('b');
   b.textContent=m.self?`${m.name}（自分）`:`${m.name}  徳位${m.level||1}`;
@@ -4684,13 +4712,31 @@ function chatMsgNode(m){
   d.appendChild(document.createTextNode(m.text));
   return d;
 }
+function logLineNode(entry){
+  const d=document.createElement('div');
+  d.className='chatMsg logline'+(entry.cls?' '+entry.cls:'');
+  d.textContent=entry.text;
+  return d;
+}
 function renderChatLog(){
   const el=$('chatLog');
   el.innerHTML='';
-  for(const m of chat.history)
-    if(m.channel===chat.tab||m.channel==='sys')el.appendChild(chatMsgNode(m));
+  if(chat.tab==='log'){
+    for(const entry of gameLogHistory)el.appendChild(logLineNode(entry));
+  }else{
+    for(const m of chat.history)
+      if(m.channel===chat.tab||m.channel==='sys')el.appendChild(chatMsgNode(m));
+  }
   el.scrollTop=el.scrollHeight;
 }
+// 戦闘・取得ログをログタブへ流す(log()はチャット初期化前にも呼ばれ得るため、フックで受ける)
+window.__chatMirrorLog=(txt,cls)=>{
+  if(!chat.open||chat.tab!=='log')return;
+  const el=$('chatLog');
+  el.appendChild(logLineNode({text:txt,cls:cls||''}));
+  while(el.children.length>150)el.removeChild(el.firstChild);
+  el.scrollTop=el.scrollHeight;
+};
 function updateChatBadge(){
   const b=$('chatBadge');
   b.hidden=chat.unread<=0;
@@ -4698,16 +4744,21 @@ function updateChatBadge(){
 }
 function spawnChatFloat(m){
   const d=document.createElement('div');
-  d.className='chatFloatMsg';
+  d.className='chatFloatMsg'+(m.kind==='drop'?' drop':'');
   d.style.setProperty('--chatc',(CHAT_CHANNELS[m.channel]||CHAT_CHANNELS.general).color);
-  const b=document.createElement('b');b.textContent=m.name;
-  d.appendChild(b);d.appendChild(document.createTextNode(m.text));
+  if(m.kind!=='drop'){
+    // ドロップ告知は本文に名前が含まれるので名札を付けない
+    const b=document.createElement('b');b.textContent=m.name;
+    d.appendChild(b);
+  }
+  d.appendChild(document.createTextNode(m.text));
   const host=$('chatFloat');
   host.appendChild(d);
   while(host.children.length>3)host.removeChild(host.firstChild);
   setTimeout(()=>d.remove(),8200);
 }
 function setChatBubble(m){
+  if(m.kind==='drop')return;  // 告知は頭上に出さない
   const fx={text:m.text,channel:m.channel,until:performance.now()+6500};
   if(m.self){player.chatFx=fx;return;}
   const e=remotePlayers.get(m.userId||'');
@@ -4730,26 +4781,29 @@ function addChatMessage(m){
   if(m.channel!=='sys')setChatBubble(m);
 }
 function updateChatInputState(){
-  // 一般タブは未ログインでも入力可にし、送信時に案内を出す(無効だと「使えない」ように見える)
-  const ready=chat.tab==='general';
-  $('chatIn').disabled=!ready;
-  $('chatSend').disabled=!ready;
-  $('chatIn').placeholder=!ready?`${CHAT_CHANNELS[chat.tab].label}は準備中`
-    :chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要';
+  // 送信できるのは一般(付近)と全体。未ログインでも入力自体は可にし、送信時に案内を出す
+  const t=chat.tab,canSend=t==='general'||t==='world';
+  $('chatIn').disabled=!canSend;
+  $('chatSend').disabled=!canSend;
+  $('chatIn').placeholder=
+    t==='general'?(chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要')
+    :t==='world'?(chat.worldOnline?'冥府全体へ話す (Enter)':'話すには魂籍ログインが必要')
+    :t==='log'?'戦闘・取得のログ(閲覧のみ)'
+    :`${CHAT_CHANNELS[t].label}は準備中`;
 }
 function renderChatTab(){
   for(const b of document.querySelectorAll('.chatTab'))
     b.classList.toggle('on',b.dataset.ch===chat.tab);
-  const ready=chat.tab==='general';
-  $('chatNotice').hidden=ready;
-  $('chatLog').hidden=!ready;
-  if(!ready){
-    $('chatNotice').textContent=chat.tab==='friend'
+  const t=chat.tab,hasList=t==='general'||t==='world'||t==='log';
+  $('chatNotice').hidden=hasList;
+  $('chatLog').hidden=!hasList;
+  if(!hasList){
+    $('chatNotice').textContent=t==='friend'
       ?'フレンド機能は準備中。いずれ遠くの魂とも言葉を交わせるようになる。'
       :'チーム機能は準備中。いずれ徒党を組んで冥府の深部に挑めるようになる。';
   }
   updateChatInputState();
-  if(ready)renderChatLog();
+  if(hasList)renderChatLog();
 }
 function openChat(focus=true){
   chat.open=true;
@@ -4769,21 +4823,31 @@ function closeChat(){
 }
 function sendChat(){
   const input=$('chatIn');
+  const ch=chat.tab;
   const text=input.value.replace(/\s+/g,' ').trim().slice(0,60);
-  if(!text||chat.tab!=='general')return;
-  if(!chat.online){
+  if(!text||(ch!=='general'&&ch!=='world'))return;
+  const connected=ch==='general'?chat.online:chat.worldOnline;
+  if(!connected){
     // 入力内容は消さず、届け方を案内する
     addChatMessage({channel:'sys',
-      text:'まだ声が届かない。右上の「魂籍」でログイン・接続を確認すると付近の魂と話せる',ts:Date.now()});
+      text:'まだ声が届かない。右上の「魂籍」でログイン・接続を確認すると話せる',ts:Date.now()});
     return;
   }
   const now=Date.now();
   if(now-chat.lastSentAt<700)return;  // 連投防止
   chat.lastSentAt=now;
   input.value='';
-  chat.outbox.push({channel:'general',text});
-  addChatMessage({channel:'general',text,self:true,
+  chat.outbox.push({channel:ch,text});
+  addChatMessage({channel:ch,text,self:true,
     name:player.name||'ナナシ',level:player.lv,userId:'',ts:now});
+}
+function announceRareDrop(mobName,itemName){
+  // レアドロップを全体へ告知(自分の画面には即時表示、他プレイヤーへは全体チャンネル経由)
+  addChatMessage({channel:'world',kind:'drop',self:true,
+    name:player.name||'ナナシ',level:player.lv,userId:'',
+    text:`${player.name||'ナナシ'} が ${mobName} から ${itemName} を手に入れた！`,
+    ts:Date.now()});
+  chat.outbox.push({channel:'drop',mobName,itemName});
 }
 $('chatToggle').addEventListener('click',()=>{
   chat.open?closeChat():openChat();
@@ -5194,6 +5258,23 @@ window.EnmaGameBridge={
     chat.online=next;
     updateChatInputState();
   },
+  setWorldChatOnline(on){
+    const next=Boolean(on);
+    if(next===chat.worldOnline)return;
+    chat.worldOnline=next;
+    updateChatInputState();
+  },
+  receiveDropNotice(msg){
+    if(!msg||typeof msg!=='object')return;
+    const name=String(msg.displayName||'ナナシ').slice(0,16);
+    const mobName=String(msg.mobName||'').slice(0,24);
+    const itemName=String(msg.itemName||'').slice(0,24);
+    if(!mobName||!itemName)return;
+    addChatMessage({channel:'world',kind:'drop',self:false,
+      name,level:Math.max(1,msg.level|0),userId:String(msg.userId||''),
+      text:`${name} が ${mobName} から ${itemName} を手に入れた！`,
+      ts:Date.now()});
+  },
   playRemoteAttack(raw){
     const id=String(raw?.userId||''),sessionId=String(raw?.sessionId||'');
     const e=remotePlayers.get(id);
@@ -5259,8 +5340,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721b"></script>
+<script src="online/config.js?v=20260721c"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721b"></script>
+<script type="module" src="online/account.js?v=20260721c"></script>
 </body>
 </html>
