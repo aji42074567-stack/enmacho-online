@@ -94,40 +94,28 @@ async function syncContact(config: ResendConfig, email: string, optedIn: boolean
   }
 }
 
-async function listPreferences(admin: any) {
-  const rows: Array<{ user_id: string; newsletter_opt_in: boolean }> = []
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await admin.from('account_preferences')
-      .select('user_id,newsletter_opt_in').range(from, from + 999)
+async function listAudience(database: any) {
+  const users: Array<{ email: string; newsletter_opt_in: boolean }> = []
+  for (let offset = 0; ; offset += 100) {
+    const { data, error } = await database.rpc('admin_list_users', {
+      p_search: '',
+      p_limit: 100,
+      p_offset: offset,
+    })
     if (error) throw error
-    rows.push(...(data || []))
-    if (!data || data.length < 1000) break
-  }
-  return rows
-}
-
-async function listAuthUsers(admin: any) {
-  const users: Array<{ id: string; email?: string }> = []
-  for (let page = 1; ; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-    users.push(...(data.users || []))
-    if (!data.users || data.users.length < 1000) break
+    users.push(...(data || []))
+    if (!data || data.length < 100) break
   }
   return users
 }
 
-async function syncAudience(admin: any, resend: ResendConfig) {
-  const [preferences, users] = await Promise.all([
-    listPreferences(admin),
-    listAuthUsers(admin),
-  ])
-  const preferenceMap = new Map(preferences.map(row => [row.user_id, row.newsletter_opt_in]))
+async function syncAudience(database: any, resend: ResendConfig) {
+  const users = await listAudience(database)
   let synced = 0
   let subscribed = 0
   for (const user of users) {
-    if (!user.email || !preferenceMap.has(user.id)) continue
-    const optedIn = preferenceMap.get(user.id) === true
+    if (!user.email) continue
+    const optedIn = user.newsletter_opt_in === true
     await syncContact(resend, user.email, optedIn)
     synced++
     if (optedIn) subscribed++
@@ -146,10 +134,9 @@ Deno.serve(async request => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   const resendSegmentId = Deno.env.get('RESEND_SEGMENT_ID')
-  if (!supabaseUrl || !anonKey || !serviceRoleKey || !resendApiKey || !resendSegmentId)
+  if (!supabaseUrl || !anonKey || !resendApiKey || !resendSegmentId)
     return json(request, { error: 'server configuration is incomplete' }, 500)
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -158,12 +145,12 @@ Deno.serve(async request => {
   const { data: { user }, error: userError } = await userClient.auth.getUser()
   if (userError || !user) return json(request, { error: 'invalid session' }, 401)
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const { data: grant, error: grantError } = await admin.from('admin_users')
-    .select('user_id').eq('user_id', user.id).maybeSingle()
-  if (grantError || !grant) return json(request, { error: 'admin access required' }, 403)
+  // 呼び出し元のJWTのままSECURITY DEFINER関数へ照会し、以後もRLSを保つ。
+  const { data: isAdmin, error: adminCheckError } = await userClient.rpc('is_enma_admin')
+  if (adminCheckError || isAdmin !== true)
+    return json(request, { error: 'admin access required' }, 403)
+
+  const database = userClient
 
   const requested = await request.json().catch(() => ({}))
   const action = cleanText(requested.action, 20)
@@ -171,15 +158,15 @@ Deno.serve(async request => {
 
   try {
     if (action === 'sync') {
-      return json(request, { ok: true, ...(await syncAudience(admin, resend)) })
+      return json(request, { ok: true, ...(await syncAudience(database, resend)) })
     }
 
     const campaignId = cleanText(requested.campaignId, 64)
     if (!campaignId) return json(request, { error: 'campaign is required' }, 400)
     const [{ data: campaign, error: campaignError }, { data: settings, error: settingsError }] =
       await Promise.all([
-        admin.from('email_campaigns').select('*').eq('id', campaignId).single(),
-        admin.from('admin_email_settings').select('*').eq('id', 1).single(),
+        database.from('email_campaigns').select('*').eq('id', campaignId).single(),
+        database.from('admin_email_settings').select('*').eq('id', 1).single(),
       ])
     if (campaignError || !campaign) return json(request, { error: 'campaign not found' }, 404)
     if (settingsError || !settings) return json(request, { error: 'email settings not found' }, 500)
@@ -218,10 +205,10 @@ Deno.serve(async request => {
     if (!['draft', 'failed'].includes(campaign.status))
       return json(request, { error: 'campaign was already submitted' }, 409)
 
-    const audience = await syncAudience(admin, resend)
+    const audience = await syncAudience(database, resend)
     if (audience.subscribed < 1)
       return json(request, { error: 'there are no subscribed recipients' }, 409)
-    await admin.from('email_campaigns').update({
+    await database.from('email_campaigns').update({
       status: 'sending',
       target_count: audience.subscribed,
       error_message: null,
@@ -242,14 +229,14 @@ Deno.serve(async request => {
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500)
       console.error('Resend broadcast failed', response.status, detail)
-      await admin.from('email_campaigns').update({
+      await database.from('email_campaigns').update({
         status: 'failed',
         error_message: `Resend ${response.status}: ${detail}`.slice(0, 1000),
       }).eq('id', campaign.id)
       return json(request, { error: 'broadcast delivery failed' }, 502)
     }
     const result = await response.json().catch(() => ({}))
-    await admin.from('email_campaigns').update({
+    await database.from('email_campaigns').update({
       status: 'submitted',
       target_count: audience.subscribed,
       resend_broadcast_id: cleanText(result.id, 128),
