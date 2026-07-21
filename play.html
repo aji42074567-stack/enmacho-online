@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>閻魔庁ONLINE — 死後に知る。生前こそが地獄だった。</title>
 <style>
   :root{
@@ -133,6 +133,8 @@
     color:var(--parchment);font-family:var(--sans);font-size:12px;padding:7px 9px;outline:none}
   #chatIn:focus{border-color:#6b5730}
   #chatIn:disabled{opacity:.5}
+  /* スマホはフォーカス時の自動ズームを防ぐため16px必須(横持ちも含めpointerで判定) */
+  @media (pointer:coarse){#chatIn{font-size:16px}}
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
     letter-spacing:.1em;padding:0 13px;cursor:pointer}
@@ -485,7 +487,6 @@
     #log{bottom:150px;font-size:10.5px}
     #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px))}
     #chatLog{height:132px}
-    #chatIn{font-size:16px}
     #stage.chatOpen #log{bottom:326px}
     #vitals{display:none}
     #skills{gap:5px}
@@ -4669,11 +4670,12 @@ function addChatMessage(m){
   if(m.channel!=='sys')setChatBubble(m);
 }
 function updateChatInputState(){
-  const ready=chat.tab==='general',ok=ready&&chat.online;
-  $('chatIn').disabled=!ok;
-  $('chatSend').disabled=!ok;
+  // 一般タブは未ログインでも入力可にし、送信時に案内を出す(無効だと「使えない」ように見える)
+  const ready=chat.tab==='general';
+  $('chatIn').disabled=!ready;
+  $('chatSend').disabled=!ready;
   $('chatIn').placeholder=!ready?`${CHAT_CHANNELS[chat.tab].label}は準備中`
-    :chat.online?'付近の魂へ話す (Enter)':'魂籍にログインすると話せる';
+    :chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要';
 }
 function renderChatTab(){
   for(const b of document.querySelectorAll('.chatTab'))
@@ -4708,7 +4710,13 @@ function closeChat(){
 function sendChat(){
   const input=$('chatIn');
   const text=input.value.replace(/\s+/g,' ').trim().slice(0,60);
-  if(!text||!chat.online||chat.tab!=='general')return;
+  if(!text||chat.tab!=='general')return;
+  if(!chat.online){
+    // 入力内容は消さず、届け方を案内する
+    addChatMessage({channel:'sys',
+      text:'まだ声が届かない。右上の「魂籍」でログイン・接続を確認すると付近の魂と話せる',ts:Date.now()});
+    return;
+  }
   const now=Date.now();
   if(now-chat.lastSentAt<700)return;  // 連投防止
   chat.lastSentAt=now;
