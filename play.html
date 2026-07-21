@@ -3494,14 +3494,13 @@ function drawRemotePlayer(sx,sy,e){
 }
 function drawRemotePlayerLabel(sx,sy,e){
   if(e.dead)return;
-  const name=`${e.name||'ナナシ'}  徳位${e.level||1}`;
-  ctx.font='bold 10px sans-serif';ctx.textAlign='center';
-  ctx.strokeStyle='rgba(0,0,0,.92)';ctx.lineWidth=3;
-  ctx.strokeText(name,sx,sy-52,128);
-  ctx.fillStyle='#bfe7d0';ctx.fillText(name,sx,sy-52,128);
-  ctx.fillStyle='#79c783';
-  const textWidth=Math.min(128,ctx.measureText(name).width);
-  ctx.beginPath();ctx.arc(sx-textWidth/2-5,sy-55,2.3,0,6.29);ctx.fill();
+  const name=e.name||'ナナシ';
+  // 世界を縮小するスマホでも、自分の名前と同じ画面上11px・高さ52pxを保つ。
+  const labelScale=worldViewScale(),labelY=sy-52/labelScale,maxW=128/labelScale;
+  ctx.font=`bold ${11/labelScale}px sans-serif`;ctx.textAlign='center';
+  ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3/labelScale;
+  ctx.strokeText(name,sx,labelY,maxW);
+  ctx.fillStyle='#bfe7d0';ctx.fillText(name,sx,labelY,maxW);
 }
 const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8'};
 function drawChatBubbleFx(sx,sy,fx){
