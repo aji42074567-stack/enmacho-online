@@ -640,6 +640,18 @@
   .social-compose-foot{display:flex;align-items:center;justify-content:space-between;
     gap:8px;margin-top:7px;color:var(--dim);font:9.5px var(--sans)}
   #suggestBody .suggest-note,#kesshaBody .suggest-note,#reposeBody .suggest-note{margin:6px 0 10px;color:#cfc2a0;font:12px/1.8 var(--sans)}
+  .repose-speech{margin:0 0 13px;padding:11px 12px;border:1px solid #564329;
+    background:linear-gradient(180deg,rgba(71,52,30,.32),rgba(22,16,11,.5));
+    color:#eadfc8;font:12px/1.85 var(--serif);text-align:left}
+  .repose-guide{margin:10px 0 14px;padding:10px;border:1px solid #423522;background:#100d09;text-align:left}
+  .repose-guide h3{margin:0 0 8px;color:#d8b866;font:12px var(--serif);letter-spacing:.12em}
+  .repose-enemy{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:6px 2px;
+    border-top:1px solid #302719;font:11px/1.45 var(--sans);color:#cfc2a0}
+  .repose-enemy:first-of-type{border-top:0}
+  .repose-enemy b{color:#dfb4ff;font-weight:600}
+  .repose-enemy small{display:block;color:#8f846e;font-size:9.5px}
+  .repose-enemy span:last-child{color:#bca36a;white-space:nowrap}
+  .repose-rule{margin:8px 0 12px;color:#a79b82;font:10px/1.65 var(--sans);text-align:left}
   #suggestBody .suggest-note.thanks{color:#ffe9b8;font-family:var(--serif);font-size:13px;text-align:center;padding:14px 0}
   #kesshaBody .suggest-note b{color:#ffe9b8}
   #suggestBody textarea{width:100%;box-sizing:border-box;background:#0d0c10;color:#e8dcc0;border:1px solid #3e3422;
@@ -1028,8 +1040,9 @@
 
   <div class="overlay hidden" id="repose">
     <div class="scroll">
-      <h2>魂具供養所</h2>
-      <div class="sub">重なったレア装備を魂火へ返し、供養点に換える</div>
+      <div class="portrait" style="background-image:url(assets/npc_shizume.png)"></div>
+      <h2>供養守 シズメ</h2>
+      <div class="sub">魂具供養所の案内・供養・交換</div>
       <div id="reposeBody"></div>
       <button class="btn small" id="reposeClose">立ち去る</button>
     </div>
@@ -1414,6 +1427,7 @@ let npcs=[
   {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
   {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
   {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・重複レア装備の焚き上げ所
+  {x:42.3,y:49.2,kind:'repose_keeper',name:'シズメ'}, // 供養所の案内・供養・交換を担う供養守
 ];
 
 /* ---- 町を囲う柵と門 ---- */
@@ -1937,6 +1951,14 @@ const RARE_DROPS={
   gashao:[['shion_mofuku',0.24],['shion_kote',0.22],['shion_tabi',0.22],['higan_shuin',0.18],['higan_tekko',0.18],['hakkin_gusoku',0.18]],
   drake:[['drake_slayer',1],['sogetsu_kabuto',0.35],['seirin_musha',0.35],['kurogane_tsutsugote',0.35],['seirin_gusoku',0.35]],
 };
+const RARE_DROP_GUIDE=[
+  {type:'oni_king',area:'試練の洞窟 最深部'},
+  {type:'shira_bone',area:'無縁塚 一層'},
+  {type:'kyokotsu',area:'無縁塚 二層以降'},
+  {type:'oo_dokuro',area:'無縁塚 最深部'},
+  {type:'gashao',area:'無縁塚 最深部'},
+  {type:'drake',area:'竜の洞窟 最深部'},
+];
 const DRAGON_BLOOD_DROP_RATE=0.07;
 let mobs=[];
 function spawnMob(type,x,y){
@@ -2876,8 +2898,15 @@ function renderRepose(){
   const copies=Object.entries(player.rareCopies)
     .filter(([id,n])=>ITEMS[id]?.rare&&n>0)
     .sort((a,b)=>(ITEMS[b[0]].repose||0)-(ITEMS[a[0]].repose||0));
-  let html=`<div class="goldrow">供養点 <b>${player.reposePts}</b> 点</div>`
-    +'<div class="suggest-note">手元に残る最初の一品は供養できません。重なったレア装備だけを魂火へ返せます。店売り品から供養点は得られません。</div>';
+  const enemyGuide=RARE_DROP_GUIDE.map(({type,area})=>{
+    const mob=MOBS[type];
+    return `<div class="repose-enemy"><span><b>${esc(mob.name)}</b><small>${esc(area)}</small></span><span>徳位 ${mob.lv}</span></div>`;
+  }).join('');
+  let html='<div class="repose-speech">「私は供養守のシズメ。魔物の執着が結んだ魂具を見定め、重なった品だけを魂火へ返します。一品目は縁として手元に残りますよ」</div>'
+    +'<div class="repose-guide"><h3>レア魂具を残す魔物</h3>'+enemyGuide+'</div>'
+    +'<div class="repose-rule">徳位15以上の魔物が対象です。中ボスや竜などの大物は、一度に複数のレア魂具を残すことがあります。店で買える装備は対象外です。</div>'
+    +`<div class="goldrow">供養点 <b>${player.reposePts}</b> 点</div>`
+    +`<div class="suggest-note">重複レア装備を供養し、供養点${REPOSE_SCROLL_COST}点で強化の巻物と交換できます。</div>`;
   if(!copies.length){
     html+='<div class="social-empty">供養できる重複レア装備はありません</div>';
   }else for(const [id,n] of copies){
@@ -3428,7 +3457,7 @@ function openNpc(npc){
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
   else if(npc.kind==='suggest'){renderSuggest();$('suggest').classList.remove('hidden');}
-  else if(npc.kind==='repose'){renderRepose();$('repose').classList.remove('hidden');}
+  else if(npc.kind==='repose'||npc.kind==='repose_keeper'){renderRepose();$('repose').classList.remove('hidden');}
   else if(npc.kind==='kessha'){
     questProgress('talk','kessha');
     renderKessha();$('kessha').classList.remove('hidden');
@@ -4566,6 +4595,7 @@ loadSprite('map_suggestion_box','assets/map_suggestion_box.png');
 loadSprite('map_memorial_altar','assets/map_memorial_altar.png');
 loadSprite('npc_einer','assets/npc_einer.png');
 loadSprite('npc_kazu','assets/npc_kazu.png');
+loadSprite('npc_shizume','assets/npc_shizume.png');
 loadSprite('map_fence_x','assets/map_fence_x.png');
 loadSprite('map_fence_y','assets/map_fence_y.png');
 loadSprite('map_gate','assets/map_gate.png');
@@ -5571,7 +5601,7 @@ function drawGate(sx,sy,p){
   ctx.font='10px sans-serif';ctx.textAlign='center';
   ctx.fillText(`${g.name}${g.open?'(開)':''}`,sx,sy+16);
 }
-const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith:'npc_kanayama',guest:'npc_kazu',enma:'npc_enma'};
+const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith:'npc_kanayama',guest:'npc_kazu',repose_keeper:'npc_shizume',enma:'npc_enma'};
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
   if(n.kind==='suggest'){drawSuggestBox(sx,sy);return;}
