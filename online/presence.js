@@ -80,6 +80,10 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     targetY,
     seq: Math.max(0, Math.trunc(cleanNumber(raw.seq, 0))),
     ach: normalizeAch(raw.ach),
+    hp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.hp, 0)))),
+    maxHp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.maxHp, 0)))),
+    mp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.mp, 0)))),
+    maxMp: Math.max(0, Math.min(99999, Math.trunc(cleanNumber(raw.maxMp, 0)))),
     lastSeen: Date.now(),
   };
 }
@@ -212,6 +216,10 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     return {
       ...identityFor(snapshot),
       ach: normalizeAch(snapshot.ach) || undefined,
+      hp: Math.max(0, Math.trunc(cleanNumber(snapshot.hp, 0))),
+      maxHp: Math.max(0, Math.trunc(cleanNumber(snapshot.maxHp, 0))),
+      mp: Math.max(0, Math.trunc(cleanNumber(snapshot.mp, 0))),
+      maxMp: Math.max(0, Math.trunc(cleanNumber(snapshot.maxMp, 0))),
       zone: cleanText(snapshot.zone, 16),
       x: Math.round(cleanNumber(snapshot.x) * 1000) / 1000,
       y: Math.round(cleanNumber(snapshot.y) * 1000) / 1000,
@@ -466,6 +474,38 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         if (!identity || !text) return;
         bridge?.receiveChatMessage?.({ ...identity, channel: 'team', text });
       })
+      .on('broadcast', { event: 'kill' }, ({ payload }) => {
+        if (activeChannel !== partyChannel) return;
+        const from = chatIdentity(payload, sessionId);
+        if (!from) return;
+        const xp = Math.max(1, Math.min(99999, Math.trunc(cleanNumber(payload.xp, 0))));
+        const x = cleanNumber(payload.x, NaN), y = cleanNumber(payload.y, NaN);
+        const zone = cleanText(payload.zone, 16);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !zone) return;
+        bridge?.receivePartyKill?.({ from, xp, x, y, zone,
+          mobName: cleanText(payload.mobName, 24) });
+      })
+      .on('broadcast', { event: 'heal' }, ({ payload }) => {
+        if (activeChannel !== partyChannel) return;
+        const from = chatIdentity(payload, sessionId);
+        if (!from) return;
+        const amount = Math.max(1, Math.min(9999, Math.trunc(cleanNumber(payload.amount, 0))));
+        const x = cleanNumber(payload.x, NaN), y = cleanNumber(payload.y, NaN);
+        const zone = cleanText(payload.zone, 16);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !zone) return;
+        bridge?.receivePartyHeal?.({ from, amount, x, y, zone });
+      })
+      .on('broadcast', { event: 'loot' }, ({ payload }) => {
+        if (activeChannel !== partyChannel) return;
+        // 分配ドロップは宛先本人だけが受け取る
+        if (cleanText(payload?.toUserId, 64) !== (session?.user?.id || '')) return;
+        const from = chatIdentity(payload, sessionId);
+        if (!from) return;
+        const loot = ['nectar', 'blood', 'wscroll', 'ascroll'].includes(payload.loot)
+          ? payload.loot : '';
+        if (!loot) return;
+        bridge?.receivePartyLoot?.({ from, loot, mobName: cleanText(payload.mobName, 24) });
+      })
       .subscribe(async status => {
         if (activeChannel !== partyChannel) return;
         partyOpening = false;
@@ -606,6 +646,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       identity.displayName,
       identity.gender,
       identity.level,
+      Math.round(cleanNumber(snapshot.hp) / 5),
+      Math.round(cleanNumber(snapshot.mp) / 5),
     ].join('|');
     const changed = key !== lastSentKey;
     const attackChanged = attackSeq !== lastSentAttackSeq;
@@ -701,6 +743,27 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         };
         if (item.kind === 'team' && !VALID_UUID.test(payload.partyId)) continue;
         sendToInbox(targetUserId, 'invite', payload);
+      } else if (item.type === 'party_kill' || item.type === 'party_heal'
+        || item.type === 'party_loot') {
+        if (!partyChannel || !partySubscribed) continue;
+        const base = { ...identityFor(snapshot), sentAt: Date.now() };
+        if (item.type === 'party_kill') {
+          partyChannel.send({ type: 'broadcast', event: 'kill', payload: { ...base,
+            xp: Math.trunc(cleanNumber(item.xp, 0)),
+            x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0),
+            zone: cleanText(item.zone, 16),
+            mobName: cleanText(item.mobName, 24) } }).catch(() => {});
+        } else if (item.type === 'party_heal') {
+          partyChannel.send({ type: 'broadcast', event: 'heal', payload: { ...base,
+            amount: Math.trunc(cleanNumber(item.amount, 0)),
+            x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0),
+            zone: cleanText(item.zone, 16) } }).catch(() => {});
+        } else {
+          partyChannel.send({ type: 'broadcast', event: 'loot', payload: { ...base,
+            toUserId: cleanText(item.toUserId, 64),
+            loot: cleanText(item.loot, 12),
+            mobName: cleanText(item.mobName, 24) } }).catch(() => {});
+        }
       } else if (item.type === 'invite_reply' && VALID_INVITE_KIND.has(item.kind)) {
         sendToInbox(targetUserId, 'invite_reply', {
           ...identityFor(snapshot),

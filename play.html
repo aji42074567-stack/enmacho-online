@@ -1477,6 +1477,7 @@ const player={
     dragonCleared:false,chapter1Seen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される鍵
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
+  partySupportT:0,                          // 回向支援の余韻(この間はチーム討伐の徳が全額入る)
   foodAtkT:0,foodDefT:0,foodRegenT:0,       // まかない飯バフ
   items:['dagger','cloth'],
   eq:{weapon:'dagger',head:'',body:'cloth',arms:'',feet:'',acc:''},
@@ -1943,25 +1944,52 @@ function grantMobReward(m){
   gainXp(m.def.xp);
   log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
   const drop=DROPS[m.type];
+  // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
+  const lootTo=()=>{
+    if(!party.id)return null;
+    const cands=[null];  // null=自分
+    for(const mem of party.members){
+      if(mem.self)continue;
+      const e=remotePlayers.get(mem.userId);
+      if(e&&e.zone===zone&&!e.dead&&dist(e,m)<=12)cands.push({userId:mem.userId,name:e.name});
+    }
+    return cands[rndi(0,cands.length-1)];
+  };
   if(drop&&Math.random()<dropChance(drop[1])&&!player.items.includes(drop[0])){
     gainItem(drop[0]);
     announceRareDrop(m.name,ITEMS[drop[0]].name);
   }else if(Math.random()<dropChance(0.28)){
-    player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');
+    const to=lootTo();
+    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,loot:'nectar',mobName:m.name});
+      log(`甘露水は ${to.name} の手に渡った`,'sys');}
+    else{player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');}
   }
   if(m.type==='drake'&&Math.random()<dropChance(DRAGON_BLOOD_DROP_RATE)){
-    player.dragonBlood++;
-    addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
-    log('希少素材「竜の血」を手に入れた！','gain');
-    announceRareDrop(m.name,'竜の血');
+    const to=lootTo();
+    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,loot:'blood',mobName:m.name});
+      log(`「竜の血」は ${to.name} の手に渡った`,'sys');}
+    else{
+      player.dragonBlood++;
+      addFloat(m.x,m.y-1.1,'竜の血！','#ff5575',true);
+      log('希少素材「竜の血」を手に入れた！','gain');
+      announceRareDrop(m.name,'竜の血');
+    }
   }
   if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
     const wpn=Math.random()<0.5;
-    if(wpn)player.wScrolls++;else player.aScrolls++;
-    addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
-    log(`超激レア！ ${wpn?'武器':'防具'}強化の巻物を手に入れた！`,'gain');
-    announceRareDrop(m.name,`${wpn?'武器':'防具'}強化の巻物`);
+    const to=lootTo();
+    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,
+      loot:wpn?'wscroll':'ascroll',mobName:m.name});
+      log(`${wpn?'武器':'防具'}強化の巻物は ${to.name} の手に渡った`,'sys');}
+    else{
+      if(wpn)player.wScrolls++;else player.aScrolls++;
+      addFloat(m.x,m.y-1.4,'強化巻物！','#ffd97a',true);
+      log(`超激レア！ ${wpn?'武器':'防具'}強化の巻物を手に入れた！`,'gain');
+      announceRareDrop(m.name,`${wpn?'武器':'防具'}強化の巻物`);
+    }
   }
+  // 討伐の知らせをチームへ(受け取った側が距離・支援状態で徳の分け前を判定)
+  if(party.id)netOutbox.push({type:'party_kill',xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
     log('カズーが話していた因果の続きが聞けそうだ','sys');
@@ -2059,16 +2087,32 @@ function castHeal(){
   if(player.lv<3){log('印「回向」は徳位3で授かる','sys');return;}
   if(player.cd.heal>0)return;
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
-  if(player.hp>=player.maxHp){log('HPは満タンだ','sys');return;}
+  const allyNear=party.id&&partyMemberNear(6);
+  if(player.hp>=player.maxHp&&!allyNear){log('HPは満タンだ','sys');return;}
   player.mp-=12;player.cd.heal=3;
   player.swing=0.32;player.swingMax=0.32;player.swingKind='cast';
   signalPlayerAction('heal');
   const n=45+7*player.lv;
   player.hp=Math.min(player.maxHp,player.hp+n);
-  addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
+  if(player.hp<player.maxHp||!allyNear)addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
   addActionEffect('heal',player.x,player.y);
   burst(player.x,player.y,'#7fe07f',12);
   sfx.heal();
+  // 仲間が近くにいれば回向は届き、支援参加として10秒間チーム討伐の徳が全額入る
+  if(allyNear){
+    netOutbox.push({type:'party_heal',amount:n,x:player.x,y:player.y,zone});
+    if(player.partySupportT<=0)log('回向の支援 — 10秒のあいだ仲間の討伐で徳が全て入る','sys');
+    player.partySupportT=10;
+  }
+}
+function partyMemberNear(range){
+  if(!party.id)return false;
+  for(const mem of party.members){
+    if(mem.self)continue;
+    const e=remotePlayers.get(mem.userId);
+    if(e&&e.zone===zone&&!e.dead&&dist(e,player)<=range)return true;
+  }
+  return false;
 }
 function castFire(){
   if(player.dead||!started)return;
@@ -2753,6 +2797,7 @@ function update(dt){
     if(player.hitT>0)player.hitT-=dt;
     for(const k in player.cd)if(player.cd[k]>0)player.cd[k]-=dt;
     if(player.hasteT>0)player.hasteT-=dt;
+    if(player.partySupportT>0)player.partySupportT-=dt;
     if(player.critT>0)player.critT-=dt;
     if(player.foodAtkT>0)player.foodAtkT-=dt;
     if(player.foodDefT>0)player.foodDefT-=dt;
@@ -3678,9 +3723,21 @@ function drawRemotePlayerLabel(sx,sy,e){
   ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3/labelScale;
   ctx.strokeText(name,sx,labelY,maxW);
   // チームの仲間は青、フレンドは緑がかった名前で見分けられる
-  ctx.fillStyle=partyHas(e.userId)?'#8fc4ff'
+  const inParty=partyHas(e.userId);
+  ctx.fillStyle=inParty?'#8fc4ff'
     :isFriend(e.userId)?'#a8e7b6':'#bfe7d0';
   ctx.fillText(name,sx,labelY,maxW);
+  // チームの仲間はHP/MPバーを名前の下に出す
+  if(inParty&&e.maxHp>0){
+    const s2=labelScale,bw=36/s2,bh=3.2/s2,gap=1.2/s2;
+    const bx=sx-bw/2,by=labelY+3.5/s2;
+    ctx.fillStyle='rgba(0,0,0,.66)';
+    ctx.fillRect(bx-1/s2,by-1/s2,bw+2/s2,bh*2+gap+2/s2);
+    ctx.fillStyle='#c74a35';
+    ctx.fillRect(bx,by,bw*clamp(e.hp/e.maxHp,0,1),bh);
+    ctx.fillStyle='#4a7fd0';
+    ctx.fillRect(bx,by+bh+gap,bw*clamp((e.mp||0)/Math.max(1,e.maxMp||0),0,1),bh);
+  }
 }
 const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8'};
 function drawChatBubbleFx(sx,sy,fx){
@@ -5641,6 +5698,8 @@ window.EnmaGameBridge={
       weaponId:player.eq.weapon,
       targetX:player.actionTargetX,
       targetY:player.actionTargetY,
+      hp:Math.ceil(player.hp),maxHp:player.maxHp,
+      mp:Math.floor(player.mp),maxMp:player.maxMp,
       ach:{
         kills,
         trial:player.quests.trial>=2,
@@ -5748,6 +5807,8 @@ window.EnmaGameBridge={
       e.level=Math.max(1,raw.level|0);
       e.userId=id;
       if(raw.ach&&typeof raw.ach==='object')e.ach=raw.ach;  // presence.jsで正規化済み
+      e.hp=Math.max(0,raw.hp|0);e.maxHp=Math.max(0,raw.maxHp|0);
+      e.mp=Math.max(0,raw.mp|0);e.maxMp=Math.max(0,raw.maxMp|0);
       e.zone=raw.zone;e.lastSeen=now;
     }
     for(const id of remotePlayers.keys())if(!seen.has(id))remotePlayers.delete(id);
@@ -5808,6 +5869,49 @@ window.EnmaGameBridge={
   receiveInvite(invite){
     if(!invite||!invite.from)return;
     queueInvite(invite);
+  },
+  receivePartyKill(msg){
+    if(!party.id||!msg||msg.zone!==zone||player.dead)return;
+    const support=player.partySupportT>0;
+    const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=12;
+    if(!support&&!near)return;  // 敵から離れていて支援もしていなければ入らない
+    const share=support?msg.xp:Math.max(1,Math.ceil(msg.xp*0.5));
+    gainXp(share);
+    addFloat(player.x,player.y-0.9,`+${share} 徳(チーム)`,'#d9c07a');
+    save();
+  },
+  receivePartyHeal(msg){
+    if(!party.id||!msg||msg.zone!==zone||player.dead)return;
+    if(Math.hypot(player.x-msg.x,player.y-msg.y)>4)return;
+    if(player.hp>=player.maxHp)return;
+    const n=Math.max(1,msg.amount|0);
+    player.hp=Math.min(player.maxHp,player.hp+n);
+    addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
+    addActionEffect('heal',player.x,player.y);
+    burst(player.x,player.y,'#7fe07f',12);
+    log(`${msg.from.displayName} の回向に癒やされた`,'gain');
+    sfx.heal();
+  },
+  receivePartyLoot(msg){
+    if(!party.id||!msg)return;
+    const mobName=String(msg.mobName||'魔物').slice(0,24);
+    if(msg.loot==='nectar'){
+      player.potions++;
+      addFloat(player.x,player.y-0.6,'甘露水獲得','#7fd0ff');
+      log('チームの分配で甘露水を受け取った','gain');
+    }else if(msg.loot==='blood'){
+      player.dragonBlood++;
+      addFloat(player.x,player.y-1.1,'竜の血！','#ff5575',true);
+      log('チームの分配で「竜の血」を受け取った！','gain');
+      announceRareDrop(mobName,'竜の血');
+    }else if(msg.loot==='wscroll'||msg.loot==='ascroll'){
+      const wpn=msg.loot==='wscroll';
+      if(wpn)player.wScrolls++;else player.aScrolls++;
+      addFloat(player.x,player.y-1.4,'強化巻物！','#ffd97a',true);
+      log(`チームの分配で${wpn?'武器':'防具'}強化の巻物を受け取った！`,'gain');
+      announceRareDrop(mobName,`${wpn?'武器':'防具'}強化の巻物`);
+    }else return;
+    save();
   },
   receiveInviteReply(reply){
     if(!reply||!reply.from)return;
@@ -5908,8 +6012,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721g"></script>
+<script src="online/config.js?v=20260721h"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721g"></script>
+<script type="module" src="online/account.js?v=20260721h"></script>
 </body>
 </html>
