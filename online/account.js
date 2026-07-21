@@ -1,6 +1,7 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260721k';
-import { createWorldController } from './world.js?v=20260721k';
+import { createPresenceController } from './presence.js?v=20260721m';
+import { createWorldController } from './world.js?v=20260721m';
+import { createSocialController } from './social.js?v=20260721m';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -39,6 +40,7 @@ const state = {
 let accountLoadRevision = 0;
 let presenceController = null;
 let worldController = null;
+let socialController = null;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -58,6 +60,7 @@ function syncOnlineControllers(session, profile) {
   Promise.allSettled([
     presenceController?.setAccount(session, profile),
     worldController?.setAccount(session, profile),
+    socialController?.setAccount(session, profile),
   ]).catch(() => {});
 }
 
@@ -645,7 +648,9 @@ async function initialize(attempt = 0) {
     });
     presenceController = createPresenceController(state.client);
     worldController = createWorldController(config);
+    socialController = createSocialController(state.client);
     window.EnmaWorldClient = worldController;
+    window.EnmaSocialClient = socialController;
     const { data, error } = await state.client.auth.getSession();
     if (error) throw error;
     state.session = data.session;
@@ -668,9 +673,12 @@ async function initialize(attempt = 0) {
     if (revision !== initializeRevision) return;
     try { await presenceController?.stop?.(); } catch {}
     try { worldController?.stop?.(); } catch {}
+    try { await socialController?.stop?.(); } catch {}
     presenceController = null;
     worldController = null;
+    socialController = null;
     window.EnmaWorldClient = null;
+    window.EnmaSocialClient = null;
     state.client = null;
     setFeedback('', `魂籍台帳へ接続できません：${error?.message || '通信エラー'}`);
     content.innerHTML = `<p class="account-lead">魂籍台帳へ接続できませんでした。</p>${feedbackHtml()}

@@ -776,8 +776,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     if (!Array.isArray(outbox) || !outbox.length) return;
     for (const item of outbox.slice(0, 4)) {
       const targetUserId = cleanText(item?.targetUserId, 64);
-      if (!VALID_UUID.test(targetUserId)) continue;
       if (item.type === 'invite' && VALID_INVITE_KIND.has(item.kind)) {
+        if (!VALID_UUID.test(targetUserId)) continue;
         const payload = {
           ...identityFor(snapshot),
           kind: item.kind,
@@ -810,6 +810,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
             mobName: cleanText(item.mobName, 24) } }).catch(() => {});
         }
       } else if (item.type === 'invite_reply' && VALID_INVITE_KIND.has(item.kind)) {
+        if (!VALID_UUID.test(targetUserId)) continue;
         sendToInbox(targetUserId, 'invite_reply', {
           ...identityFor(snapshot),
           kind: item.kind,

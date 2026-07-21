@@ -592,6 +592,32 @@
   .mtab:hover{color:var(--parchment)}
   .mtab.on{color:var(--gold);border-color:var(--gold);
     background:linear-gradient(180deg,#3d3220,#241c11)}
+  .social-section{margin-bottom:14px;text-align:left}
+  .social-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 7px;
+    color:var(--gold);font:11px var(--serif);letter-spacing:.12em}
+  .social-head button{padding:4px 9px}
+  .social-empty,.social-error{padding:11px;border:1px dashed #423721;color:var(--dim);
+    font:10.5px/1.7 var(--sans);text-align:center}
+  .social-error{border-color:#733c35;color:#e4a49c;background:#281513}
+  .social-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+    padding:9px 2px;border-bottom:1px solid #33291a;text-align:left}
+  .social-row.unread{background:linear-gradient(90deg,rgba(111,157,196,.13),transparent)}
+  .social-person{min-width:0;font:12px var(--sans);color:var(--parchment)}
+  .social-person b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .social-person small{display:block;margin-top:3px;color:var(--dim);font-size:9.5px}
+  .social-actions{display:flex;gap:5px}
+  .social-actions .buyb{padding:5px 9px}
+  .social-compose{margin:9px 0 14px;padding:10px;border:1px solid #584722;
+    background:#14100a;text-align:left}
+  .social-compose label{display:block;margin-bottom:6px;color:var(--gold);
+    font:10px var(--sans)}
+  .social-compose textarea{display:block;width:100%;min-height:72px;resize:vertical;
+    box-sizing:border-box;padding:8px;color:var(--parchment);background:#0d0b08;
+    border:1px solid var(--panel-edge);border-radius:3px;font:12px/1.6 var(--sans)}
+  .social-compose-foot{display:flex;align-items:center;justify-content:space-between;
+    gap:8px;margin-top:7px;color:var(--dim);font:9.5px var(--sans)}
+  .mail-body{margin-top:5px;color:#cfc2a0;font:11px/1.65 var(--sans);white-space:pre-wrap;
+    overflow-wrap:anywhere}
   #doll{position:relative;width:272px;height:252px;margin:0 auto 12px}
   #dollImg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     width:120px;height:120px;background:url(assets/char_player_m.png) 0 0/400% 100% no-repeat;
@@ -958,11 +984,12 @@
   <div class="overlay hidden" id="equip">
     <div class="scroll">
       <h2>メニュー</h2>
-      <div class="sub">装備・道具・ステータス</div>
+      <div class="sub">装備・道具・資質・縁者</div>
       <div id="menuTabs">
         <button class="mtab on" data-tab="eq">装備</button>
         <button class="mtab" data-tab="item">道具</button>
-        <button class="mtab" data-tab="stat">ステータス</button>
+        <button class="mtab" data-tab="stat">資質</button>
+        <button class="mtab" id="socialTabBtn" data-tab="social">縁</button>
       </div>
       <div id="tabEq">
         <div id="doll">
@@ -972,6 +999,7 @@
       </div>
       <div id="tabItem" class="hidden"><div id="itemList"></div></div>
       <div id="tabStat" class="hidden"><div id="statList"></div></div>
+      <div id="tabSocial" class="hidden"><div id="socialList"></div></div>
       <button class="btn small" id="equipClose">閉じる (I)</button>
     </div>
   </div>
@@ -2514,6 +2542,9 @@ function renderBoard(){
   }
 }
 let menuTab='eq',selSlot='weapon';
+const socialState={online:false,friends:[],incoming:[],outgoing:[],mail:[],error:''};
+let socialComposeId='',socialBusy=false;
+const knownCloudRequests=new Set(),knownMailIds=new Set();
 // 人型の周りの6ボックス位置(272x252の#doll内)
 const SLOT_POS={
   head:'left:50%;top:0;transform:translateX(-50%)',
@@ -2529,9 +2560,11 @@ function renderEquip(){
   $('tabEq').classList.toggle('hidden',menuTab!=='eq');
   $('tabItem').classList.toggle('hidden',menuTab!=='item');
   $('tabStat').classList.toggle('hidden',menuTab!=='stat');
+  $('tabSocial').classList.toggle('hidden',menuTab!=='social');
   if(menuTab==='eq')renderEquipTab();
   else if(menuTab==='item')renderItemTab();
-  else renderStatTab();
+  else if(menuTab==='stat')renderStatTab();
+  else renderSocialTab();
 }
 function renderEquipTab(){
   const doll=$('doll');
@@ -2646,8 +2679,144 @@ function renderStatTab(){
     });
   }
 }
+function socialFriends(){
+  const cloud=new Map(socialState.friends.map(f=>[f.id,{...f,cloud:true}]));
+  for(const f of player.friends){
+    if(!cloud.has(f.id))cloud.set(f.id,{...f,cloud:false});
+  }
+  return [...cloud.values()];
+}
+function socialTime(value){
+  const d=new Date(value||0);
+  if(!Number.isFinite(d.getTime()))return '';
+  return d.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function updateSocialBadge(){
+  const unread=socialState.mail.filter(m=>!m.readAt).length;
+  const count=unread+socialState.incoming.length;
+  $('socialTabBtn').textContent=count?`縁 ${count}`:'縁';
+}
+async function socialAction(action){
+  if(socialBusy)return;
+  socialBusy=true;socialState.error='';renderSocialTab();
+  try{await action();}
+  catch(e){socialState.error=e?.message||'縁者台帳の処理に失敗しました';}
+  finally{socialBusy=false;renderSocialTab();}
+}
+function renderSocialTab(){
+  updateSocialBadge();
+  const host=$('socialList');
+  if(!socialState.online){
+    host.innerHTML=`<div class="social-empty">魂籍へログインすると、フレンド申請・縁者一覧・手紙を端末を越えて残せます。</div>`;
+    return;
+  }
+  let html='';
+  if(socialState.error)html+=`<div class="social-error">${esc(socialState.error)}</div>`;
+  html+=`<div class="social-section"><div class="social-head"><span>申請</span>
+    <button class="buyb" data-social-refresh ${socialBusy?'disabled':''}>更新</button></div>`;
+  if(!socialState.incoming.length&&!socialState.outgoing.length){
+    html+='<div class="social-empty">届いている申請はありません</div>';
+  }
+  for(const f of socialState.incoming){
+    html+=`<div class="social-row"><div class="social-person"><b>${esc(f.name)}</b>
+      <small>フレンド申請が届いています</small></div><div class="social-actions">
+      <button class="buyb" data-social-accept="${f.id}" ${socialBusy?'disabled':''}>承認</button>
+      <button class="buyb" data-social-decline="${f.id}" ${socialBusy?'disabled':''}>断る</button></div></div>`;
+  }
+  for(const f of socialState.outgoing){
+    html+=`<div class="social-row"><div class="social-person"><b>${esc(f.name)}</b>
+      <small>相手の返事を待っています</small></div><span class="fx">申請中</span></div>`;
+  }
+  html+='</div>';
+
+  const friends=socialFriends();
+  html+='<div class="social-section"><div class="social-head"><span>フレンド一覧</span></div>';
+  if(!friends.length)html+='<div class="social-empty">まだ縁を結んだ魂はいません</div>';
+  for(const f of friends){
+    const live=globalOnline.get(f.id);
+    html+=`<div class="social-row"><div class="social-person"><b>${esc(live?.displayName||f.name)}</b>
+      <small>${live?`現世接続中・${zoneLabel(live.zone)}`:f.cloud?'現在は不在':'旧記録・再照合が必要'}</small></div>
+      <div class="social-actions">${f.cloud
+        ?`<button class="buyb" data-social-compose="${f.id}" ${socialBusy?'disabled':''}>手紙</button>`
+        :`<button class="buyb" data-social-request="${f.id}" ${socialBusy?'disabled':''}>再申請</button>`}
+      <button class="buyb" data-social-remove="${f.id}" ${socialBusy?'disabled':''}>解消</button></div></div>`;
+  }
+  html+='</div>';
+
+  const to=friends.find(f=>f.id===socialComposeId&&f.cloud);
+  if(to){
+    html+=`<form class="social-compose" id="socialComposeForm"><label>${esc(to.name)} へ手紙を書く</label>
+      <textarea id="socialMailBody" maxlength="240" required placeholder="相手が不在でも届きます"></textarea>
+      <div class="social-compose-foot"><span>240文字まで</span>
+      <button class="buyb" type="submit" ${socialBusy?'disabled':''}>送る</button></div></form>`;
+  }
+
+  html+='<div class="social-section"><div class="social-head"><span>届いた手紙</span></div>';
+  if(!socialState.mail.length)html+='<div class="social-empty">届いている手紙はありません</div>';
+  for(const m of socialState.mail){
+    html+=`<div class="social-row ${m.readAt?'':'unread'}"><div class="social-person">
+      <b>${esc(m.senderName)} <small>${socialTime(m.createdAt)}</small></b>
+      <div class="mail-body">${esc(m.body)}</div></div>${m.readAt?'':
+        `<button class="buyb" data-mail-read="${m.id}" ${socialBusy?'disabled':''}>既読</button>`}</div>`;
+  }
+  html+='</div>';
+  host.innerHTML=html;
+
+  host.querySelector('[data-social-refresh]')?.addEventListener('click',()=>
+    socialAction(()=>window.EnmaSocialClient.refresh()));
+  for(const b of host.querySelectorAll('[data-social-accept]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-social-accept'),f=socialState.incoming.find(x=>x.id===id);
+    socialAction(async()=>{
+      await window.EnmaSocialClient.acceptFriendRequest(id);
+      friendAdd({id,name:f?.name||'ナナシ',lv:1});
+      netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,targetUserId:id});
+      notifyNet(`${f?.name||'相手'} とフレンドになった！`);
+    });
+  });
+  for(const b of host.querySelectorAll('[data-social-decline]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-social-decline');
+    socialAction(async()=>{
+      await window.EnmaSocialClient.declineFriendRequest(id);
+      netOutbox.push({type:'invite_reply',kind:'friend',accepted:false,targetUserId:id});
+    });
+  });
+  for(const b of host.querySelectorAll('[data-social-request]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-social-request');
+    socialAction(async()=>{
+      await window.EnmaSocialClient.sendFriendRequest(id);
+      netOutbox.push({type:'invite',kind:'friend',targetUserId:id});
+      notifyNet('フレンド関係の再照合を申請しました');
+    });
+  });
+  for(const b of host.querySelectorAll('[data-social-compose]'))b.addEventListener('click',()=>{
+    socialComposeId=b.getAttribute('data-social-compose');renderSocialTab();
+  });
+  for(const b of host.querySelectorAll('[data-social-remove]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-social-remove'),f=friends.find(x=>x.id===id);
+    if(!confirm(`${f?.name||'この相手'} とのフレンド関係を解消しますか？`))return;
+    socialAction(async()=>{
+      if(f?.cloud)await window.EnmaSocialClient.removeFriend(id);
+      player.friends=player.friends.filter(x=>x.id!==id);save();
+    });
+  });
+  host.querySelector('#socialComposeForm')?.addEventListener('submit',ev=>{
+    ev.preventDefault();
+    const body=$('socialMailBody').value;
+    socialAction(async()=>{
+      await window.EnmaSocialClient.sendMail(socialComposeId,body);
+      notifyNet('手紙を送りました');socialComposeId='';
+    });
+  });
+  for(const b of host.querySelectorAll('[data-mail-read]'))b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-mail-read');
+    socialAction(()=>window.EnmaSocialClient.markMailRead(id));
+  });
+}
 for(const b of document.querySelectorAll('.mtab')){
-  b.addEventListener('click',()=>{menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();});
+  b.addEventListener('click',()=>{
+    menuTab=b.getAttribute('data-tab');sfx.click();renderEquip();
+    if(menuTab==='social')window.EnmaSocialClient?.refresh?.().catch(()=>{});
+  });
 }
 let okamiIdx=0,guestIdx=0,pendingChapterEnd=false;
 function setTalkPortrait(kind){
@@ -5494,12 +5663,14 @@ function updatePlayerCardButtons(){
   if(!id)return;
   const teamBtn=$('pcTeamBtn'),friendBtn=$('pcFriendBtn'),hint=$('pcHint');
   const inParty=partyHas(id),friend=isFriend(id);
+  const incoming=socialState.incoming.some(f=>f.id===id);
+  const outgoing=socialState.outgoing.some(f=>f.id===id);
   teamBtn.textContent=inParty?'チーム同行中':'チームに誘う';
-  friendBtn.textContent=friend?'フレンド ✓':'フレンド申請';
+  friendBtn.textContent=friend?'フレンド ✓':incoming?'申請を承認':outgoing?'申請済み':'フレンド申請';
   teamBtn.disabled=inParty||!chat.online;
-  friendBtn.disabled=friend||!chat.online;
-  hint.hidden=chat.online;
-  if(!chat.online)hint.textContent='誘い・申請には魂籍ログインが必要';
+  friendBtn.disabled=friend||outgoing||!socialState.online;
+  hint.hidden=chat.online&&socialState.online;
+  if(!chat.online||!socialState.online)hint.textContent='誘い・申請には魂籍ログインが必要';
 }
 function openPlayerCard(e){
   if(!e||!e.userId)return;
@@ -5532,11 +5703,23 @@ $('pcTeamBtn').addEventListener('click',()=>{
   closePlayerCard();
   sfx.click();
 });
-$('pcFriendBtn').addEventListener('click',()=>{
+$('pcFriendBtn').addEventListener('click',async()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
-  netOutbox.push({type:'invite',kind:'friend',targetUserId:playerCard.userId});
-  notifyNet(`${e.name} にフレンド申請を送った。返事を待とう`);
+  const targetId=playerCard.userId;
+  const incoming=socialState.incoming.some(f=>f.id===targetId);
+  $('pcFriendBtn').disabled=true;
+  try{
+    const result=await window.EnmaSocialClient?.sendFriendRequest?.(targetId);
+    if(result?.state==='accepted'){
+      friendAdd({id:targetId,name:e.name,lv:e.level});
+      if(incoming)netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,targetUserId:targetId});
+      notifyNet(`${e.name} とフレンドになった！`);
+    }else{
+      netOutbox.push({type:'invite',kind:'friend',targetUserId:targetId});
+      notifyNet(`${e.name} にフレンド申請を送った。返事を待とう`);
+    }
+  }catch(err){notifyNet(`フレンド申請を送れません：${err?.message||'通信エラー'}`);}
   closePlayerCard();
   sfx.click();
 });
@@ -5565,9 +5748,10 @@ function showNextInvite(){
   sfx.click();
   inviteTimer=setTimeout(()=>{activeInvite=null;showNextInvite();},30000);
 }
-$('inviteAccept').addEventListener('click',()=>{
+$('inviteAccept').addEventListener('click',async()=>{
   const inv=activeInvite;
   if(!inv)return;
+  $('inviteAccept').disabled=true;$('inviteDecline').disabled=true;
   if(inv.kind==='team'){
     party.id=inv.partyId;party.members=[];
     rememberParty();
@@ -5577,37 +5761,68 @@ $('inviteAccept').addEventListener('click',()=>{
     chat.tab='team';
     if(chat.open)renderChatTab();else openChat(false);
   }else{
+    try{await window.EnmaSocialClient?.acceptFriendRequest?.(inv.from.userId);}
+    catch(e){
+      notifyNet(`フレンド申請を承認できません：${e?.message||'通信エラー'}`);
+      $('inviteAccept').disabled=false;$('inviteDecline').disabled=false;
+      return;
+    }
     friendAdd({id:inv.from.userId,name:inv.from.displayName,lv:inv.from.level});
     netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,
       targetUserId:inv.from.userId});
     notifyNet(`${inv.from.displayName} とフレンドになった！`);
   }
   activeInvite=null;showNextInvite();
+  $('inviteAccept').disabled=false;$('inviteDecline').disabled=false;
   sfx.click();
 });
-$('inviteDecline').addEventListener('click',()=>{
+$('inviteDecline').addEventListener('click',async()=>{
   const inv=activeInvite;
   if(!inv)return;
+  $('inviteAccept').disabled=true;$('inviteDecline').disabled=true;
+  if(inv.kind==='friend'){
+    try{await window.EnmaSocialClient?.declineFriendRequest?.(inv.from.userId);}
+    catch(e){
+      notifyNet(`申請を処理できません：${e?.message||'通信エラー'}`);
+      $('inviteAccept').disabled=false;$('inviteDecline').disabled=false;
+      return;
+    }
+  }
   netOutbox.push({type:'invite_reply',kind:inv.kind,accepted:false,
     targetUserId:inv.from.userId,partyId:inv.partyId||''});
   activeInvite=null;showNextInvite();
+  $('inviteAccept').disabled=false;$('inviteDecline').disabled=false;
   sfx.click();
 });
 
 /* ---- フレンド ---- */
 function friendAdd(f){
-  if(!f||!f.id||isFriend(f.id))return;
-  player.friends.push({id:String(f.id),name:String(f.name||'ナナシ').slice(0,16),
+  if(!f||!f.id)return;
+  const current=player.friends.find(x=>x.id===String(f.id));
+  if(current){
+    current.name=String(f.name||current.name||'ナナシ').slice(0,16);
+    current.lv=Math.max(1,(f.lv|0)||(current.lv|0));
+  }else player.friends.push({id:String(f.id),name:String(f.name||'ナナシ').slice(0,16),
     lv:Math.max(1,f.lv|0),at:Date.now()});
   while(player.friends.length>50)player.friends.shift();
   save();
   if(chat.open&&chat.tab==='friend')renderChatLog();
   updatePlayerCardButtons();
 }
-function friendRemove(id){
+async function friendRemove(id){
+  try{
+    if(socialState.friends.some(f=>f.id===id))await window.EnmaSocialClient?.removeFriend?.(id);
+  }catch(e){notifyNet(`フレンドを解消できません：${e?.message||'通信エラー'}`);return;}
   player.friends=player.friends.filter(f=>f.id!==id);
   save();
   if(chat.open&&chat.tab==='friend')renderChatLog();
+  if(menuTab==='social')renderSocialTab();
+}
+function openSocialMenu(friendId=''){
+  if(!started)return;
+  menuTab='social';socialComposeId=friendId;
+  renderEquip();$('equip').classList.remove('hidden');
+  window.EnmaSocialClient?.refresh?.().catch(()=>{});
 }
 function friendRowNode(f){
   const live=globalOnline.get(f.id);
@@ -5623,7 +5838,10 @@ function friendRowNode(f){
   del.addEventListener('click',()=>{
     if(confirm(`${f.name} とのフレンドを解消する？`))friendRemove(f.id);
   });
-  row.append(dot,name,meta,del);
+  const mail=document.createElement('button');
+  mail.textContent='手紙';mail.title='ゲーム内の手紙を書く';
+  mail.addEventListener('click',()=>openSocialMenu(f.id));
+  row.append(dot,name,meta,mail,del);
   return row;
 }
 
@@ -6236,6 +6454,43 @@ window.EnmaGameBridge={
     for(const p of Array.isArray(list)?list:[])
       if(p&&p.userId)globalOnline.set(p.userId,p);
     if(chat.open&&chat.tab==='friend')renderChatLog();
+    if(menuTab==='social'&&!$('equip').classList.contains('hidden'))renderSocialTab();
+  },
+  syncSocialState(next){
+    const incoming=Array.isArray(next?.incoming)?next.incoming:[];
+    const mail=Array.isArray(next?.mail)?next.mail:[];
+    if(!next?.online){knownCloudRequests.clear();knownMailIds.clear();}
+    for(const request of incoming){
+      const key=String(request.friendshipId||request.id||'');
+      if(started&&key&&!knownCloudRequests.has(key))
+        notifyNet(`${request.name||'魂'} からフレンド申請が届いています（メニュー「縁」）`);
+      if(key)knownCloudRequests.add(key);
+    }
+    for(const letter of mail){
+      const key=String(letter.id||'');
+      if(started&&key&&!letter.readAt&&!knownMailIds.has(key))
+        notifyNet(`${letter.senderName||'魂'} から手紙が届きました（メニュー「縁」）`);
+      if(key)knownMailIds.add(key);
+    }
+    socialState.online=Boolean(next?.online);
+    socialState.friends=Array.isArray(next?.friends)?next.friends:[];
+    socialState.incoming=incoming;
+    socialState.outgoing=Array.isArray(next?.outgoing)?next.outgoing:[];
+    socialState.mail=mail;
+    socialState.error=String(next?.error||'');
+    let changed=false;
+    for(const f of socialState.friends){
+      const current=player.friends.find(x=>x.id===f.id);
+      if(current){
+        if(current.name!==f.name){current.name=f.name;changed=true;}
+      }else{
+        player.friends.push({id:f.id,name:f.name,lv:1,at:f.at||Date.now()});changed=true;
+      }
+    }
+    if(changed){while(player.friends.length>50)player.friends.shift();save();}
+    updateSocialBadge();updatePlayerCardButtons();
+    if(chat.open&&chat.tab==='friend')renderChatLog();
+    if(menuTab==='social'&&!$('equip').classList.contains('hidden'))renderSocialTab();
   },
   receiveInvite(invite){
     if(!invite||!invite.from)return;
@@ -6249,6 +6504,7 @@ window.EnmaGameBridge={
     if(!support&&!near)return;  // 遠く離れていて支援もしていなければ入らない
     gainXp(msg.xp);  // 範囲内なら討伐者と同じだけ徳が入る
     addFloat(player.x,player.y-0.9,`+${msg.xp} 徳(チーム)`,'#d9c07a');
+    log(`${msg.from?.displayName||'仲間'} の討伐分 +${msg.xp} 徳（チーム）`,'gain');
     save();
   },
   receivePartyHeal(msg){
@@ -6291,8 +6547,10 @@ window.EnmaGameBridge={
     if(reply.kind==='friend'){
       if(reply.accepted){
         friendAdd({id:reply.from.userId,name:reply.from.displayName,lv:reply.from.level});
+        window.EnmaSocialClient?.refresh?.().catch(()=>{});
         notifyNet(`${reply.from.displayName} とフレンドになった！`);
       }else{
+        window.EnmaSocialClient?.refresh?.().catch(()=>{});
         notifyNet(`${reply.from.displayName} は静かに首を振った`);
       }
     }else{
@@ -6385,8 +6643,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721k"></script>
+<script src="online/config.js?v=20260721m"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721k"></script>
+<script type="module" src="online/account.js?v=20260721m"></script>
 </body>
 </html>
