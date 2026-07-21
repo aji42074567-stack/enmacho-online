@@ -35,7 +35,8 @@
 - 画像が読み込めない環境では従来のコード描画に自動フォールバック
 - 森床・土道・石畳・建物・樹木・岩・村の小物は画像素材で描画
 - 主人公は男女とも4方向・最大8コマの滑らかな歩行アニメーションに対応
-- 公開URL: https://enmacho-online.pages.dev/
+- 正式公開URL: https://enmacho.com/
+- Cloudflare Pages予備URL: https://enmacho-online.pages.dev/
 - 公開は Cloudflare Pages（`main`ブランチにpushすると自動反映）
 
 ## ドキュメント

@@ -14,6 +14,7 @@
 - Supabase DB/RLS: `supabase/migrations/`
 - Resend Contacts同期Edge Function: `supabase/functions/sync-resend-contact/`
 - Cloudflare Durable Objectsの魔物同期: `worker/index.js` と `wrangler.jsonc`
-- Cloudflare Pages公開先: `https://enmacho-online.pages.dev/`
+- 正式公開URL: `https://enmacho.com/`
+- Cloudflare Pages予備URL: `https://enmacho-online.pages.dev/`
 
 秘密鍵やResend APIキーはリポジトリへ保存しない。`.env` がないことは、連携が未実装という意味ではない。秘密情報はSupabaseおよびCloudflare側のSecretsで管理する。
