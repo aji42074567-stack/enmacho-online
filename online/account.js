@@ -1,6 +1,6 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260721d';
-import { createWorldController } from './world.js?v=20260721d';
+import { createPresenceController } from './presence.js?v=20260721e';
+import { createWorldController } from './world.js?v=20260721e';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -31,6 +31,9 @@ const state = {
     : '',
   error: '',
   busy: false,
+  authMode: 'login',
+  sessionSource: 'initial',
+  lastEmail: '',
 };
 
 let accountLoadRevision = 0;
@@ -62,6 +65,60 @@ const setFeedback = (message = '', error = '') => {
   state.message = message;
   state.error = error;
 };
+
+const friendlyError = error => {
+  const message = error?.message || '処理に失敗しました';
+  if (/invalid login credentials/i.test(message))
+    return 'メールアドレスまたはパスワードが違います';
+  if (/email not confirmed/i.test(message))
+    return 'メール確認が完了していません。確認メール内のリンクを開いてください';
+  if (/user already registered/i.test(message))
+    return 'このメールアドレスは登録済みです。「ログイン」から入ってください';
+  if (/password should be at least/i.test(message))
+    return 'パスワードは8文字以上で入力してください';
+  if (/rate limit/i.test(message))
+    return '試行回数が多いため一時停止中です。少し待ってからお試しください';
+  return message;
+};
+
+function localSaveInfo() {
+  const payload = window.EnmaGameBridge?.exportSave?.() || null;
+  const ownerId = window.EnmaGameBridge?.getSaveOwner?.() || '';
+  return {
+    payload,
+    ownerId,
+    name: String(payload?.name || window.EnmaGameBridge?.getProfile?.()?.displayName || 'ナナシ'),
+    level: Number(payload?.lv) || window.EnmaGameBridge?.getProfile?.()?.level || 1,
+  };
+}
+
+function sameSaveIdentity(localPayload, cloudPayload) {
+  if (!localPayload || !cloudPayload) return false;
+  const localName = String(localPayload.name || '').trim();
+  const cloudName = String(cloudPayload.name || '').trim();
+  return Boolean(localName && cloudName && localName === cloudName
+    && (localPayload.gender || 'm') === (cloudPayload.gender || 'm'));
+}
+
+function saveBinding() {
+  const local = localSaveInfo();
+  const userId = state.session?.user?.id || '';
+  if (!local.payload) return { kind: 'empty', local };
+  if (local.ownerId === userId) return { kind: 'match', local };
+  if (local.ownerId) return { kind: 'other', local };
+  return { kind: 'unclaimed', local };
+}
+
+function bindLegacySaveIfSafe() {
+  const userId = state.session?.user?.id || '';
+  const local = localSaveInfo();
+  if (!userId || !local.payload || local.ownerId) return;
+  const cloudPayload = state.cloudSave?.payload || null;
+  const safe = state.sessionSource === 'signup'
+    || sameSaveIdentity(local.payload, cloudPayload)
+    || (state.sessionSource === 'initial' && !cloudPayload);
+  if (safe) window.EnmaGameBridge?.claimSave?.(userId);
+}
 
 const setGatewayCopy = (title, closeLabel) => {
   if (accountTitle) accountTitle.textContent = title;
@@ -96,50 +153,77 @@ function renderUnconfigured() {
 }
 
 function renderSignedOut() {
+  const local = localSaveInfo();
   setButtonState(state.message.includes('確認メール') ? 'pending' : 'offline');
-  setGatewayCopy('魂籍を登録・照合', '登録せず端末の記録で続ける');
+  setGatewayCopy('魂籍へログイン', 'ログインせず端末記録で続ける');
   content.innerHTML = `
     ${feedbackHtml()}
-    <p class="account-lead">無料の魂籍を作ると、端末を越えて記録を残せます。</p>
-    <form id="soulSignupForm" class="account-form">
-      <label>魂名
-        <input name="displayName" maxlength="16" required
-          value="${esc(window.EnmaGameBridge?.getProfile()?.displayName || '')}"
-          placeholder="ゲーム内で表示する名前" autocomplete="nickname"
-          ${window.EnmaGameBridge?.exportSave?.() ? 'readonly' : ''}>
-        ${window.EnmaGameBridge?.exportSave?.()
-          ? '<small class="account-name-note">キャラ作成時に決めた名が台帳に記されます（変更不可）</small>'
-          : '<small class="account-name-note">一度決めた名は変えられません</small>'}
-      </label>
-      <label>メールアドレス
-        <input name="email" type="email" required placeholder="name@example.com"
-          autocomplete="email">
-      </label>
-      <label>パスワード
-        <input name="password" type="password" minlength="8" required
-          placeholder="8文字以上" autocomplete="new-password">
-      </label>
-      <label class="account-check">
-        <input name="newsletter" type="checkbox">
-        <span>更新情報をメールで受け取る（いつでも解除できます）</span>
-      </label>
-      <button class="buyb account-primary" type="submit" ${state.busy ? 'disabled' : ''}>魂籍を登録</button>
-    </form>
-    <div class="account-divider"><span>登録済みの方</span></div>
-    <form id="soulLoginForm" class="account-form compact">
-      <label>メールアドレス
-        <input name="email" type="email" required autocomplete="email">
-      </label>
-      <label>パスワード
-        <input name="password" type="password" required autocomplete="current-password">
-      </label>
-      <button class="buyb account-primary" type="submit" ${state.busy ? 'disabled' : ''}>ログイン</button>
-      <button class="linkbtn account-reset" id="soulResetPassword" type="button">パスワードを再設定</button>
-    </form>`;
+    <div class="account-device-save">
+      <span>この端末の記録</span>
+      <b>${local.payload ? `${esc(local.name)}・徳位${esc(local.level)}` : 'まだ記録はありません'}</b>
+      <small>${local.ownerId
+        ? '前回の魂籍に紐付いた記録です。別の魂籍へ誤保存されません。'
+        : 'ログイン後、対応する魂籍へ安全に紐付けます。'}</small>
+    </div>
+    <div class="account-auth-tabs" role="tablist" aria-label="魂籍の入口">
+      <button type="button" role="tab" data-auth-mode="login"
+        aria-selected="${state.authMode === 'login'}"
+        class="${state.authMode === 'login' ? 'on' : ''}">ログイン</button>
+      <button type="button" role="tab" data-auth-mode="signup"
+        aria-selected="${state.authMode === 'signup'}"
+        class="${state.authMode === 'signup' ? 'on' : ''}">新規登録</button>
+    </div>
+    ${state.authMode === 'login' ? `
+      <p class="account-lead">別端末でも、登録した魂籍のメールアドレスで入れます。</p>
+      <form id="soulLoginForm" class="account-form compact">
+        <label>メールアドレス
+          <input name="email" type="email" required autocomplete="email"
+            inputmode="email" value="${esc(state.lastEmail)}" placeholder="name@example.com">
+        </label>
+        <label>パスワード
+          <input name="password" type="password" required autocomplete="current-password"
+            placeholder="登録したパスワード">
+        </label>
+        <button class="buyb account-primary" type="submit" ${state.busy ? 'disabled' : ''}>
+          ${state.busy ? '照合中…' : '魂籍へログイン'}</button>
+        <button class="linkbtn account-reset" id="soulResetPassword" type="button">パスワードを再設定</button>
+      </form>` : `
+      <p class="account-lead">無料の魂籍を作ると、端末を越えて記録を残せます。</p>
+      <form id="soulSignupForm" class="account-form">
+        <label>魂名
+          <input name="displayName" maxlength="16" required
+            value="${esc(local.name)}" placeholder="ゲーム内で表示する名前"
+            autocomplete="nickname" ${local.payload ? 'readonly' : ''}>
+          ${local.payload
+            ? '<small class="account-name-note">現在のキャラクター名で登録します（変更不可）</small>'
+            : '<small class="account-name-note">一度決めた名は変えられません</small>'}
+        </label>
+        <label>メールアドレス
+          <input name="email" type="email" required placeholder="name@example.com"
+            inputmode="email" value="${esc(state.lastEmail)}" autocomplete="email">
+        </label>
+        <label>パスワード
+          <input name="password" type="password" minlength="8" required
+            placeholder="8文字以上" autocomplete="new-password">
+        </label>
+        <label class="account-check">
+          <input name="newsletter" type="checkbox">
+          <span>更新情報をメールで受け取る（いつでも解除できます）</span>
+        </label>
+        <button class="buyb account-primary" type="submit" ${state.busy ? 'disabled' : ''}>
+          ${state.busy ? '登録中…' : '魂籍を新規登録'}</button>
+      </form>`}`;
 
   document.getElementById('soulSignupForm')?.addEventListener('submit', signUp);
   document.getElementById('soulLoginForm')?.addEventListener('submit', signIn);
   document.getElementById('soulResetPassword')?.addEventListener('click', resetPassword);
+  for (const button of content.querySelectorAll('[data-auth-mode]')) {
+    button.addEventListener('click', () => {
+      state.authMode = button.dataset.authMode === 'signup' ? 'signup' : 'login';
+      setFeedback();
+      render();
+    });
+  }
 }
 
 function stageLabel(stage) {
@@ -150,10 +234,14 @@ function stageLabel(stage) {
 
 function renderSignedIn() {
   const profile = state.profile || {};
-  const local = window.EnmaGameBridge?.getProfile?.() || {};
+  const localProfile = window.EnmaGameBridge?.getProfile?.() || {};
+  const binding = saveBinding();
+  const local = binding.local;
   const cloud = state.cloudSave;
+  const bound = window.EnmaGameBridge?.getBoundSave?.(state.session?.user?.id) || null;
+  const conflict = binding.kind === 'other' || binding.kind === 'unclaimed';
   setButtonState('online');
-  setGatewayCopy('魂籍照合済み', 'ゲーム画面へ進む');
+  setGatewayCopy('現在の魂籍', 'ゲーム画面へ戻る');
   content.innerHTML = `
     ${feedbackHtml()}
     <div class="account-code">
@@ -162,11 +250,32 @@ function renderSignedIn() {
       <small>転生後も変わらないフレンド検索用の番号</small>
     </div>
     <div class="account-grid">
-      <div><span>魂名</span><b>${esc(profile.display_name || local.displayName || 'ナナシ')}</b></div>
-      <div><span>身分</span><b>${esc(stageLabel(profile.soul_stage || local.soulStage))}</b></div>
-      <div><span>徳位</span><b>${esc(local.level ?? '—')}</b></div>
+      <div><span>魂名</span><b>${esc(profile.display_name || 'ナナシ')}</b></div>
+      <div><span>身分</span><b>${esc(stageLabel(profile.soul_stage || localProfile.soulStage))}</b></div>
+      <div><span>クラウド徳位</span><b>${esc(cloud?.payload?.lv ?? '未保存')}</b></div>
       <div><span>メール</span><b class="account-email">${esc(state.session?.user?.email || '')}</b></div>
     </div>
+    <div class="account-save-state ${conflict ? 'conflict' : 'match'}">
+      <span>この端末の記録</span>
+      <b>${local.payload ? `${esc(local.name)}・徳位${esc(local.level)}` : '記録なし'}</b>
+      <small>${binding.kind === 'match'
+        ? '現在の魂籍と一致しています。'
+        : binding.kind === 'empty'
+          ? 'この端末にはまだプレイ記録がありません。'
+          : binding.kind === 'other'
+            ? '別の魂籍に紐付いた記録です。現在の魂籍へは保存できません。'
+            : 'どの魂籍の記録か未確認です。切り替え方法を選んでください。'}</small>
+    </div>
+    ${conflict ? `<div class="account-save-warning">
+      <b>記録の混在を止めています</b>
+      <p>${cloud
+        ? '下の「この魂籍の記録へ切り替える」で、現在ログイン中のクラウド記録を読み込めます。'
+        : bound
+          ? `この端末に「${esc(bound.name || 'ナナシ')}・徳位${esc(bound.lv || 1)}」の記録が残っています。そこへ戻せます。`
+        : binding.kind === 'unclaimed'
+          ? 'クラウド記録がない魂籍です。端末記録を引き継ぐか、新しい記録で始めてください。'
+          : 'クラウド記録がない別魂籍です。誤上書きを防ぐため、新しい記録で始めてください。'}</p>
+    </div>` : ''}
     <form id="soulProfileForm" class="account-form compact account-profile-form">
       <label class="account-check">
         <input name="newsletter" type="checkbox" ${state.preferences?.newsletter_opt_in ? 'checked' : ''}>
@@ -180,16 +289,33 @@ function renderSignedIn() {
         ? `クラウド記録：徳位${esc(cloud.payload?.lv ?? '—')}・v${esc(cloud.save_version)}・${esc(new Date(cloud.updated_at).toLocaleString('ja-JP'))}`
         : 'クラウド記録はまだありません'}</p>
       <div class="account-actions">
-        <button class="buyb" id="cloudUpload" type="button" ${state.busy ? 'disabled' : ''}>端末 → クラウドへ保存</button>
+        <button class="buyb" id="cloudUpload" type="button"
+          ${state.busy || conflict ? 'disabled' : ''}>端末 → クラウドへ保存</button>
         <button class="buyb" id="cloudDownload" type="button"
-          ${state.busy || !cloud ? 'disabled' : ''}>クラウド → この端末へ読込</button>
+          ${state.busy || !cloud ? 'disabled' : ''}>${conflict
+            ? 'この魂籍の記録へ切り替える'
+            : 'クラウド → この端末へ読込'}</button>
       </div>
     </div>
-    <button class="linkbtn account-logout" id="soulLogout" type="button">ログアウト</button>`;
+    ${conflict && !cloud ? `<div class="account-switch-actions">
+      ${bound
+        ? '<button class="buyb" id="restoreBoundSave" type="button">この魂籍の端末記録へ切り替える</button>'
+        : binding.kind === 'unclaimed'
+        ? '<button class="buyb" id="claimLocalSave" type="button">端末記録をこの魂籍へ引き継ぐ</button>'
+        : ''}
+      ${bound ? '' : '<button class="linkbtn" id="startFreshSave" type="button">この魂籍を新しい記録で始める</button>'}
+    </div>` : ''}
+    <div class="account-divider"><span>魂籍の切り替え</span></div>
+    <button class="buyb account-logout" id="soulLogout" type="button"
+      ${state.busy ? 'disabled' : ''}>この端末だけログアウト</button>
+    <p class="account-logout-note">他のスマホ・PCはログインしたままです。端末記録も消えません。</p>`;
 
   document.getElementById('soulProfileForm')?.addEventListener('submit', updateProfile);
   document.getElementById('cloudUpload')?.addEventListener('click', uploadCloudSave);
   document.getElementById('cloudDownload')?.addEventListener('click', downloadCloudSave);
+  document.getElementById('claimLocalSave')?.addEventListener('click', claimLocalSave);
+  document.getElementById('restoreBoundSave')?.addEventListener('click', restoreBoundSave);
+  document.getElementById('startFreshSave')?.addEventListener('click', startFreshSave);
   document.getElementById('soulLogout')?.addEventListener('click', signOut);
 }
 
@@ -294,6 +420,7 @@ async function loadAccountData() {
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;
+  bindLegacySaveIfSafe();
   syncOnlineControllers(state.session, state.profile);
   render();
 }
@@ -305,7 +432,7 @@ async function withBusy(action) {
   try {
     await action();
   } catch (error) {
-    setFeedback('', error?.message || '処理に失敗しました');
+    setFeedback('', friendlyError(error));
   } finally {
     state.busy = false;
     render();
@@ -321,6 +448,7 @@ async function signUp(event) {
     const password = String(form.get('password') || '');
     const displayName = String(form.get('displayName') || '').trim().slice(0, 16);
     const newsletterOptIn = form.get('newsletter') === 'on';
+    state.lastEmail = email;
     const { data, error } = await state.client.auth.signUp({
       email,
       password,
@@ -331,6 +459,8 @@ async function signUp(event) {
     });
     if (error) throw error;
     state.session = data.session;
+    state.sessionSource = 'signup';
+    if (data.session) window.EnmaGameBridge?.claimSave?.(data.session.user.id);
     setFeedback(data.session
       ? '魂籍を登録しました'
       : '確認メールを送りました。メール内のリンクを開いて登録を完了してください');
@@ -343,12 +473,15 @@ async function signIn(event) {
   const form = new FormData(event.currentTarget);
   await withBusy(async () => {
     setFeedback();
+    const email = String(form.get('email') || '').trim();
+    state.lastEmail = email;
     const { data, error } = await state.client.auth.signInWithPassword({
-      email: String(form.get('email') || '').trim(),
+      email,
       password: String(form.get('password') || ''),
     });
     if (error) throw error;
     state.session = data.session;
+    state.sessionSource = 'manual';
     setFeedback('魂籍台帳へログインしました');
     await loadAccountData();
   });
@@ -409,6 +542,11 @@ async function uploadCloudSave() {
   await withBusy(async () => {
     const payload = window.EnmaGameBridge?.exportSave?.();
     if (!payload) throw new Error('この端末に保存記録がありません');
+    const binding = saveBinding();
+    if (binding.kind === 'other')
+      throw new Error('別の魂籍の端末記録は保存できません。先に記録を切り替えてください');
+    if (binding.kind === 'unclaimed')
+      window.EnmaGameBridge?.claimSave?.(state.session.user.id);
     const { data, error } = await state.client.from('game_saves').upsert({
       user_id: state.session.user.id,
       save_version: Number(payload.v) || 1,
@@ -431,20 +569,50 @@ async function downloadCloudSave() {
     const localLevel = window.EnmaGameBridge?.getProfile?.().level ?? '—';
     const cloudLevel = data.payload?.lv ?? '—';
     if (!confirm(`この端末の徳位${localLevel}の記録を、クラウドの徳位${cloudLevel}の記録で置き換えます。よろしいですか？`)) return;
-    window.EnmaGameBridge?.importSave?.(data.payload);
+    window.EnmaGameBridge?.importSave?.(data.payload, { ownerId: state.session.user.id });
   });
 }
 
+async function claimLocalSave() {
+  const local = localSaveInfo();
+  if (!local.payload || !state.session) return;
+  if (!confirm(`端末の「${local.name}・徳位${local.level}」を、現在の魂籍の記録として使いますか？`)) return;
+  window.EnmaGameBridge?.claimSave?.(state.session.user.id);
+  setFeedback('端末記録を現在の魂籍へ紐付けました。クラウドへ保存できます');
+  render();
+}
+
+async function restoreBoundSave() {
+  if (!state.session) return;
+  const payload = window.EnmaGameBridge?.getBoundSave?.(state.session.user.id);
+  if (!payload) {
+    setFeedback('', 'この魂籍の端末記録が見つかりません');
+    render();
+    return;
+  }
+  if (!confirm(`この端末を「${payload.name || 'ナナシ'}・徳位${payload.lv || 1}」の記録へ切り替えますか？`)) return;
+  window.EnmaGameBridge?.activateBoundSave?.(state.session.user.id);
+}
+
+async function startFreshSave() {
+  if (!state.session) return;
+  if (!confirm('現在の端末記録は消さずに切り離し、この魂籍を徳位1から始めます。よろしいですか？')) return;
+  window.EnmaGameBridge?.startFreshSave?.(state.session.user.id);
+}
+
 async function signOut() {
+  if (!confirm('この端末だけ魂籍からログアウトします。ほかのスマホ・PCのログインと、端末のプレイ記録はそのまま残ります。')) return;
   await withBusy(async () => {
-    const { error } = await state.client.auth.signOut();
+    const { error } = await state.client.auth.signOut({ scope: 'local' });
     if (error) throw error;
     state.session = null;
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
     syncOnlineControllers(null, null);
-    setFeedback('ログアウトしました');
+    state.authMode = 'login';
+    state.sessionSource = 'manual';
+    setFeedback('この端末だけログアウトしました。別の魂籍でログインできます');
   });
 }
 

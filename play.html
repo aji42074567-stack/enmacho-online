@@ -393,6 +393,29 @@
   .account-cloud{text-align:left}
   .account-actions{display:flex;gap:7px;margin-top:10px}
   .account-actions .buyb{flex:1;padding-inline:7px}
+  .account-device-save,.account-save-state{margin:0 0 14px;padding:11px 12px;
+    border:1px solid #3d3425;border-radius:4px;background:#11100d;text-align:left}
+  .account-device-save span,.account-save-state span{display:block;color:var(--gold);
+    font:9px var(--sans);letter-spacing:.13em;margin-bottom:5px}
+  .account-device-save b,.account-save-state b{display:block;color:var(--parchment);
+    font:13px var(--serif)}
+  .account-device-save small,.account-save-state small{display:block;margin-top:5px;
+    color:var(--dim);font:9.5px/1.6 var(--sans)}
+  .account-save-state.match{border-color:#42563a;background:#11170f}
+  .account-save-state.conflict{border-color:#764138;background:#221311}
+  .account-save-warning{margin:-6px 0 14px;padding:10px 12px;border:1px solid #8a4a3d;
+    border-radius:4px;background:#2a1512;text-align:left}
+  .account-save-warning b{color:#efb0a6;font:12px var(--serif)}
+  .account-save-warning p{margin:5px 0 0;color:#d6aea7;font:10px/1.65 var(--sans)}
+  .account-auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 13px}
+  .account-auth-tabs button{min-height:38px;border:1px solid #443721;border-radius:3px;
+    background:#17120c;color:var(--dim);font:12px var(--serif);cursor:pointer}
+  .account-auth-tabs button.on{border-color:var(--gold);color:#f2d786;
+    background:linear-gradient(180deg,#3b2c18,#21160d)}
+  .account-switch-actions{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .account-switch-actions .buyb{min-height:40px}
+  .account-logout{min-height:40px;margin-top:0;align-self:stretch;width:100%}
+  .account-logout-note{margin:7px 0 0;color:var(--dim);font:9.5px/1.6 var(--sans)}
 
   /* ---- title / account gateway ---- */
   .title-screen{align-items:stretch;justify-content:stretch;box-sizing:border-box;
@@ -550,6 +573,8 @@
     .account-actions{flex-direction:column}
     .account-actions .buyb{min-height:42px}
     .account-code strong{font-size:19px}
+    .account-form input:not([type="checkbox"]){min-height:44px;font-size:16px}
+    .account-auth-tabs button,.account-logout{min-height:44px}
   }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
@@ -866,6 +891,9 @@ const COMBAT_HOLD_SECONDS=4;
 const MOB_RESPAWN_SECONDS=45;
 const BOSS_RESPAWN_SECONDS=120;
 const SAVE_KEY='aden_save_v1';
+const SAVE_OWNER_KEY='enma_save_owner_v1';
+const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
+const accountSaveKey=userId=>ACCOUNT_SAVE_PREFIX+String(userId||'');
 const MOBILE_VIEW_SCALE=0.74;
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
@@ -1376,7 +1404,7 @@ let resetting=false,migrationStatGrant=0;  // 転生リセット中は自動セ�
 function save(){
   if(resetting)return;
   try{
-    localStorage.setItem(SAVE_KEY,JSON.stringify({
+    const serialized=JSON.stringify({
       v:7,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
@@ -1389,7 +1417,10 @@ function save(){
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,settings
-    }));
+    });
+    localStorage.setItem(SAVE_KEY,serialized);
+    const ownerId=localStorage.getItem(SAVE_OWNER_KEY);
+    if(ownerId)localStorage.setItem(accountSaveKey(ownerId),serialized);
   }catch(e){}
 }
 function load(){
@@ -5062,9 +5093,11 @@ $('resetConfirmBtn').addEventListener('click',()=>{
   if(resetting)return;
   const btn=$('resetConfirmBtn');
   btn.disabled=true;
-  let backup;
+  let backup,ownerId,boundBackup;
   try{
     backup=localStorage.getItem(SAVE_KEY);
+    ownerId=localStorage.getItem(SAVE_OWNER_KEY)||'';
+    boundBackup=ownerId?localStorage.getItem(accountSaveKey(ownerId)):null;
   }catch(e){
     btn.disabled=false;
     $('resetError').textContent='記録の保存状態を確認できなかった。記録は消していない。';
@@ -5074,11 +5107,13 @@ $('resetConfirmBtn').addEventListener('click',()=>{
   resetting=true;  // 確定した瞬間からbeforeunloadの自動セーブを止める
   try{
     localStorage.removeItem(SAVE_KEY);
+    if(ownerId)localStorage.removeItem(accountSaveKey(ownerId));
     if(localStorage.getItem(SAVE_KEY)!==null)throw new Error('reset failed');
   }catch(e){
     let restored=false;
     try{
       if(backup!==null)localStorage.setItem(SAVE_KEY,backup);
+      if(ownerId&&boundBackup!==null)localStorage.setItem(accountSaveKey(ownerId),boundBackup);
       restored=localStorage.getItem(SAVE_KEY)===backup;
     }catch(restoreError){}
     resetting=false;
@@ -5120,13 +5155,65 @@ window.EnmaGameBridge={
       return raw?JSON.parse(raw):null;
     }catch(e){return null;}
   },
-  importSave(payload){
+  getSaveOwner(){
+    try{return localStorage.getItem(SAVE_OWNER_KEY)||'';}catch(e){return '';}
+  },
+  getBoundSave(userId){
+    if(!userId)return null;
+    try{
+      const raw=localStorage.getItem(accountSaveKey(userId));
+      return raw?JSON.parse(raw):null;
+    }catch(e){return null;}
+  },
+  claimSave(userId){
+    if(!userId)throw new Error('魂籍を確認できません');
+    try{
+      const raw=localStorage.getItem(SAVE_KEY);
+      localStorage.setItem(SAVE_OWNER_KEY,String(userId));
+      if(raw)localStorage.setItem(accountSaveKey(userId),raw);
+    }catch(e){throw new Error('端末記録を魂籍へ紐付けられませんでした');}
+  },
+  activateBoundSave(userId){
+    if(!userId)throw new Error('魂籍を確認できません');
+    let payload;
+    try{
+      const raw=localStorage.getItem(accountSaveKey(userId));
+      payload=raw?JSON.parse(raw):null;
+    }catch(e){}
+    if(!payload)throw new Error('この魂籍の端末記録が見つかりません');
+    this.importSave(payload,{ownerId:userId});
+  },
+  startFreshSave(userId){
+    if(!userId)throw new Error('魂籍を確認できません');
+    resetting=true;
+    try{
+      const currentOwner=localStorage.getItem(SAVE_OWNER_KEY)||'';
+      const currentRaw=localStorage.getItem(SAVE_KEY);
+      if(currentOwner&&currentRaw)localStorage.setItem(accountSaveKey(currentOwner),currentRaw);
+      localStorage.setItem(SAVE_OWNER_KEY,String(userId));
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(accountSaveKey(userId));
+      location.reload();
+    }catch(error){
+      resetting=false;
+      throw new Error('新しい端末記録を準備できませんでした');
+    }
+  },
+  importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
       payload.v<1||payload.v>7)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
+      const currentOwner=localStorage.getItem(SAVE_OWNER_KEY)||'';
+      const currentRaw=localStorage.getItem(SAVE_KEY);
+      if(currentOwner&&currentRaw)localStorage.setItem(accountSaveKey(currentOwner),currentRaw);
       localStorage.setItem(SAVE_KEY,serialized);
+      const ownerId=String(options.ownerId||currentOwner||'');
+      if(ownerId){
+        localStorage.setItem(SAVE_OWNER_KEY,ownerId);
+        localStorage.setItem(accountSaveKey(ownerId),serialized);
+      }
       if(localStorage.getItem(SAVE_KEY)!==serialized)
         throw new Error('クラウド記録を端末へ保存できませんでした');
       try{sessionStorage.setItem('enma_cloud_import_notice',String(payload.lv||1));}catch(e){}
@@ -5378,8 +5465,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721d"></script>
+<script src="online/config.js?v=20260721e"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721d"></script>
+<script type="module" src="online/account.js?v=20260721e"></script>
 </body>
 </html>
