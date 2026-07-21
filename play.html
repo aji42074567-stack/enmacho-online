@@ -1314,8 +1314,8 @@ const ENMA_SOUL_VOICES=[
   {name:'チヨ',sprite:'npc_soul_sae',line:'「誰かを赦すのは、その人のためだけじゃなかった。恨みを握る自分の手を、ほどいてやることだったんだね」'},
 ];
 const ENMA_SOUL_LAYOUT={
-  1:[[37,41,0],[40,35,1],[33,36,2],[29,29,3],[24,24,4]],
-  2:[[36,40,5],[35,36,6],[33,31,7],[30,28,8],[24,23,9]],
+  1:[[37,40,0],[38,35,1],[33,36,2],[29,29,3],[24,24,4]],
+  2:[[36,39,5],[35,36,6],[33,31,7],[30,28,8],[24,23,9]],
   3:[[37,40,10],[37,35,11],[33,35,12],[28,29,13],[25,24,14]],
 };
 const KAZU_STORY=[
@@ -3500,9 +3500,9 @@ function buildEnmaHall(){
     // x-y が画面上の左右、x+y が画面上の奥行きに対応する。
     for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
       const depth=x+y,side=Math.abs(x-y);
-      const aisle=depth>=43&&depth<=83&&side<=6;
+      const aisle=depth>=43&&depth<=83&&side<=3;
       const frontSteps=depth>83&&depth<=90&&side<=4;
-      const upperSteps=depth>=37&&depth<43&&side<=5;
+      const upperSteps=depth>=37&&depth<43&&side<=4;
       if(aisle||frontSteps||upperSteps){
         blocked[y*MAP+x]=0;tileKind[y*MAP+x]=6;
       }
