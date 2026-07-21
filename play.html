@@ -1177,7 +1177,7 @@ function placeLargeBuilding(bx,by,bw,bh,kind){
     footprintW:bw,footprintH:bh,
   });
 }
-placeLargeBuilding(24,40,7,5,'enmacho');           // 町の核となる閻魔庁本殿
+placeLargeBuilding(24,42,7,5,'enmacho');           // 町の核となる閻魔庁本殿
 placeBuilding(36,46,'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
 placeBuilding(35,51,'shop','#7a5a2a','#645022');
 placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
@@ -1189,8 +1189,8 @@ props.push({x:31,y:53,kind:'well'});
 props.push({x:29,y:51,kind:'lamp'});
 props.push({x:37,y:49,kind:'lamp'});
 props.push({x:31,y:55.6,kind:'lamp'});   // 酒場前の通り
-props.push({x:27,y:46,kind:'lamp'});     // 閻魔庁前の灯籠
-props.push({x:31,y:46,kind:'lamp'});
+props.push({x:25,y:48,kind:'lamp'});     // 閻魔庁前の灯籠
+props.push({x:31,y:47,kind:'lamp'});
 
 let npcs=[
   {x:34,y:53,kind:'merchant',name:'オババ'},
@@ -1198,7 +1198,7 @@ let npcs=[
   {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
   {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
   {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
-  {x:28.2,y:41.6,kind:'board',name:'高札'},       // クエスト掲示板(北門のそば)
+  {x:34.4,y:42.2,kind:'board',name:'高札'},       // 閻魔庁の東を回る北門通り
 ];
 
 /* ---- 町を囲う柵と門 ---- */
@@ -4085,7 +4085,7 @@ function drawEnmachoHall(sx,sy,p){
     drawHouse(sx,sy,{...p,kind:'house',roof1:'#211c1c',roof2:'#15171d'});
     return;
   }
-  const w=430,h=w*img.height/img.width;
+  const w=410,h=w*img.height/img.width;
   const frontOffset=((p.footprintW-1)+(p.footprintH-1))*TH/4;
   const baseY=sy+frontOffset+8;
   ctx.drawImage(img,sx-w/2,baseY-h,w,h);
@@ -4503,7 +4503,10 @@ function drawNpc(sx,sy,n){
 }
 
 function render(){
-  const tx=isoX(player.x,player.y),ty=isoY(player.x,player.y);
+  const tx=isoX(player.x,player.y);
+  // 門前町では視点を少し北へ寄せ、閻魔庁の大屋根まで画面へ収める。
+  const nearEnmacho=zone==='field'&&Math.hypot(player.x-SPAWN.x,player.y-SPAWN.y)<11;
+  const ty=isoY(player.x,player.y)-(nearEnmacho?(MOBILE_RENDER?28:54):0);
   if(!camInit){camX=tx;camY=ty;camInit=true;}
   camX+=(tx-camX)*0.08;camY+=(ty-camY)*0.08;
   const shakeRatio=shakeDur>0?shakeT/shakeDur:0;
