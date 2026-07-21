@@ -593,6 +593,41 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           const message = normalizeChatMessage(payload, channelZone, sessionId);
           if (message) bridge?.receiveChatMessage?.(message);
         })
+        .on('broadcast', { event: 'party_kill' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          const from = chatIdentity(payload, sessionId);
+          if (!from) return;
+          const partyId = cleanText(payload.partyId, 64);
+          const xp = Math.max(1, Math.min(99999, Math.trunc(cleanNumber(payload.xp, 0))));
+          const x = cleanNumber(payload.x, NaN);
+          const y = cleanNumber(payload.y, NaN);
+          if (!partyId || !Number.isFinite(x) || !Number.isFinite(y)) return;
+          bridge?.receivePartyKill?.({ from, partyId, xp, x, y,
+            zone: channelZone, mobName: cleanText(payload.mobName, 24) });
+        })
+        .on('broadcast', { event: 'party_heal' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          const from = chatIdentity(payload, sessionId);
+          if (!from) return;
+          const partyId = cleanText(payload.partyId, 64);
+          const amount = Math.max(1, Math.min(9999, Math.trunc(cleanNumber(payload.amount, 0))));
+          const x = cleanNumber(payload.x, NaN);
+          const y = cleanNumber(payload.y, NaN);
+          if (!partyId || !Number.isFinite(x) || !Number.isFinite(y)) return;
+          bridge?.receivePartyHeal?.({ from, partyId, amount, x, y, zone: channelZone });
+        })
+        .on('broadcast', { event: 'party_loot' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          if (cleanText(payload?.toUserId, 64) !== (session?.user?.id || '')) return;
+          const from = chatIdentity(payload, sessionId);
+          if (!from) return;
+          const partyId = cleanText(payload.partyId, 64);
+          const loot = ['nectar', 'blood', 'wscroll', 'ascroll'].includes(payload.loot)
+            ? payload.loot : '';
+          if (!partyId || !loot) return;
+          bridge?.receivePartyLoot?.({ from, partyId, loot,
+            mobName: cleanText(payload.mobName, 24) });
+        })
         .on('broadcast', { event: 'attack' }, ({ payload }) => {
           if (activeChannel !== channel) return;
           const action = normalizeRemote(
@@ -753,21 +788,23 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         sendToInbox(targetUserId, 'invite', payload);
       } else if (item.type === 'party_kill' || item.type === 'party_heal'
         || item.type === 'party_loot') {
-        if (!partyChannel || !partySubscribed) continue;
-        const base = { ...identityFor(snapshot), sentAt: Date.now() };
+        // 討伐・回復・分配は同じマップ内の出来事なので、
+        // 実績のあるゾーンチャンネルで送る(パーティチャンネルより確実)
+        if (!channel || !subscribed || snapshot.zone !== channelZone) continue;
+        const partyId = cleanText(item.partyId, 64);
+        if (!VALID_UUID.test(partyId)) continue;
+        const base = { ...identityFor(snapshot), partyId, sentAt: Date.now() };
         if (item.type === 'party_kill') {
-          partyChannel.send({ type: 'broadcast', event: 'kill', payload: { ...base,
+          channel.send({ type: 'broadcast', event: 'party_kill', payload: { ...base,
             xp: Math.trunc(cleanNumber(item.xp, 0)),
             x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0),
-            zone: cleanText(item.zone, 16),
             mobName: cleanText(item.mobName, 24) } }).catch(() => {});
         } else if (item.type === 'party_heal') {
-          partyChannel.send({ type: 'broadcast', event: 'heal', payload: { ...base,
+          channel.send({ type: 'broadcast', event: 'party_heal', payload: { ...base,
             amount: Math.trunc(cleanNumber(item.amount, 0)),
-            x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0),
-            zone: cleanText(item.zone, 16) } }).catch(() => {});
+            x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0) } }).catch(() => {});
         } else {
-          partyChannel.send({ type: 'broadcast', event: 'loot', payload: { ...base,
+          channel.send({ type: 'broadcast', event: 'party_loot', payload: { ...base,
             toUserId: cleanText(item.toUserId, 64),
             loot: cleanText(item.loot, 12),
             mobName: cleanText(item.mobName, 24) } }).catch(() => {});

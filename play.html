@@ -2023,13 +2023,13 @@ function grantMobReward(m){
     announceRareDrop(m.name,ITEMS[drop[0]].name);
   }else if(Math.random()<dropChance(0.28)){
     const to=lootTo();
-    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,loot:'nectar',mobName:m.name});
+    if(to){netOutbox.push({type:'party_loot',partyId:party.id,toUserId:to.userId,loot:'nectar',mobName:m.name});
       log(`甘露水は ${to.name} の手に渡った`,'sys');}
     else{player.potions++;addFloat(m.x,m.y-0.6,'甘露水獲得','#7fd0ff');log('甘露水を拾った','gain');}
   }
   if(m.type==='drake'&&Math.random()<dropChance(DRAGON_BLOOD_DROP_RATE)){
     const to=lootTo();
-    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,loot:'blood',mobName:m.name});
+    if(to){netOutbox.push({type:'party_loot',partyId:party.id,toUserId:to.userId,loot:'blood',mobName:m.name});
       log(`「竜の血」は ${to.name} の手に渡った`,'sys');}
     else{
       player.dragonBlood++;
@@ -2041,7 +2041,7 @@ function grantMobReward(m){
   if((m.type==='oni_blue'||m.type==='oni_king'||m.type==='drake')&&Math.random()<dropChance(SCROLL_DROP_RATE)){
     const wpn=Math.random()<0.5;
     const to=lootTo();
-    if(to){netOutbox.push({type:'party_loot',toUserId:to.userId,
+    if(to){netOutbox.push({type:'party_loot',partyId:party.id,toUserId:to.userId,
       loot:wpn?'wscroll':'ascroll',mobName:m.name});
       log(`${wpn?'武器':'防具'}強化の巻物は ${to.name} の手に渡った`,'sys');}
     else{
@@ -2052,7 +2052,8 @@ function grantMobReward(m){
     }
   }
   // 討伐の知らせをチームへ(受け取った側が距離・支援状態で徳の分け前を判定)
-  if(party.id)netOutbox.push({type:'party_kill',xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
+  if(party.id)netOutbox.push({type:'party_kill',partyId:party.id,
+    xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
     log('カズーが話していた因果の続きが聞けそうだ','sys');
@@ -2163,7 +2164,7 @@ function castHeal(){
   sfx.heal();
   // 仲間が近くにいれば回向は届き、支援参加として10秒間チーム討伐の徳が全額入る
   if(allyNear){
-    netOutbox.push({type:'party_heal',amount:n,x:player.x,y:player.y,zone});
+    netOutbox.push({type:'party_heal',partyId:party.id,amount:n,x:player.x,y:player.y,zone});
     if(player.partySupportT<=0)log('回向の支援 — 10秒のあいだ仲間の討伐で徳が全て入る','sys');
     player.partySupportT=10;
   }
@@ -6179,6 +6180,7 @@ window.EnmaGameBridge={
   },
   receivePartyKill(msg){
     if(!party.id||!msg||msg.zone!==zone||player.dead)return;
+    if(msg.partyId&&msg.partyId!==party.id)return;  // 別チームの討伐
     const support=player.partySupportT>0;
     const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=18;  // 近く〜中距離
     if(!support&&!near)return;  // 遠く離れていて支援もしていなければ入らない
@@ -6188,6 +6190,7 @@ window.EnmaGameBridge={
   },
   receivePartyHeal(msg){
     if(!party.id||!msg||msg.zone!==zone||player.dead)return;
+    if(msg.partyId&&msg.partyId!==party.id)return;
     if(Math.hypot(player.x-msg.x,player.y-msg.y)>4)return;
     if(player.hp>=player.maxHp)return;
     const n=Math.max(1,msg.amount|0);
@@ -6200,6 +6203,7 @@ window.EnmaGameBridge={
   },
   receivePartyLoot(msg){
     if(!party.id||!msg)return;
+    if(msg.partyId&&msg.partyId!==party.id)return;
     const mobName=String(msg.mobName||'魔物').slice(0,24);
     if(msg.loot==='nectar'){
       player.potions++;
@@ -6318,8 +6322,8 @@ resize();
 requestAnimationFrame(frame);
 </script>
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
-<script src="online/config.js?v=20260721j"></script>
+<script src="online/config.js?v=20260721k"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721j"></script>
+<script type="module" src="online/account.js?v=20260721k"></script>
 </body>
 </html>
