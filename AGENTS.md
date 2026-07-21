@@ -6,6 +6,12 @@
 - 正本は GitHub `aji42074567-stack/enmacho-online` の `main` ブランチ。許可された環境では `git fetch origin` 後に `origin/main` と比較する。
 - 古いコミットだけを見て、現在の機能が存在しないと断定しない。
 
+## ページ構成
+
+- `index.html`: TOPページ(公式サイト)。ゲーム本体ではない
+- `play.html`: ゲーム本体(旧index.html)。`#soul`付きで開くと魂籍パネルを自動表示
+- 旧メール確認・パスワード再設定リンクがTOPに着地した場合は `play.html` へ転送される
+
 ## オンライン連携の配置
 
 - Supabase公開設定: `online/config.js`

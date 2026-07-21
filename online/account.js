@@ -104,7 +104,11 @@ function renderSignedOut() {
       <label>魂名
         <input name="displayName" maxlength="16" required
           value="${esc(window.EnmaGameBridge?.getProfile()?.displayName || '')}"
-          placeholder="ゲーム内で表示する名前" autocomplete="nickname">
+          placeholder="ゲーム内で表示する名前" autocomplete="nickname"
+          ${window.EnmaGameBridge?.exportSave?.() ? 'readonly' : ''}>
+        ${window.EnmaGameBridge?.exportSave?.()
+          ? '<small class="account-name-note">キャラ作成時に決めた名が台帳に記されます（変更不可）</small>'
+          : '<small class="account-name-note">一度決めた名は変えられません</small>'}
       </label>
       <label>メールアドレス
         <input name="email" type="email" required placeholder="name@example.com"
@@ -163,15 +167,11 @@ function renderSignedIn() {
       <div><span>メール</span><b class="account-email">${esc(state.session?.user?.email || '')}</b></div>
     </div>
     <form id="soulProfileForm" class="account-form compact account-profile-form">
-      <label>魂名を変更
-        <input name="displayName" maxlength="16" required
-          value="${esc(profile.display_name || local.displayName || '')}">
-      </label>
       <label class="account-check">
         <input name="newsletter" type="checkbox" ${state.preferences?.newsletter_opt_in ? 'checked' : ''}>
         <span>更新情報をメールで受け取る</span>
       </label>
-      <button class="buyb" type="submit" ${state.busy ? 'disabled' : ''}>プロフィールを保存</button>
+      <button class="buyb" type="submit" ${state.busy ? 'disabled' : ''}>メール設定を保存</button>
     </form>
     <div class="account-divider"><span>魂の記録</span></div>
     <div class="account-cloud">
@@ -374,13 +374,12 @@ async function updateProfile(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   await withBusy(async () => {
-    const displayName = String(form.get('displayName') || '').trim().slice(0, 16);
+    // 魂名は変更不可: display_nameはここでは触らない
     const newsletterOptIn = form.get('newsletter') === 'on';
     const gameProfile = window.EnmaGameBridge?.getProfile?.() || {};
     const [{ data, error }, { data: preferences, error: preferencesError }] =
       await Promise.all([
         state.client.from('profiles').update({
-          display_name: displayName,
           soul_stage: gameProfile.soulStage || 'deceased',
           avatar_key: gameProfile.gender || 'm',
           last_seen_at: new Date().toISOString(),
