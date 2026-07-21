@@ -1,6 +1,7 @@
 const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 150;
 const IDLE_HEARTBEAT_MS = 2_000;
+const CONNECT_FAILURE_REPORT_THRESHOLD = 3;
 const PROTOCOL = 'enma-world-v1';
 const SHARED_ZONES = new Set([
   'field', 'cave', 'cave2', 'cave3', 'dg1', 'dg2', 'dg3', 'dg4', 'dg5',
@@ -35,6 +36,25 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
   let lastSentKey = '';
   let lastMessageAt = 0;
   let socketZone = '';
+  let connectFailures = 0;
+
+  function reportEvent(code, message, details = {}) {
+    try {
+      window.dispatchEvent(new CustomEvent('enma:system-event', {
+        detail: {
+          source: 'world',
+          code,
+          severity: 'warning',
+          message,
+          details: {
+            zone: socketZone,
+            online: navigator.onLine !== false,
+            ...details,
+          },
+        },
+      }));
+    } catch {}
+  }
 
   function publishConnection(nextConnected) {
     if (connected === nextConnected) return;
@@ -107,6 +127,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     socket = nextSocket;
     nextSocket.addEventListener('open', () => {
       if (socket !== nextSocket) return;
+      connectFailures = 0;
       retryDelay = 1_000;
       lastMessageAt = Date.now();
       lastSentAt = 0;
@@ -115,12 +136,29 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       sendPosition(bridge?.getSharedWorldPlayer?.() || {});
     });
     nextSocket.addEventListener('message', onMessage);
-    nextSocket.addEventListener('close', () => {
+    nextSocket.addEventListener('close', event => {
       if (socket !== nextSocket) return;
+      const wasConnected = connected;
       socket = null;
       publishConnection(false);
       retryAt = Date.now() + retryDelay;
       retryDelay = Math.min(10_000, retryDelay * 1.8);
+      if (document.hidden) return;
+      if (wasConnected) {
+        reportEvent('world_socket_closed', '共有魔物サーバーとの接続が切れました', {
+          closeCode: Number(event.code) || 0,
+          reason: String(event.reason || '').slice(0, 80),
+        });
+      } else {
+        connectFailures += 1;
+        if (connectFailures >= CONNECT_FAILURE_REPORT_THRESHOLD) {
+          reportEvent('world_connect_failed', '共有魔物サーバーへ接続できませんでした', {
+            attempts: connectFailures,
+            closeCode: Number(event.code) || 0,
+          });
+          connectFailures = 0;
+        }
+      }
     });
     nextSocket.addEventListener('error', () => {
       if (socket === nextSocket) nextSocket.close();
@@ -179,6 +217,9 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     if (socket && socketZone !== zoneNow) closeSocket(false);
     if (!socket && Date.now() >= retryAt) connect(zoneNow);
     if (connected && Date.now() - lastMessageAt > 10_000) {
+      reportEvent('world_heartbeat_timeout', '共有魔物サーバーからの応答が途切れました', {
+        silentMs: Date.now() - lastMessageAt,
+      });
       closeSocket(true);
       return;
     }

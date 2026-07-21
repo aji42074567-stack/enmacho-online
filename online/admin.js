@@ -13,6 +13,12 @@ const state = {
   campaigns: [],
   presence: null,
   online: [],
+  system: {
+    database: 'checking',
+    world: { status: 'checking', detail: '確認中' },
+    summary: {},
+    events: [],
+  },
   busy: false,
 };
 
@@ -97,6 +103,120 @@ function renderOnline() {
       <small>徳位${esc(person.level)}・${esc(zoneName(person.zone))}</small></div>`
   ).join('') : '<div class="empty">現在接続している登録者はいません</div>';
   renderMetrics();
+}
+
+const sourceLabel = source => ({
+  world: '共有魔物', account: '魂籍', presence: '同時接続', chat: 'チャット',
+  cloud_save: 'クラウド保存', email: 'メール', client: 'ゲーム端末',
+}[source] || source || '不明');
+
+const severityLabel = severity => ({
+  info: '情報', warning: '警告', error: '異常', critical: '重大',
+}[severity] || '警告');
+
+function renderSystemHealth() {
+  const system = state.system;
+  const summary = system.summary || {};
+  const events1h = Number(summary.events1h) || 0;
+  const events24h = Number(summary.events24h) || 0;
+  const errors24h = Number(summary.errors24h) || 0;
+  const isDown = system.database === 'down' || system.world.status === 'down';
+  const hasWarning = isDown || events1h > 0 || errors24h > 0;
+  const live = $('systemLive');
+  live.classList.toggle('warn', hasWarning && !isDown);
+  live.classList.toggle('down', isDown);
+  $('systemLiveLabel').textContent = isDown ? '異常を検知' : hasWarning ? '要確認' : '正常稼働';
+  document.title = hasWarning ? `【要確認】閻魔庁 運営台帳` : '閻魔庁 運営台帳';
+
+  const databaseStatus = system.database === 'ok'
+    ? ['ok', '正常', '管理DBへ接続済み']
+    : system.database === 'down'
+      ? ['down', '応答なし', system.databaseDetail || '監視情報を取得できません']
+      : ['warn', '確認中', '応答を待っています'];
+  const worldStatus = system.world.status === 'ok'
+    ? ['ok', '正常', system.world.detail || '共有魔物サーバー稼働中']
+    : system.world.status === 'down'
+      ? ['down', '応答なし', system.world.detail || '接続できません']
+      : ['warn', '確認中', '応答を待っています'];
+  const eventStatus = errors24h > 0
+    ? ['down', `${errors24h}件`, '24時間以内のエラー・重大']
+    : events1h > 0
+      ? ['warn', `${events1h}件`, '1時間以内の警告']
+      : ['ok', '異常なし', '直近1時間'];
+  $('systemHealth').innerHTML = [
+    ['魂籍・監視DB', ...databaseStatus],
+    ['共有魔物サーバー', ...worldStatus],
+    ['プレイ中の異常', ...eventStatus],
+  ].map(([label, className, value, detail]) =>
+    `<div class="system-card ${className}"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(detail)}</small></div>`
+  ).join('');
+
+  const alertClass = isDown ? 'down' : hasWarning ? 'warn' : '';
+  const alertText = isDown
+    ? '現在応答のないサービスがあります。下の状態と直近記録を確認してください。'
+    : hasWarning
+      ? '現在のサービスは応答していますが、直近に通信警告が記録されています。'
+      : '現在、検知している異常はありません。';
+  $('systemAlert').innerHTML = `<div class="system-alert ${alertClass}">${esc(alertText)}</div>`;
+  $('eventSummary').textContent = `1時間 ${events1h}件・24時間 ${events24h}件・影響 ${Number(summary.affectedUsers24h) || 0}人`;
+
+  $('systemEvents').innerHTML = system.events.length ? system.events.map(event => {
+    const detail = event.details && typeof event.details === 'object' ? event.details : {};
+    const parts = [sourceLabel(event.source), event.display_name || event.soul_code || '登録魂'];
+    if (detail.zone) parts.push(zoneName(detail.zone));
+    if (detail.closeCode) parts.push(`切断${detail.closeCode}`);
+    return `<div class="event ${esc(event.severity)}">
+      <span class="event-level">${esc(severityLabel(event.severity))}</span>
+      <div><b>${esc(event.message)}</b><small>${esc(parts.join('・'))} / ${esc(event.code)}</small></div>
+      <time>${esc(dateText(event.created_at))}</time></div>`;
+  }).join('') : '<div class="empty">直近30日間の異常記録はありません</div>';
+}
+
+async function checkWorldService() {
+  if (!config.worldServerUrl) throw new Error('共有サーバーURL未設定');
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5_000);
+  const startedAt = performance.now();
+  try {
+    const response = await fetch(`${config.worldServerUrl.replace(/\/$/, '')}/health?admin=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data?.ok !== true) throw new Error('正常応答ではありません');
+    return { status: 'ok', detail: `応答 ${Math.max(1, Math.round(performance.now() - startedAt))}ms` };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function loadSystemHealth() {
+  state.system.database = 'checking';
+  state.system.world = { status: 'checking', detail: '確認中' };
+  renderSystemHealth();
+  const [summaryResult, eventsResult, worldResult] = await Promise.allSettled([
+    state.client.rpc('admin_system_health', { p_hours: 24 }),
+    state.client.rpc('admin_list_system_events', { p_limit: 50 }),
+    checkWorldService(),
+  ]);
+  if (summaryResult.status === 'fulfilled' && !summaryResult.value.error
+    && eventsResult.status === 'fulfilled' && !eventsResult.value.error) {
+    state.system.database = 'ok';
+    state.system.databaseDetail = '';
+    state.system.summary = summaryResult.value.data || {};
+    state.system.events = eventsResult.value.data || [];
+  } else {
+    const error = summaryResult.status === 'rejected' ? summaryResult.reason
+      : summaryResult.value?.error || (eventsResult.status === 'rejected'
+        ? eventsResult.reason : eventsResult.value?.error);
+    state.system.database = 'down';
+    state.system.databaseDetail = error?.message || '監視情報を取得できません';
+  }
+  state.system.world = worldResult.status === 'fulfilled'
+    ? worldResult.value
+    : { status: 'down', detail: worldResult.reason?.message || '接続できません' };
+  renderSystemHealth();
 }
 
 async function connectPresence() {
@@ -244,7 +364,7 @@ async function invokeNewsletter(body) {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStats(), loadUsers($('userSearch').value.trim()), loadSettings(), loadCampaigns()]);
+  await Promise.all([loadStats(), loadUsers($('userSearch').value.trim()), loadSettings(), loadCampaigns(), loadSystemHealth()]);
   renderOnline();
 }
 
@@ -285,6 +405,7 @@ $('logoutBtn').addEventListener('click', () => void runBusy(async () => {
 }));
 
 $('refreshBtn').addEventListener('click', () => void runBusy(refreshAll));
+$('refreshSystemBtn').addEventListener('click', () => void runBusy(loadSystemHealth));
 $('userSearchForm').addEventListener('submit', event => {
   event.preventDefault();
   void runBusy(() => loadUsers($('userSearch').value.trim()));
@@ -356,7 +477,9 @@ async function initialize() {
     await runBusy(() => openAdmin(data.session), 'authFeedback');
   }
   window.setInterval(() => {
-    if (state.session && !document.hidden && !state.busy) void loadStats().catch(() => {});
+    if (state.session && !document.hidden && !state.busy) {
+      void Promise.allSettled([loadStats(), loadSystemHealth()]);
+    }
   }, 60_000);
 }
 

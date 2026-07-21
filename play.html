@@ -6338,7 +6338,6 @@ window.EnmaGameBridge={
     };
   },
   setSharedWorldConnection(status){
-    const wasConnected=sharedWorld.connected;
     const prevZone=sharedWorld.zone;
     sharedWorld.connected=Boolean(status?.connected);
     sharedWorld.zone=sharedWorld.connected&&SHARED_ZONES.has(status?.zone)?status.zone:'';
@@ -6348,10 +6347,6 @@ window.EnmaGameBridge={
         mob.serverMoving=false;
         if(!mob.dead){mob.state='idle';mob.path=[];}
       }
-    }
-    if(started&&wasConnected!==sharedWorld.connected){
-      if(sharedWorld.connected)log('この区域の魔物が現世同期された','sys');
-      else if(zone===prevZone)log('現世同期が途切れたため、魔物は端末内の動きに戻った','sys');
     }
   },
   setSharedMonsters(monsters,zoneName){
@@ -6678,6 +6673,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260721n"></script>
+<script type="module" src="online/account.js?v=20260721o"></script>
 </body>
 </html>

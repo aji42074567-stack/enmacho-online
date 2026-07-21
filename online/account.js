@@ -1,6 +1,6 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
 import { createPresenceController } from './presence.js?v=20260721n';
-import { createWorldController } from './world.js?v=20260721n';
+import { createWorldController } from './world.js?v=20260721o';
 import { createSocialController } from './social.js?v=20260721n';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
@@ -41,6 +41,37 @@ let accountLoadRevision = 0;
 let presenceController = null;
 let worldController = null;
 let socialController = null;
+const reportedSystemEvents = new Map();
+
+async function reportSystemEvent(detail = {}, retry = false) {
+  if (!state.client || !state.session?.user?.id) return;
+  const source = String(detail.source || 'client').toLowerCase().slice(0, 32);
+  const code = String(detail.code || 'unknown').toLowerCase().slice(0, 48);
+  const key = `${source}:${code}`;
+  const now = Date.now();
+  if (!retry) {
+    if (now - (reportedSystemEvents.get(key) || 0) < 60_000) return;
+    reportedSystemEvents.set(key, now);
+  }
+  const severity = ['info', 'warning', 'error', 'critical'].includes(detail.severity)
+    ? detail.severity : 'warning';
+  try {
+    const { error } = await state.client.rpc('report_client_event', {
+      p_source: source,
+      p_code: code,
+      p_severity: severity,
+      p_message: String(detail.message || code).slice(0, 160),
+      p_details: detail.details && typeof detail.details === 'object' ? detail.details : {},
+    });
+    if (error) throw error;
+  } catch {
+    if (!retry) window.setTimeout(() => void reportSystemEvent(detail, true), 10_000);
+  }
+}
+
+window.addEventListener('enma:system-event', event => {
+  void reportSystemEvent(event.detail || {});
+});
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
