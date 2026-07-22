@@ -486,7 +486,7 @@
     color:#3b2913;font-size:13px;font-weight:700;width:28px;height:28px;margin:3px;
     border-radius:50%;background:radial-gradient(circle at 35% 30%,#e4c36a,#8f6828 72%);
     border:2px ridge #c79a42;box-shadow:0 0 7px rgba(214,169,70,.3)}
-  .itemrow .gm-meishoku-reset-icon{display:grid;place-items:center;font-family:var(--serif);
+  .itemrow .gm-meishoku-reset-icon,.itemrow .gm-gender-change-icon{display:grid;place-items:center;font-family:var(--serif);
     color:#641a18;font-size:15px;font-weight:700;width:25px;height:31px;margin:1px 4px;
     background:linear-gradient(135deg,#f0dfb5,#c8a66b);border:1px solid #8f692d;
     box-shadow:inset 0 0 0 2px rgba(255,247,211,.32),0 0 7px rgba(201,162,74,.3);
@@ -3329,8 +3329,13 @@ const socialState={online:false,friends:[],incoming:[],outgoing:[],mail:[],error
 let socialComposeId='',socialBusy=false;
 const knownCloudRequests=new Set(),knownMailIds=new Set();
 let gmMeishokuResetCount=0,gmMeishokuResetBusy=false;
+let gmGenderChangeCount=0,gmGenderChangeBusy=false;
 document.addEventListener('enma:gm-meishoku-reset-count',event=>{
   gmMeishokuResetCount=Math.max(0,event.detail?.count|0);
+  if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+});
+document.addEventListener('enma:gm-gender-change-count',event=>{
+  gmGenderChangeCount=Math.max(0,event.detail?.count|0);
   if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
 });
 // 人型の周りの6ボックス位置(272x252の#doll内)
@@ -3417,6 +3422,13 @@ function renderItemTab(){
         <span class="fx">GM専用・現在の冥職を解除して選び直す</span></span>
       <button class="buyb" data-gm-meishoku-reset ${canReset?'':'disabled'}>${gmMeishokuResetBusy?'使用中…':player.meishoku?'使う':'転職後に使用'}</button></div>`;
   }
+  if(gmGenderChangeCount>0){
+    const nextGender=player.gender==='f'?'男性':'女性';
+    html+=`<div class="itemrow"><span class="icn gm-gender-change-icon" aria-hidden="true">姿</span>
+      <span class="nm">性別変更の札 ×${gmGenderChangeCount}
+        <span class="fx">GM専用・魂の姿を${nextGender}へ変更する</span></span>
+      <button class="buyb" data-gm-gender-change ${gmGenderChangeBusy?'disabled':''}>${gmGenderChangeBusy?'使用中…':'使う'}</button></div>`;
+  }
   if(player.dragonBlood>0){
     html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
@@ -3441,6 +3453,7 @@ function renderItemTab(){
     });
   }
   $('itemList').querySelector('[data-gm-meishoku-reset]')?.addEventListener('click',useGmMeishokuReset);
+  $('itemList').querySelector('[data-gm-gender-change]')?.addEventListener('click',useGmGenderChange);
 }
 async function useGmMeishokuReset(){
   const current=MEISHOKU[player.meishoku];
@@ -3462,6 +3475,30 @@ async function useGmMeishokuReset(){
     log(error?.message||'冥職やり直しの札を使えなかった','sys');
   }finally{
     gmMeishokuResetBusy=false;
+    if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+  }
+}
+async function useGmGenderChange(){
+  if(gmGenderChangeBusy)return;
+  if(!window.EnmaAccountBridge?.consumeGmGenderChange){
+    log('魂籍台帳に接続できないため、札を使えない','sys');return;
+  }
+  const nextGender=player.gender==='f'?'m':'f';
+  const currentLabel=player.gender==='f'?'女性':'男性';
+  const nextLabel=nextGender==='f'?'女性':'男性';
+  if(!confirm(`魂の姿を「${currentLabel}」から「${nextLabel}」へ変更しますか？\n性別変更の札を1個使います。`))return;
+  gmGenderChangeBusy=true;renderItemTab();
+  try{
+    gmGenderChangeCount=await window.EnmaAccountBridge.consumeGmGenderChange(nextGender);
+    player.gender=nextGender;
+    $('pickM').classList.toggle('on',nextGender==='m');
+    $('pickF').classList.toggle('on',nextGender==='f');
+    save();hud();renderEquip();
+    log(`性別変更の札を使い、魂の姿を「${nextLabel}」へ改めた`,'gain');
+  }catch(error){
+    log(error?.message||'性別変更の札を使えなかった','sys');
+  }finally{
+    gmGenderChangeBusy=false;
     if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
   }
 }
@@ -8659,6 +8696,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722l"></script>
+<script type="module" src="online/account.js?v=20260722m"></script>
 </body>
 </html>
