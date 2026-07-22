@@ -41,3 +41,9 @@
 - Cloudflare Pages予備URL: `https://enmacho-online.pages.dev/`
 
 秘密鍵やResend APIキーはリポジトリへ保存しない。`.env` がないことは、連携が未実装という意味ではない。秘密情報はSupabaseおよびCloudflare側のSecretsで管理する。
+
+## 画像素材の原本
+
+- `_wip_src/` はgitignore対象の素材置き場(このMacのローカルにのみ存在)。
+  第二章の職「羅刹」の男女一式 `rasetsu_*.png` が保管済み。
+  内訳と組込仕様は `docs/art-guide.md` の「羅刹(第二章の職)素材」の項を参照。
