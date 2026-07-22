@@ -61,6 +61,12 @@
   #quest .goal{font-family:var(--serif);font-size:12px;color:var(--parchment);letter-spacing:.08em}
   #quest .n{font-family:var(--sans);font-size:11px;color:var(--dim);margin-top:4px;
     font-variant-numeric:tabular-nums}
+  #worldClock{display:flex;justify-content:flex-end;gap:8px;margin-top:5px;
+    padding-top:5px;border-top:1px solid rgba(201,162,74,.18);
+    font:10px/1.2 var(--sans);letter-spacing:.08em;color:#b8ad95;
+    font-variant-numeric:tabular-nums}
+  #worldClock .phase{color:#f0d383}
+  #worldClock.night .phase{color:#a9c8ff}
   #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:var(--parchment);cursor:pointer;padding:0;line-height:1}
@@ -399,6 +405,19 @@
     border:1px solid #4a3b22;border-radius:3px;padding:8px 4px;background:#17120d}
   .chapter-note{font-family:var(--sans);font-size:10.5px;color:var(--dim);
     letter-spacing:.08em;margin-top:12px}
+  .meishoku-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:18px 0 12px}
+  .meishoku-card{min-height:74px;border:1px solid #4a3b22;border-radius:5px;
+    padding:10px 8px;background:linear-gradient(160deg,#251d12,#120f0b);cursor:pointer;
+    color:var(--parchment);font-family:var(--serif)}
+  .meishoku-card b{display:block;font-size:15px;letter-spacing:.16em;margin-bottom:5px}
+  .meishoku-card small{display:block;color:var(--dim);font:9.5px/1.5 var(--sans);letter-spacing:.04em}
+  .meishoku-card.on{border-color:#d0aa52;box-shadow:0 0 14px rgba(208,170,82,.18)}
+  .meishoku-card:disabled{opacity:.43;cursor:not-allowed}
+  .meishoku-detail{min-height:58px;text-align:left;border-top:1px solid #332817;
+    border-bottom:1px solid #332817;padding:11px 4px;color:#cfc2a0;
+    font:11px/1.75 var(--sans)}
+  .meishoku-current{color:#e8c86a;font-family:var(--serif);letter-spacing:.1em}
+  #meishokuConfirm:disabled{opacity:.45;cursor:not-allowed}
   .btn{margin-top:20px;font-family:var(--serif);font-size:15px;letter-spacing:.2em;
     color:var(--parchment);background:linear-gradient(180deg,#3d3220,#241c11);
     border:1px solid #6b5730;border-radius:4px;padding:12px 32px;cursor:pointer}
@@ -855,6 +874,7 @@
   <div id="quest">
     <div class="goal">賽の森のゴウリュウを鎮めよ</div>
     <div class="n">成仏させた魂 <span id="kills">0</span></div>
+    <div id="worldClock"><span class="phase" id="worldPhase">昼</span><span id="worldRemain">次刻まで —</span></div>
   </div>
 
   <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
@@ -1083,6 +1103,7 @@
       <h2 id="talkTitle">オキナ</h2>
       <div class="sub" id="talkSub">三途の川の番人</div>
       <div class="say" id="talkText"></div>
+      <button class="btn small hidden" id="talkAction">進む</button>
       <button class="btn small" id="talkClose">別れる</button>
     </div>
   </div>
@@ -1101,6 +1122,24 @@
       </div>
       <div class="chapter-note">— 第二章・転生編へ続く —</div>
       <button class="btn" id="chapterClose">賽の森に残る</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="meishokuSelect">
+    <div class="scroll">
+      <div class="chapter-kicker">第二章　転生編</div>
+      <h1>魂の役目</h1>
+      <div class="sub">MEISHOKU SELECTION</div>
+      <div class="say">輪廻へ進む魂は、四つの役目から己の道を定める。</div>
+      <div class="meishoku-grid" id="meishokuGrid">
+        <button class="meishoku-card" data-job="rasetsu"><b>羅刹</b><small>力と肉体を活かす近接戦闘</small></button>
+        <button class="meishoku-card" data-job="kagehoshi" disabled><b>影法師</b><small>速さ・会心・間合いを活かす遊撃　準備中</small></button>
+        <button class="meishoku-card" data-job="jugonshi" disabled><b>呪禁師</b><small>知力・術・状態異常を扱う制圧　準備中</small></button>
+        <button class="meishoku-card" data-job="gohousou" disabled><b>護法僧</b><small>防御・回復・支援を担う守護　準備中</small></button>
+      </div>
+      <div class="meishoku-detail" id="meishokuDetail">四つの印へ触れ、魂に刻む役目を選んでください。</div>
+      <button class="btn" id="meishokuConfirm" disabled>羅刹を魂に刻む</button>
+      <button class="linkbtn" id="meishokuClose">今は選ばない</button>
     </div>
   </div>
 
@@ -1249,6 +1288,10 @@ const COMBAT_HOLD_SECONDS=4;
 const MOB_RESPAWN_SECONDS=45;
 const BOSS_RESPAWN_SECONDS=120;
 const DRAKE_RESPAWN_SECONDS=30*60;
+const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
+const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
+const WORLD_TRANSITION_MS=10*60*1000;
+const JST_OFFSET_MS=9*60*60*1000;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -1291,6 +1334,24 @@ const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const rndi=(a,b)=>Math.floor(rnd(a,b+1));
+const posMod=(value,divisor)=>((value%divisor)+divisor)%divisor;
+function worldClockState(now=Date.now()){
+  // 日本時間の0・4・8・12・16・20時に周期をそろえ、全端末で同じ空を共有する。
+  const elapsed=posMod(now+JST_OFFSET_MS,WORLD_CYCLE_MS);
+  const day=elapsed<WORLD_DAY_MS;
+  let nightBlend=day?0:1,phase='昼';
+  if(elapsed<WORLD_TRANSITION_MS){
+    phase='朝';nightBlend=1-elapsed/WORLD_TRANSITION_MS;
+  }else if(elapsed>=WORLD_DAY_MS-WORLD_TRANSITION_MS&&day){
+    phase='夕';nightBlend=(elapsed-(WORLD_DAY_MS-WORLD_TRANSITION_MS))/WORLD_TRANSITION_MS;
+  }else if(!day)phase='夜';
+  const remaining=phase==='朝'?WORLD_TRANSITION_MS-elapsed
+    :phase==='昼'?WORLD_DAY_MS-WORLD_TRANSITION_MS-elapsed
+    :phase==='夕'?WORLD_DAY_MS-elapsed
+    :WORLD_CYCLE_MS-elapsed;
+  return{elapsed,day,phase,nightBlend:clamp(nightBlend,0,1),remaining};
+}
+const outdoorZone=z=>z==='field'||z==='rinne';
 
 /* ================= アイテム定義 ================= */
 const ITEMS={
@@ -1368,11 +1429,26 @@ const defaultQuickItems=tier=>[
 ];
 const HASTE_PRICE=300,CRIT_PRICE=300;
 
+/* ================= 冥職 ================= */
+const MEISHOKU={
+  rasetsu:{
+    name:'羅刹',role:'力と肉体を活かす近接戦闘',
+    hp:40,mp:0,atk:4,def:2,
+    detail:'最大HP+40、攻撃+4、防御+2。大太刀を振るい、敵の正面を力で押し切る近接冥職。',
+    starter:'bastard',
+  },
+  kagehoshi:{name:'影法師',role:'速さ・会心・間合いを活かす遊撃',hp:0,mp:0,atk:0,def:0},
+  jugonshi:{name:'呪禁師',role:'知力・術・状態異常を扱う制圧',hp:0,mp:0,atk:0,def:0},
+  gohousou:{name:'護法僧',role:'防御・回復・支援を担う守護',hp:0,mp:0,atk:0,def:0},
+};
+const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
+const rasetsuAvailable=gender=>gender==='m'||gender==='f';
+
 /* ================= マップ生成 ================= */
 let blocked=new Uint8Array(MAP*MAP);
 let tileKind=new Uint8Array(MAP*MAP);   // 0草 1道 2石畳 3砂浜 4海 5洞窟床
 let zone='field',FIELD=null,CAVE=null,CAVE2=null,CAVE3=null;
-let ENMA1=null,ENMA2=null,ENMA3=null;
+let ENMA1=null,ENMA2=null,ENMA3=null,RINNE=null;
 const CAVE_DOOR={x:50.5,y:21.8};   // 試練の洞窟の入口(フィールド東)
 const CAVE_TRIG={x:49.2,y:23.2};   // ここに触れると洞窟へ
 // 階層間の階段(from階のat地点に触れるとto階のentryへ)
@@ -1420,7 +1496,18 @@ const ENMA_LINKS=[
   {from:'enma2',at:{x:23,y:20},   to:'enma3',entry:{x:39,y:41},label:'三階へ',tone:'up'},
   {from:'enma3',at:{x:40,y:43},   to:'enma2',entry:{x:22,y:21},label:'二階へ',tone:'down'},
 ];
-const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
+const RINNE_ENTRY={x:49,y:49};
+const RINNE_EXIT={x:53,y:53};
+const MEISHOKU_SEALS=[
+  {x:37,y:45,job:'rasetsu', label:'羅刹'},
+  {x:45,y:37,job:'kagehoshi',label:'影法師'},
+  {x:43,y:49,job:'jugonshi', label:'呪禁師'},
+  {x:49,y:43,job:'gohousou', label:'護法僧'},
+];
+const RINNE_LINKS=[
+  {from:'rinne',at:RINNE_EXIT,to:'field',entry:()=>ferryDockPoint(),label:'渡し船へ',tone:'exit'},
+];
+const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS,RINNE_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
@@ -1864,6 +1951,7 @@ const player={
     oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false,
     oniVideoIntroSeen:false,gashaoVideoIntroSeen:false,dragonVideoIntroSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
+  meishoku:'',meishokuLv:0,                 // 第二章で魂に刻む役目
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
   partySupportT:0,                          // 回向支援の余韻(この間はチーム討伐の徳が全額入る)
@@ -1887,7 +1975,7 @@ const player={
 const remotePlayers=new Map();
 const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
 const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5','muen1','muen2','muen3']);
-const worldByZone=z=>({field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
+const worldByZone=z=>({field:FIELD,rinne:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
   ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]
   :z&&z.startsWith('muen')?MUENW[+z.slice(4)-1]:null));
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
@@ -1896,14 +1984,16 @@ const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
 const eqSum=f=>SLOTS.reduce((s,[k])=>{const it=ITEMS[player.eq[k]];return s+(it&&it[f]||0);},0);
 const weaponPlus=id=>player.plus[id]||0;
-const atkTotal=()=>6+ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)+(player.foodAtkT>0?4:0);
+const atkTotal=()=>6+ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.weapon)
+  +(meishokuDef(player)?.atk||0)+(player.foodAtkT>0?4:0);
 const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'');};
 /* ---- 装備強化(鍛冶屋カナヤマ・巻物式) ---- */
 const ENH_MAX=9;
 const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
 const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の血が必要
 const SCROLL_DROP_RATE=0.07;   // 中ボス・竜からの強化巻物ドロップ率
-const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/4)+(player.foodDefT>0?4:0);
+const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/4)
+  +(meishokuDef(player)?.def||0)+(player.foodDefT>0?4:0);
 const critRate=()=>Math.min(0.75,Math.min(0.5,0.1+0.01*ST().agi)+(player.critT>0?0.25:0));
 const dodgeRate=()=>Math.min(0.3,0.005*ST().agi);
 const mpRegenMul=()=>Math.min(2,1+0.02*ST().int);
@@ -1912,8 +2002,9 @@ const dropChance=base=>base>=1?1:Math.min(0.75,base*dropMul());
 const speedNow=()=>player.speed*(player.hasteT>0?1.3:1);
 const sharedWorldActive=()=>sharedWorld.connected&&sharedWorld.zone===zone;
 function recalcMax(){
-  player.maxHp=80+12*(player.lv-1)+10*ST().con+eqSum('hpb');
-  player.maxMp=30+6*(player.lv-1)+8*ST().int+eqSum('mpb');
+  const job=meishokuDef(player);
+  player.maxHp=80+12*(player.lv-1)+10*ST().con+eqSum('hpb')+(job?.hp||0);
+  player.maxMp=30+6*(player.lv-1)+8*ST().int+eqSum('mpb')+(job?.mp||0);
   player.hp=Math.min(player.hp,player.maxHp);
   player.mp=Math.min(player.mp,player.maxMp);
 }
@@ -1924,7 +2015,7 @@ function save(){
   try{
     const savedAt=Date.now();
     const serialized=JSON.stringify({
-      v:10,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:11,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
@@ -1936,6 +2027,7 @@ function save(){
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
+      meishoku:player.meishoku,meishokuLv:player.meishokuLv,
       friends:player.friends,giftsUsed:player.giftsUsed,settings
     });
     localStorage.setItem(SAVE_KEY,serialized);
@@ -1947,7 +2039,7 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>10)return false;
+    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>11)return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -2021,6 +2113,8 @@ function load(){
     }
     if(questIsActive('q_tokkuri'))player.qb.active.q_tokkuri=player.story.kazuStage;
     player.ferrymanCoin=!!d.ferrymanCoin||!!player.qb.done.q_tokkuri;
+    player.meishoku=d.v>=11&&MEISHOKU[d.meishoku]?d.meishoku:'';
+    player.meishokuLv=player.meishoku?Math.max(1,d.meishokuLv|0):0;
     player.friends=Array.isArray(d.friends)
       ?d.friends.filter(f=>f&&typeof f.id==='string'&&f.id)
         .map(f=>({id:f.id,name:String(f.name||'ナナシ').slice(0,16),
@@ -3566,7 +3660,13 @@ for(const b of document.querySelectorAll('.mtab')){
     if(menuTab==='social')window.EnmaSocialClient?.refresh?.().catch(()=>{});
   });
 }
-let okamiIdx=0,guestIdx=0,pendingChapterEnd=false;
+let okamiIdx=0,guestIdx=0,pendingChapterEnd=false,talkActionFn=null,selectedMeishoku='';
+function setTalkAction(label='',action=null){
+  talkActionFn=typeof action==='function'?action:null;
+  const button=$('talkAction');
+  button.textContent=label||'進む';
+  button.classList.toggle('hidden',!talkActionFn);
+}
 function setTalkPortrait(kind){
   const key=NPC_SPRITE[kind]||kind;   // 個別画像を持つ庁内の魂は画像キーを直接渡せる
   const p=$('talkPortrait');
@@ -3607,6 +3707,7 @@ function showChapterEnd(){
   $('chapterEnd').classList.remove('hidden');
 }
 function openFerry(){
+  setTalkAction();
   setTalkPortrait(null);
   $('talkTitle').textContent='渡し船';
   $('talkSub').textContent='第二審査区行き';
@@ -3614,15 +3715,22 @@ function openFerry(){
     $('talkText').textContent='船頭は静かに首を横へ振った。\n\n「渡し守の六文銭がなければ、この船には乗せられぬ。あれは金ではなく、次の審査区へ渡る資格の証。千本亭のカズーに因果話の続きを聞いてこい」';
     log('渡し船に乗るには、カズーから託される「渡し守の六文銭」が必要だ','sys');
   }else{
-    $('talkText').textContent='船頭は差し出された六文銭を確かめ、深くうなずいた。\n\n「渡し守の六文銭、確かに。次の審査区へ渡る資格を認めよう。これは通行の証ゆえ、船賃として取り上げはせぬ。出航の刻を待て」';
+    $('talkText').textContent='船頭は差し出された六文銭を確かめ、深くうなずいた。\n\n「渡し守の六文銭、確かに。次の審査区へ渡る資格を認めよう。これは通行の証ゆえ、船賃として取り上げはせぬ。海の向こう、輪廻の都へ出航するか」';
     log('渡し守の六文銭を示し、第二審査区への乗船資格が認められた','gain');
-    // 第二章実装時は、六文銭を消費せず、ここから新たな島へ遷移する。
+    setTalkAction('輪廻の都へ出航',()=>{
+      $('talk').classList.add('hidden');
+      setTalkAction();
+      switchZone('rinne',RINNE_ENTRY.x,RINNE_ENTRY.y);
+      banner={txt:'第二章　輪廻の都',age:0};
+    });
   }
   $('talk').classList.remove('hidden');
   sfx.click();
 }
 function openNpc(npc){
+  setTalkAction();
   if(npc.kind==='ferry'){openFerry();return;}
+  if(npc.kind==='jobseal'){openMeishokuSelect(npc.job);return;}
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
   else if(npc.kind==='smith'){
     if(!player.smithIntro){
@@ -3688,6 +3796,53 @@ function openNpc(npc){
   }
   sfx.click();
 }
+function renderMeishokuSelect(){
+  const current=MEISHOKU[player.meishoku];
+  for(const card of document.querySelectorAll('.meishoku-card')){
+    const job=card.dataset.job;
+    card.classList.toggle('on',job===(player.meishoku||selectedMeishoku));
+    if(job==='rasetsu')card.disabled=Boolean(player.meishoku)||!rasetsuAvailable(player.gender);
+  }
+  const confirm=$('meishokuConfirm');
+  if(current){
+    $('meishokuDetail').innerHTML=`<span class="meishoku-current">現在の冥職：${current.name}</span><br>${current.detail||current.role}`;
+    confirm.disabled=true;confirm.textContent=`${current.name}を魂に刻印済み`;
+    return;
+  }
+  if(!rasetsuAvailable(player.gender)){
+    $('meishokuDetail').textContent='この魂の姿に対応する羅刹の冥装は準備中です。素材が整うまで、魂への刻印は保留されます。';
+    confirm.disabled=true;confirm.textContent='この姿の羅刹は準備中';
+    return;
+  }
+  const selected=MEISHOKU[selectedMeishoku];
+  $('meishokuDetail').textContent=selected?.detail||'四つの印へ触れ、魂に刻む役目を選んでください。';
+  confirm.disabled=selectedMeishoku!=='rasetsu';
+  confirm.textContent=selectedMeishoku==='rasetsu'?'羅刹を魂に刻む':'冥職を選ぶ';
+}
+function openMeishokuSelect(preferred=''){
+  selectedMeishoku=MEISHOKU[preferred]?preferred:'';
+  renderMeishokuSelect();
+  $('meishokuSelect').classList.remove('hidden');
+  sfx.click();
+}
+for(const card of document.querySelectorAll('.meishoku-card'))card.addEventListener('click',()=>{
+  if(card.disabled||player.meishoku)return;
+  selectedMeishoku=card.dataset.job;
+  renderMeishokuSelect();
+});
+$('meishokuConfirm').addEventListener('click',()=>{
+  if(player.meishoku||selectedMeishoku!=='rasetsu'||!rasetsuAvailable(player.gender))return;
+  const job=MEISHOKU.rasetsu;
+  player.meishoku='rasetsu';player.meishokuLv=1;
+  if(!player.items.includes(job.starter))player.items.push(job.starter);
+  player.eq.weapon=job.starter;
+  recalcMax();player.hp=player.maxHp;player.mp=player.maxMp;
+  save();hud();
+  $('meishokuSelect').classList.add('hidden');
+  banner={txt:'冥職　羅刹',age:0};
+  log('魂に冥職「羅刹」が刻まれ、大太刀を授かった','gain');
+});
+$('meishokuClose').addEventListener('click',()=>$('meishokuSelect').classList.add('hidden'));
 $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
 $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
@@ -3697,8 +3852,10 @@ $('reposeClose').addEventListener('click',()=>$('repose').classList.add('hidden'
 $('kesshaClose').addEventListener('click',()=>$('kessha').classList.add('hidden'));
 $('talkClose').addEventListener('click',()=>{
   $('talk').classList.add('hidden');
+  setTalkAction();
   if(pendingChapterEnd)showChapterEnd();
 });
+$('talkAction').addEventListener('click',()=>talkActionFn?.());
 $('chapterClose').addEventListener('click',()=>$('chapterEnd').classList.add('hidden'));
 $('equipClose').addEventListener('click',()=>$('equip').classList.add('hidden'));
 function toggleEquip(){
@@ -3924,11 +4081,13 @@ function update(dt){
       for(const L of ZONE_LINKS){
         if(zone===L.from&&dist(player,L.at)<0.9){
           if(L.to==='dg1'&&!canEnterDragonCave()){blockDragonGate();break;}
-          switchZone(L.to,L.entry.x,L.entry.y);break;
+          const entry=typeof L.entry==='function'?L.entry():L.entry;
+          if(entry)switchZone(L.to,entry.x,entry.y);
+          break;
         }
       }
     }
-    const inVillage=zone==='field'&&dist(player,SPAWN)<6.5;
+    const inVillage=(zone==='field'&&dist(player,SPAWN)<6.5)||zone==='rinne';
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2)*mpRegenMul());
     if(inVillage||!player.moving)
       player.hp=Math.min(player.maxHp,player.hp+dt*(inVillage?6:1.5));
@@ -4064,6 +4223,7 @@ function scheduleActiveGroundRender(){
     groundRenderQueued=false;
     if(zone==='field')renderGround();
     else if(zone.startsWith('enma'))renderGroundEnma();
+    else if(zone==='rinne')renderGroundRinne();
     else renderGroundCave();
   });
 }
@@ -4410,6 +4570,34 @@ function renderGroundEnma(world){
   }
   tgt._groundReady=true;
 }
+function renderGroundRinne(world){
+  const tgt=world?world.ground:ground;
+  const W2=world||RINNE;
+  if(!W2)return;
+  const prepared=prepareGroundCanvas(tgt);
+  const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
+  const GX=(x,y)=>(x-y)*TW/2+gW/2;
+  const GY=(x,y)=>(x+y)*TH/2+TH/2;
+  g.fillStyle='#b9dce4';g.fillRect(0,0,gW,gH);
+  const img=SPRITES.map_rinne_hub_day;
+  if(img){
+    const w=1800,h=w*img.height/img.width;
+    const bottom=GY(64,64)-10;
+    g.drawImage(img,GX(36,36)-w/2,bottom-h,w,h);
+  }else{
+    const dia=(x,y)=>{
+      const cx=GX(x,y),cy=GY(x,y);
+      g.beginPath();g.moveTo(cx,cy-TH/2-1);g.lineTo(cx+TW/2+1,cy);
+      g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1,cy);g.closePath();
+    };
+    for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+      if(W2.blocked[y*MAP+x])continue;
+      g.fillStyle=((x+y)&1)?'#d7d0b9':'#e7dfc8';dia(x,y);g.fill();
+      g.strokeStyle='rgba(120,96,52,.16)';g.lineWidth=1;dia(x,y);g.stroke();
+    }
+  }
+  tgt._groundReady=true;
+}
 function buildCave(){
   blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
   tileKind=new Uint8Array(MAP*MAP);
@@ -4505,6 +4693,24 @@ function buildEnmaHall(){
     floors.push({blocked,tileKind,props,npcs,mobs,ground,zone:zn,artKey:`map_enmacho_${floor}f`});
   }
   [ENMA1,ENMA2,ENMA3]=floors;
+}
+function buildRinneHub(){
+  blocked=new Uint8Array(MAP*MAP);blocked.fill(1);
+  tileKind=new Uint8Array(MAP*MAP);
+  props=[];npcs=[];mobs=[];
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){
+    const depth=x+y,side=Math.abs(x-y);
+    const mainApproach=depth>=44&&depth<=108&&side<=5;
+    const upperCourt=depth>=56&&depth<72&&side<=9;
+    const grandCourt=depth>=68&&depth<=100&&side<=15;
+    if(mainApproach||upperCourt||grandCourt){
+      blocked[y*MAP+x]=0;tileKind[y*MAP+x]=7;
+    }
+  }
+  props.push({x:RINNE_EXIT.x,y:RINNE_EXIT.y,kind:'hallportal',label:'渡し船へ',tone:'exit'});
+  for(const seal of MEISHOKU_SEALS)props.push({...seal,kind:'jobseal'});
+  ground=document.createElement('canvas');
+  RINNE={blocked,tileKind,props,npcs,mobs,ground,zone:'rinne',artKey:'map_rinne_hub_day'};
 }
 /* ---- 竜の洞窟(地下5階) ---- */
 let DGW=[];   // dg1〜dg5 のワールド
@@ -4719,7 +4925,7 @@ function switchZone(z,px,py){
   const previousGround=ground;
   zone=z;
   const W2={
-    field:FIELD,cave:CAVE,cave2:CAVE2,cave3:CAVE3,
+    field:FIELD,rinne:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3,
     enma1:ENMA1,enma2:ENMA2,enma3:ENMA3,
   }[z]||(z.startsWith('muen')?MUENW[+z.slice(4)-1]:DGW[+z.slice(2)-1]);
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
@@ -4729,6 +4935,7 @@ function switchZone(z,px,py){
   if(started&&!ground._groundReady){
     if(zone==='field')renderGround();
     else if(zone.startsWith('enma'))renderGroundEnma();
+    else if(zone==='rinne')renderGroundRinne();
     else renderGroundCave();
   }
   corpses.length=0;bolts.length=0;actionFx.length=0;
@@ -4751,6 +4958,7 @@ function switchZone(z,px,py){
   }
   const ZMSG={
     field:'賽の森へ戻ってきた',
+    rinne:'第二審査区・輪廻の都へ到着した',
     cave:'試練の洞窟に足を踏み入れた…',
     cave2:'地下二層へ降りた。空気が冷たく、重い…',
     cave3:'地下三層——最深部。奥で何かが待っている…',
@@ -4787,15 +4995,18 @@ function startOneSprite(key,src,attempt=0){
     if(SPRITE_PENDING.get(key)!==img)return;
     SPRITE_PENDING.delete(key);
     SPRITES[key]=img;
-    const W2={map_enmacho_1f:ENMA1,map_enmacho_2f:ENMA2,map_enmacho_3f:ENMA3}[key];
+    const W2={map_enmacho_1f:ENMA1,map_enmacho_2f:ENMA2,map_enmacho_3f:ENMA3,
+      map_rinne_hub_day:RINNE}[key];
     if(W2){
       W2.ground._groundReady=false;
-      if(started&&ground===W2.ground)renderGroundEnma(W2);
+      if(started&&ground===W2.ground){
+        if(W2===RINNE)renderGroundRinne(W2);else renderGroundEnma(W2);
+      }
     }
   };
   img.onerror=()=>{
     if(SPRITE_PENDING.get(key)!==img)return;
-    if(key.startsWith('map_enmacho_')&&attempt<2){
+    if((key.startsWith('map_enmacho_')||key==='map_rinne_hub_day')&&attempt<2){
       setTimeout(()=>startOneSprite(key,src,attempt+1),500*(attempt+1));
     }else SPRITE_PENDING.delete(key);
   };
@@ -4822,6 +5033,16 @@ loadSprite('player_f_hit','assets/char_player_f_hit.png');
 loadSprite('player_f_death','assets/char_player_f_death.png');
 loadSprite('player_f_walk','assets/char_player_f_walk.png');
 loadSprite('player_f_attack','assets/char_player_f_attack.png');
+loadSprite('player_rasetsu_m','assets/char_rasetsu_m.png');
+loadSprite('player_rasetsu_m_walk','assets/char_rasetsu_m_walk.png');
+loadSprite('player_rasetsu_m_attack','assets/char_rasetsu_m_attack.png');
+loadSprite('player_rasetsu_m_hit','assets/char_rasetsu_m_hit.png');
+loadSprite('player_rasetsu_m_death','assets/char_rasetsu_m_death.png');
+loadSprite('player_rasetsu_f','assets/char_rasetsu_f.png');
+loadSprite('player_rasetsu_f_walk','assets/char_rasetsu_f_walk.png');
+loadSprite('player_rasetsu_f_attack','assets/char_rasetsu_f_attack.png');
+loadSprite('player_rasetsu_f_hit','assets/char_rasetsu_f_hit.png');
+loadSprite('player_rasetsu_f_death','assets/char_rasetsu_f_death.png');
 loadSprite('mob_goblin','assets/mob_goblin.png');
 loadSprite('mob_goblin_red','assets/mob_goblin_red.png');
 loadSprite('mob_goblin_attack','assets/mob_goblin_attack.png');
@@ -4865,6 +5086,7 @@ loadSprite('map_enmacho_hall','assets/map_enmacho_hall.png');
 loadSprite('map_enmacho_1f',MOBILE_RENDER?'assets/map_enmacho_1f_mobile.jpg':'assets/map_enmacho_1f.jpg');
 loadSprite('map_enmacho_2f',MOBILE_RENDER?'assets/map_enmacho_2f_mobile.jpg':'assets/map_enmacho_2f.jpg');
 loadSprite('map_enmacho_3f',MOBILE_RENDER?'assets/map_enmacho_3f_mobile.jpg':'assets/map_enmacho_3f.jpg');
+loadSprite('map_rinne_hub_day','assets/map_rinne_hub_day.jpg');
 loadSprite('npc_enma','assets/npc_enma.png');
 loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
 loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
@@ -5006,13 +5228,16 @@ function drawSwordSlashTrail(e,t){
 }
 function drawPlayer(sx,sy,e){
   const g=e.gender||'m';
-  const base=SPRITES['player_'+g]||SPRITES.player_m;
-  const walkS=SPRITES['player_'+g+'_walk'];   // 性別専用(無ければ立ち絵で代用)
-  const atkS=SPRITES['player_'+g+'_attack'];
-  const hitS=SPRITES['player_'+g+'_hit'];
+  const jobSpriteId=e.meishoku==='rasetsu'?`rasetsu_${g}`:'';
+  const spriteId=jobSpriteId&&SPRITES['player_'+jobSpriteId]?jobSpriteId:g;
+  const bundledWeapon=spriteId.startsWith('rasetsu_');
+  const base=SPRITES['player_'+spriteId]||SPRITES['player_'+g]||SPRITES.player_m;
+  const walkS=SPRITES['player_'+spriteId+'_walk']||SPRITES['player_'+g+'_walk'];
+  const atkS=SPRITES['player_'+spriteId+'_attack']||SPRITES['player_'+g+'_attack'];
+  const hitS=SPRITES['player_'+spriteId+'_hit']||SPRITES['player_'+g+'_hit'];
   if(!base&&!walkS){drawKnight(sx,sy,e);return;}
   drawShadow(sx,sy+2,10);
-  const F=128,D=48,k=D/F;
+  const F=128,D=bundledWeapon?56:48,k=D/F;
   const row=DIR_FRAME[e.dir]||0;
   ctx.save();ctx.translate(sx,sy);
   if(e.attackDur>0&&atkS){
@@ -5034,7 +5259,7 @@ function drawPlayer(sx,sy,e){
     // 歩行: 実際に進んだ距離(walkT)に同期してコマ送り(足滑り防止)
     const fr=Math.floor((e.walkT||0)*2.6)%4;
     ctx.drawImage(walkS,fr*F,row*F,F,F,-D/2,-D+3,D,D);
-    drawHeldWeapon(e,fr);
+    if(!bundledWeapon)drawHeldWeapon(e,fr);
   }else{
     const swingMax=e.swingMax||0.25;
     const t2=e.swing>0?clamp(1-e.swing/swingMax,0,1):-1;   // 印・道具を使う身振り
@@ -5045,7 +5270,7 @@ function drawPlayer(sx,sy,e){
     }
     if(base)ctx.drawImage(base,row*F,0,F,F,-D/2,-D+3,D,D);
     else ctx.drawImage(walkS,F,row*F,F,F,-D/2,-D+3,D,D);
-    drawHeldWeapon(e,1);
+    if(!bundledWeapon)drawHeldWeapon(e,1);
   }
   ctx.restore();
 }
@@ -5177,9 +5402,13 @@ function drawActionEffect(fx){
   ctx.restore();
 }
 function drawPlayerCorpse(sx,sy,e){
-  const img=SPRITES['player_'+(e.gender||'m')+'_death'];
+  const g=e.gender||'m';
+  const jobSpriteId=e.meishoku==='rasetsu'?`rasetsu_${g}`:'';
+  const spriteId=jobSpriteId&&SPRITES['player_'+jobSpriteId+'_death']?jobSpriteId:g;
+  const img=SPRITES['player_'+spriteId+'_death']||SPRITES['player_'+g+'_death'];
   drawShadow(sx,sy+2,12);
-  if(img)ctx.drawImage(img,0,0,128,128,sx-24,sy-45,48,48);
+  const D=spriteId.startsWith('rasetsu_')?56:48;
+  if(img)ctx.drawImage(img,0,0,128,128,sx-D/2,sy-D+3,D,D);
 }
 function drawPlayerMobileHud(sx,sy){
   if(W>640||!started||player.dead)return;
@@ -5815,6 +6044,26 @@ function drawHallPortal(sx,sy,p){
   ctx.fillText(p.label||'',0,21);
   ctx.restore();
 }
+function drawJobSeal(sx,sy,p){
+  const palette={rasetsu:'214,74,52',kagehoshi:'136,99,190',jugonshi:'78,142,196',gohousou:'205,165,72'};
+  const rgb=palette[p.job]||'205,165,72';
+  const active=player.meishoku===p.job;
+  const pulse=0.55+Math.sin(time*2.2+p.x)*0.22;
+  ctx.save();ctx.translate(sx,sy);
+  const glow=ctx.createRadialGradient(0,-2,0,0,-2,active?48:38);
+  glow.addColorStop(0,`rgba(${rgb},${active?0.34:0.16+pulse*0.08})`);
+  glow.addColorStop(1,`rgba(${rgb},0)`);
+  ctx.fillStyle=glow;ctx.fillRect(-52,-42,104,78);
+  ctx.fillStyle=`rgba(${rgb},${active?0.26:0.12})`;
+  ctx.strokeStyle=`rgba(${rgb},${active?0.95:0.58+pulse*0.2})`;ctx.lineWidth=active?2.2:1.4;
+  ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(22,0);ctx.lineTo(0,13);ctx.lineTo(-22,0);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle=active?'#fff4cf':`rgba(${rgb},0.98)`;
+  ctx.font='bold 11px "Yu Mincho",serif';ctx.textAlign='center';
+  ctx.strokeStyle='rgba(12,10,14,.82)';ctx.lineWidth=3;
+  ctx.strokeText(p.label,0,30);
+  ctx.fillText(p.label,0,30);
+  ctx.restore();
+}
 function fencePost(px,py,s){
   ctx.fillStyle='#4a3a26';
   ctx.fillRect(px-2.5*s,py-24*s,5*s,24*s);
@@ -6109,6 +6358,7 @@ function render(){
       case 'stairdown':drawStairs(sx,sy,true);break;
       case 'stairup':drawStairs(sx,sy,false);break;
       case 'hallportal':drawHallPortal(sx,sy,it.o);break;
+      case 'jobseal':drawJobSeal(sx,sy,it.o);break;
       case 'stone':drawStone(sx,sy);break;
       case 'enmacho':drawEnmachoHall(sx,sy,it.o);break;
       case 'house':case 'shop':case 'smithy':case 'tavern':drawHouse(sx,sy,it.o);break;
@@ -6216,13 +6466,42 @@ function render(){
     ctx.beginPath();ctx.arc(sx,sy,2.2,0,6.29);ctx.fill();
   }
   ctx.restore();
+  if(outdoorZone(zone)){
+    const sky=worldClockState();
+    if(sky.phase==='夕'){
+      const dusk=ctx.createLinearGradient(0,0,0,H);
+      dusk.addColorStop(0,`rgba(161,76,47,${0.16*sky.nightBlend})`);
+      dusk.addColorStop(1,'rgba(84,45,84,0)');
+      ctx.fillStyle=dusk;ctx.fillRect(0,0,W,H);
+    }
+    if(sky.nightBlend>0.01){
+      ctx.fillStyle=`rgba(10,18,50,${sky.nightBlend*(zone==='rinne'?0.40:0.30)})`;
+      ctx.fillRect(0,0,W,H);
+      const moon=ctx.createRadialGradient(W*.78,H*.08,0,W*.78,H*.08,Math.max(W,H)*.72);
+      moon.addColorStop(0,`rgba(126,166,220,${0.10*sky.nightBlend})`);
+      moon.addColorStop(1,'rgba(42,58,104,0)');
+      ctx.fillStyle=moon;ctx.fillRect(0,0,W,H);
+    }
+    if(zone==='rinne'&&sky.nightBlend>0.02){
+      ctx.save();ctx.globalCompositeOperation='screen';
+      for(const [lx,ly] of [[48,48],[44,44],[40,40],[36,36],[32,32],[28,28]]){
+        const sx=SX(lx,ly),sy=SY(lx,ly)-10;
+        const lamp=ctx.createRadialGradient(sx,sy,0,sx,sy,42);
+        lamp.addColorStop(0,`rgba(255,224,146,${0.46*sky.nightBlend})`);
+        lamp.addColorStop(0.34,`rgba(255,174,72,${0.22*sky.nightBlend})`);
+        lamp.addColorStop(1,'rgba(255,140,40,0)');
+        ctx.fillStyle=lamp;ctx.fillRect(sx-46,sy-46,92,92);
+      }
+      ctx.restore();
+    }
+  }
   // 漂う霧
   for(let i=0;i<3;i++){
     const fx=W*0.5+Math.sin(time*0.05+i*2.1)*W*0.42;
     const fy=H*0.5+Math.cos(time*0.037+i*1.7)*H*0.36;
     const fr=Math.max(W,H)*0.38;
     const fg=ctx.createRadialGradient(fx,fy,0,fx,fy,fr);
-    fg.addColorStop(0,'rgba(150,175,195,0.075)');
+    fg.addColorStop(0,zone==='rinne'?'rgba(190,210,220,0.025)':'rgba(150,175,195,0.075)');
     fg.addColorStop(1,'rgba(150,175,195,0)');
     ctx.fillStyle=fg;ctx.fillRect(fx-fr,fy-fr,fr*2,fr*2);
   }
@@ -6237,7 +6516,8 @@ function render(){
     ctx.globalAlpha=1;
   }
   const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.max(W,H)*0.75);
-  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(4,6,12,0.55)');
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,zone==='rinne'?'rgba(20,24,32,0.28)':'rgba(4,6,12,0.55)');
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   if(CAVE_DEPTH[zone]){  // 洞窟はさらに暗く(深いほど濃く)
     const cv=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.22,W/2,H/2,Math.max(W,H)*0.7);
@@ -6269,6 +6549,12 @@ function hud(){
   el.atkv.textContent=atkTotal();
   el.defv.textContent=defTotal();
   el.kills.textContent=kills;
+  const clock=worldClockState();
+  const remainingMinutes=Math.max(0,Math.ceil(clock.remaining/60000));
+  const hours=Math.floor(remainingMinutes/60),minutes=remainingMinutes%60;
+  $('worldPhase').textContent=`${clock.day?'☀':'☾'} ${clock.phase}`;
+  $('worldRemain').textContent=`次刻まで ${hours}:${String(minutes).padStart(2,'0')}`;
+  $('worldClock').classList.toggle('night',!clock.day);
   el.xp.style.width=(player.xp/xpNext(player.lv)*100)+'%';
   el.hp.style.width=(player.hp/player.maxHp*100)+'%';
   el.mp.style.width=(player.mp/player.maxMp*100)+'%';
@@ -6290,7 +6576,9 @@ function hud(){
     const progress=q.n>1?`${q.name} ${questProg(q.id)}/${q.n}`:q.name;
     el.goal.textContent=tracking.length>1?`受注中${tracking.length}件｜${progress}`:progress;
   }else{
-    el.goal.textContent=player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
+    el.goal.textContent=zone==='rinne'
+      ?player.meishoku?`冥職「${MEISHOKU[player.meishoku]?.name||'—'}」として第二審査へ`:'広場の四つの印から冥職を選ぼう'
+      :player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
       :player.story.dragonCleared?'クエストを受け、カズーの因果話を聞こう'
       :player.quests.trial===0?'まずはオキナの話を聞こう'
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
@@ -6378,6 +6666,21 @@ canvas.addEventListener('pointerdown',ev=>{
         player.talkTarget=target;player.target=null;
         player.path=findPath(player.x,player.y,dock.x,dock.y);
         log('桟橋の先の渡し船へ向かう…','sys');
+      }
+      return;
+    }
+  }
+  // 輪廻の都の四冥職印。遠ければ印の前まで歩いてから選択画面を開く。
+  if(zone==='rinne')for(const seal of props){
+    if(seal.kind!=='jobseal')continue;
+    const nx=isoX(seal.x,seal.y)-camX+W/2;
+    const ny=isoY(seal.x,seal.y)-camY+H/2-10;
+    if(Math.hypot(nx-sx,ny-sy)<46){
+      if(dist(player,seal)<2.6)openNpc(seal);
+      else{
+        player.talkTarget=seal;player.target=null;
+        player.path=findPath(player.x,player.y,seal.x,seal.y);
+        log(`${seal.label}の印へ向かう…`,'sys');
       }
       return;
     }
@@ -6702,7 +7005,7 @@ let activeInvite=null,inviteTimer=0;
 const genPartyId=()=>globalThis.crypto?.randomUUID
   ?crypto.randomUUID()
   :`${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,10)}`;
-const ZONE_LABELS={field:'賽の森',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
+const ZONE_LABELS={field:'賽の森',rinne:'輪廻の都',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
   dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5',
   muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3'};
 const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
@@ -7185,6 +7488,7 @@ $('startBtn').addEventListener('click',()=>{
   if(!ground._groundReady){
     if(zone==='field')renderGround();
     else if(zone.startsWith('enma'))renderGroundEnma();
+    else if(zone==='rinne')renderGroundRinne();
     else renderGroundCave();
   }
   audio();startBgm();
@@ -7278,6 +7582,7 @@ buildCave();
 buildCave2();
 buildCave3();
 buildEnmaHall();
+buildRinneHub();
 buildDragonCaves();
 buildBoneCaves();
 // 共有ワールド用のID(workerはスポーン順でid付与するため、順序を揃える)
@@ -7367,7 +7672,7 @@ window.EnmaGameBridge={
   },
   importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
-      payload.v<1||payload.v>10)throw new Error('対応していない記録です');
+      payload.v<1||payload.v>11)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
@@ -7392,8 +7697,9 @@ window.EnmaGameBridge={
   getProfile(){
     return{
       displayName:player.name||$('nameIn').value.trim()||'ナナシ',
-      soulStage:player.story.dragonCleared?'rebirth_candidate':'deceased',
+      soulStage:player.meishoku?'reincarnated':player.story.dragonCleared?'rebirth_candidate':'deceased',
       gender:player.gender,
+      meishoku:player.meishoku,
       level:player.lv,
       zone,
       x:player.x,
@@ -7405,6 +7711,7 @@ window.EnmaGameBridge={
       active:started,
       displayName:player.name||$('nameIn').value.trim()||'ナナシ',
       gender:player.gender,
+      meishoku:player.meishoku,
       level:player.lv,
       guild:guildState.name,
       zone,
@@ -7425,7 +7732,7 @@ window.EnmaGameBridge={
         trial:player.quests.trial>=2,
         oniKing:player.story.oniKingCleared,
         dragon:player.story.dragonCleared,
-        stage:player.story.dragonCleared?'rebirth_candidate':'deceased',
+        stage:player.meishoku?'reincarnated':player.story.dragonCleared?'rebirth_candidate':'deceased',
       },
     };
   },
@@ -7548,6 +7855,7 @@ window.EnmaGameBridge={
       e.dir=['up','down','left','right'].includes(raw.dir)?raw.dir:e.dir;
       e.remoteMoving=!!raw.moving;e.dead=!!raw.dead;
       e.gender=raw.gender==='f'?'f':'m';
+      e.meishoku=raw.meishoku==='rasetsu'?'rasetsu':'';
       e.weaponId=ITEMS[raw.weaponId]?.slot==='weapon'?raw.weaponId:'dagger';
       e.name=String(raw.displayName||'ナナシ').slice(0,16);
       e.level=Math.max(1,raw.level|0);
@@ -7841,6 +8149,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722e"></script>
+<script type="module" src="online/account.js?v=20260722f"></script>
 </body>
 </html>
