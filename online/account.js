@@ -28,6 +28,7 @@ const state = {
   preferences: null,
   cloudSave: null,
   gmMeishokuResetCount: 0,
+  gmGenderChangeCount: 0,
   autoSyncState: 'checking',
   autoSyncMessage: 'クラウド記録を確認しています…',
   configured: Boolean(config.supabaseUrl && config.supabasePublishableKey),
@@ -61,6 +62,14 @@ function publishGmMeishokuResetCount(value = 0) {
   }));
 }
 
+function publishGmGenderChangeCount(value = 0) {
+  const count = Math.max(0, Math.trunc(Number(value) || 0));
+  state.gmGenderChangeCount = count;
+  document.dispatchEvent(new CustomEvent('enma:gm-gender-change-count', {
+    detail: { count },
+  }));
+}
+
 window.EnmaAccountBridge = {
   async consumeGmMeishokuReset() {
     if (!state.client || !state.session?.user?.id)
@@ -69,6 +78,20 @@ window.EnmaAccountBridge = {
     if (error) throw error;
     publishGmMeishokuResetCount(data);
     return state.gmMeishokuResetCount;
+  },
+  async consumeGmGenderChange(gender) {
+    if (!state.client || !state.session?.user?.id)
+      throw new Error('魂籍へログインしてください');
+    const nextGender = gender === 'f' ? 'f' : gender === 'm' ? 'm' : '';
+    if (!nextGender) throw new Error('変更先の姿を確認できません');
+    const { data, error } = await state.client.rpc('consume_gm_gender_change', {
+      p_gender: nextGender,
+    });
+    if (error) throw error;
+    publishGmGenderChangeCount(data);
+    if (state.profile) state.profile = { ...state.profile, avatar_key: nextGender };
+    syncOnlineControllers(state.session, state.profile);
+    return state.gmGenderChangeCount;
   },
 };
 
@@ -449,15 +472,16 @@ function render() {
 }
 
 async function fetchAccountData(userId) {
-  const [profileResult, preferencesResult, cloudSaveResult, gmItemResult] = await Promise.all([
+  const [profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult] = await Promise.all([
     state.client.from('profiles').select('*').eq('id', userId).single(),
     state.client.from('account_preferences').select('newsletter_opt_in')
       .eq('user_id', userId).single(),
     state.client.from('game_saves').select('save_version,revision,client_updated_at,updated_at,payload')
       .eq('user_id', userId).maybeSingle(),
     state.client.rpc('gm_meishoku_reset_count'),
+    state.client.rpc('gm_gender_change_count'),
   ]);
-  return { profileResult, preferencesResult, cloudSaveResult, gmItemResult };
+  return { profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult };
 }
 
 async function loadAccountData() {
@@ -473,6 +497,7 @@ async function loadAccountData() {
     state.preferences = null;
     state.cloudSave = null;
     publishGmMeishokuResetCount(0);
+    publishGmGenderChangeCount(0);
     syncOnlineControllers(null, null);
     render();
     return;
@@ -494,6 +519,7 @@ async function loadAccountData() {
     state.preferences = null;
     state.cloudSave = null;
     publishGmMeishokuResetCount(0);
+    publishGmGenderChangeCount(0);
     cloudSaveUserId = '';
     setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
     scheduleAccountReload();
@@ -522,6 +548,7 @@ async function loadAccountData() {
     } catch (retryError) {
       if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
       publishGmMeishokuResetCount(0);
+      publishGmGenderChangeCount(0);
       setFeedback('', `${retryError.message}。ゲームはそのまま開始できます`);
       setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
       scheduleAccountReload();
@@ -537,6 +564,7 @@ async function loadAccountData() {
     preferencesResult: { data: preferences, error: preferencesError },
     cloudSaveResult: { data: cloudSave, error: saveError },
     gmItemResult: { data: gmItemCount, error: gmItemError },
+    gmGenderResult: { data: gmGenderCount, error: gmGenderError },
   } = results;
 
   if (profileError) {
@@ -562,6 +590,7 @@ async function loadAccountData() {
   state.preferences = preferences;
   state.cloudSave = cloudSave;
   publishGmMeishokuResetCount(gmItemError ? 0 : gmItemCount);
+  publishGmGenderChangeCount(gmGenderError ? 0 : gmGenderCount);
   if (state.profile) {
     const lastSeenAt = new Date().toISOString();
     state.profile.last_seen_at = lastSeenAt;
@@ -911,6 +940,7 @@ async function signOut() {
     state.preferences = null;
     state.cloudSave = null;
     publishGmMeishokuResetCount(0);
+    publishGmGenderChangeCount(0);
     window.clearTimeout(cloudSaveTimer);
     window.clearTimeout(cloudReloadTimer);
     cloudSaveTimer = 0;
