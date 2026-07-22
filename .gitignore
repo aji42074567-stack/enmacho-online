@@ -1,3 +1,5 @@
 _wip_src/
 .claude/
 .wrangler/
+__pycache__/
+*.pyc

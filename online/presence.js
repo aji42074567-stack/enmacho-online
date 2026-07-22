@@ -1,8 +1,9 @@
 const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
-const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
+const VALID_ZONE = /^(field|rinne|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
+const VALID_MEISHOKU = new Set(['', 'rasetsu']);
 const VALID_ATTACK_KIND = new Set([
   'melee', 'bolt', 'fire', 'heal',
   'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
@@ -68,6 +69,7 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
     sessionId,
     displayName: cleanText(raw.displayName, 16) || 'ナナシ',
     gender: raw.gender === 'f' ? 'f' : 'm',
+    meishoku: VALID_MEISHOKU.has(raw.meishoku) ? raw.meishoku : '',
     level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(raw.level, 1)))),
     guild: cleanText(raw.guild, 12),
     zone,
@@ -228,6 +230,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       displayName: cleanText(profile?.display_name || snapshot.displayName, 16) || 'ナナシ',
       gender: snapshot.gender === 'f' || (snapshot.gender !== 'm' && profile?.avatar_key === 'f')
         ? 'f' : 'm',
+      meishoku: VALID_MEISHOKU.has(snapshot.meishoku) ? snapshot.meishoku : '',
       level: Math.max(1, Math.min(999, Math.trunc(cleanNumber(snapshot.level, 1)))),
     };
   }
@@ -774,6 +777,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       Math.round(cleanNumber(snapshot.targetY, snapshot.y) * 100),
       identity.displayName,
       identity.gender,
+      identity.meishoku,
       identity.level,
       cleanText(snapshot.guild, 12),
       Math.round(cleanNumber(snapshot.hp) / 5),
