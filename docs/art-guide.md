@@ -148,7 +148,8 @@ enmacho-online/
 - 大太刀・肩鎧を含む大柄な原画のため、通常主人公48pxに対して羅刹は56pxで描画する
 - 元の緑背景画像4枚から透過化・人物領域抽出・セル正規化する手順は
   `scripts/process_rasetsu_sprites.py` に保存。今後の素材差し替え時も同じ出力名で再生成できる。
-  女性素材のように待機を歩行から作る場合は `--stand-from-walk`、不等間隔の攻撃原画は
-  `--attack-irregular-grid`、被弾と死亡が別画像なら `--hit` / `--death` を指定する
+  女性素材のように待機を歩行から作る場合は `--stand-from-walk`、不等間隔の歩行・攻撃原画は
+  `--walk-irregular-grid` / `--attack-irregular-grid`、被弾と死亡が別画像なら
+  `--hit` / `--death` を指定する
 - `map_rinne_hub_day.jpg` = 輪廻の都の昼背景。コード側の歩行判定とは分離し、
   夜は別画像を持たずリアルタイムの色調・月光・灯籠光を合成する

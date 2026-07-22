@@ -7,6 +7,7 @@ const GIFT_KINDS = new Set([
 
 const cleanId = value => String(value || '').trim().slice(0, 64);
 const cleanName = value => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || 'ナナシ';
+const cleanLevel = value => Math.max(1, Math.min(999, Math.trunc(Number(value) || 1)));
 function cleanGift(raw) {
   if (!raw) return null;
   const kind = String(raw.kind || '').trim();
@@ -45,10 +46,13 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
     if (!unique.length) return new Map();
     const { data, error } = await client
       .from('profiles')
-      .select('id,display_name')
+      .select('id,display_name,level')
       .in('id', unique);
     if (error) throw error;
-    return new Map((data || []).map(profile => [profile.id, cleanName(profile.display_name)]));
+    return new Map((data || []).map(profile => [profile.id, {
+      name: cleanName(profile.display_name),
+      level: cleanLevel(profile.level),
+    }]));
   }
 
   async function refresh() {
@@ -97,10 +101,12 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
       const outgoing = [];
       for (const row of friendships) {
         const peerId = row.requester_id === ownId ? row.addressee_id : row.requester_id;
+        const profile = profiles.get(peerId);
         const peer = {
           id: peerId,
           friendshipId: row.id,
-          name: profiles.get(peerId) || 'ナナシ',
+          name: profile?.name || 'ナナシ',
+          level: profile?.level || 1,
           at: Date.parse(row.responded_at || row.created_at) || Date.now(),
           cloud: true,
         };
@@ -113,7 +119,7 @@ export function createSocialController(client, bridge = window.EnmaGameBridge) {
         ...mail.map(row => ({
           id: row.id,
           senderId: row.sender_id,
-          senderName: profiles.get(row.sender_id) || 'ナナシ',
+          senderName: profiles.get(row.sender_id)?.name || 'ナナシ',
           body: String(row.body || '').slice(0, 240),
           createdAt: row.created_at,
           readAt: row.read_at,

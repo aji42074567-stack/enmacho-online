@@ -1504,10 +1504,7 @@ const MEISHOKU_SEALS=[
   {x:43,y:49,job:'jugonshi', label:'呪禁師'},
   {x:49,y:43,job:'gohousou', label:'護法僧'},
 ];
-const RINNE_LINKS=[
-  {from:'rinne',at:RINNE_EXIT,to:'field',entry:()=>ferryDockPoint(),label:'渡し船へ',tone:'exit'},
-];
-const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS,RINNE_LINKS);
+const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
@@ -3387,7 +3384,8 @@ function renderStatTab(){
   }
 }
 function socialFriends(){
-  const cloud=new Map(socialState.friends.map(f=>[f.id,{...f,cloud:true}]));
+  const cloud=new Map(socialState.friends.map(f=>[f.id,{...f,
+    lv:Math.max(1,(f.level|0)||(f.lv|0)),cloud:true}]));
   for(const f of player.friends){
     if(!cloud.has(f.id))cloud.set(f.id,{...f,cloud:false});
   }
@@ -3530,8 +3528,9 @@ function renderSocialTab(){
   if(!friends.length)html+='<div class="social-empty">まだ縁を結んだ魂はいません</div>';
   for(const f of friends){
     const live=globalOnline.get(f.id);
+    const friendLevel=Math.max(1,(live?.level|0)||(f.level|0)||(f.lv|0));
     html+=`<div class="social-row"><div class="social-person"><b>${esc(live?.displayName||f.name)}</b>
-      <small>${live?`現世接続中・${zoneLabel(live.zone)}`:f.cloud?'現在は不在':'旧記録・再照合が必要'}</small></div>
+      <small>徳位${friendLevel}・${live?`現世接続中・${zoneLabel(live.zone)}`:f.cloud?'現在は不在':'旧記録・再照合が必要'}</small></div>
       <div class="social-actions">${f.cloud
         ?`<button class="buyb" data-social-compose="${f.id}" ${socialBusy?'disabled':''}>手紙</button>`
         :`<button class="buyb" data-social-request="${f.id}" ${socialBusy?'disabled':''}>再申請</button>`}
@@ -3601,7 +3600,7 @@ function renderSocialTab(){
     const id=b.getAttribute('data-social-accept'),f=socialState.incoming.find(x=>x.id===id);
     socialAction(async()=>{
       await window.EnmaSocialClient.acceptFriendRequest(id);
-      friendAdd({id,name:f?.name||'ナナシ',lv:1});
+      friendAdd({id,name:f?.name||'ナナシ',lv:Math.max(1,(f?.level|0)||(f?.lv|0))});
       netOutbox.push({type:'invite_reply',kind:'friend',accepted:true,targetUserId:id});
       notifyNet(`${f?.name||'相手'} とフレンドになった！`);
     });
@@ -3727,9 +3726,27 @@ function openFerry(){
   $('talk').classList.remove('hidden');
   sfx.click();
 }
+function openRinneGuide(){
+  setTalkAction();
+  setTalkPortrait('npc_soul_ren');
+  $('talkTitle').textContent='渡し守 レン';
+  $('talkSub').textContent='輪廻航路・帰り舟の案内人';
+  $('talkText').textContent='「輪廻の都での用事は済んだか？　賽の森へ戻る舟なら、すぐ出せる。渡し守の六文銭は通行の証だから、帰りもなくならないよ」';
+  setTalkAction('賽の森へ戻る',()=>{
+    $('talk').classList.add('hidden');
+    setTalkAction();
+    const dock=ferryDockPoint();
+    switchZone('field',dock.x,dock.y);
+    banner={txt:'第一審査区　賽の森',age:0};
+    log('渡し守レンの帰り舟で、賽の森へ戻った','sys');
+  });
+  $('talk').classList.remove('hidden');
+  sfx.click();
+}
 function openNpc(npc){
   setTalkAction();
   if(npc.kind==='ferry'){openFerry();return;}
+  if(npc.kind==='rinne_guide'){openRinneGuide();return;}
   if(npc.kind==='jobseal'){openMeishokuSelect(npc.job);return;}
   if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
   else if(npc.kind==='smith'){
@@ -4707,7 +4724,8 @@ function buildRinneHub(){
       blocked[y*MAP+x]=0;tileKind[y*MAP+x]=7;
     }
   }
-  props.push({x:RINNE_EXIT.x,y:RINNE_EXIT.y,kind:'hallportal',label:'渡し船へ',tone:'exit'});
+  props.push({x:RINNE_EXIT.x,y:RINNE_EXIT.y,kind:'hallportal',label:'帰りの渡し場',tone:'exit'});
+  npcs.push({x:51.4,y:50.6,kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
   for(const seal of MEISHOKU_SEALS)props.push({...seal,kind:'jobseal'});
   ground=document.createElement('canvas');
   RINNE={blocked,tileKind,props,npcs,mobs,ground,zone:'rinne',artKey:'map_rinne_hub_day'};
@@ -7979,10 +7997,12 @@ window.EnmaGameBridge={
     let changed=false;
     for(const f of socialState.friends){
       const current=player.friends.find(x=>x.id===f.id);
+      const level=Math.max(1,(f.level|0)||(f.lv|0));
       if(current){
         if(current.name!==f.name){current.name=f.name;changed=true;}
+        if(current.lv!==level){current.lv=level;changed=true;}
       }else{
-        player.friends.push({id:f.id,name:f.name,lv:1,at:f.at||Date.now()});changed=true;
+        player.friends.push({id:f.id,name:f.name,lv:level,at:f.at||Date.now()});changed=true;
       }
     }
     if(changed){while(player.friends.length>50)player.friends.shift();save();}
@@ -8149,6 +8169,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722f"></script>
+<script type="module" src="online/account.js?v=20260722g"></script>
 </body>
 </html>
