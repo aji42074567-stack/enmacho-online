@@ -486,6 +486,11 @@
     color:#3b2913;font-size:13px;font-weight:700;width:28px;height:28px;margin:3px;
     border-radius:50%;background:radial-gradient(circle at 35% 30%,#e4c36a,#8f6828 72%);
     border:2px ridge #c79a42;box-shadow:0 0 7px rgba(214,169,70,.3)}
+  .itemrow .gm-meishoku-reset-icon{display:grid;place-items:center;font-family:var(--serif);
+    color:#641a18;font-size:15px;font-weight:700;width:25px;height:31px;margin:1px 4px;
+    background:linear-gradient(135deg,#f0dfb5,#c8a66b);border:1px solid #8f692d;
+    box-shadow:inset 0 0 0 2px rgba(255,247,211,.32),0 0 7px rgba(201,162,74,.3);
+    transform:rotate(-3deg)}
   .itemrow img.icn[src*="assets/items/"],
   .slotbox img[src*="assets/items/"]{image-rendering:auto;object-fit:contain;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
@@ -3317,6 +3322,11 @@ let menuTab='eq',selSlot='weapon';
 const socialState={online:false,friends:[],incoming:[],outgoing:[],mail:[],error:''};
 let socialComposeId='',socialBusy=false;
 const knownCloudRequests=new Set(),knownMailIds=new Set();
+let gmMeishokuResetCount=0,gmMeishokuResetBusy=false;
+document.addEventListener('enma:gm-meishoku-reset-count',event=>{
+  gmMeishokuResetCount=Math.max(0,event.detail?.count|0);
+  if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+});
 // 人型の周りの6ボックス位置(272x252の#doll内)
 const SLOT_POS={
   head:'left:50%;top:0;transform:translateX(-50%)',
@@ -3394,6 +3404,13 @@ function renderItemTab(){
     html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
       <span class="nm">防具強化の巻物 ×${player.aScrolls} <span class="fx">鍛冶屋カナヤマで使う</span></span></div>`;
   }
+  if(gmMeishokuResetCount>0){
+    const canReset=Boolean(player.meishoku)&&!gmMeishokuResetBusy;
+    html+=`<div class="itemrow"><span class="icn gm-meishoku-reset-icon" aria-hidden="true">職</span>
+      <span class="nm">冥職やり直しの札 ×${gmMeishokuResetCount}
+        <span class="fx">GM専用・現在の冥職を解除して選び直す</span></span>
+      <button class="buyb" data-gm-meishoku-reset ${canReset?'':'disabled'}>${gmMeishokuResetBusy?'使用中…':player.meishoku?'使う':'転職後に使用'}</button></div>`;
+  }
   if(player.dragonBlood>0){
     html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">希少素材・ゴウリュウから7%</span></span></div>`;
@@ -3416,6 +3433,30 @@ function renderItemTab(){
       else setQuickItem(id);
       renderItemTab();
     });
+  }
+  $('itemList').querySelector('[data-gm-meishoku-reset]')?.addEventListener('click',useGmMeishokuReset);
+}
+async function useGmMeishokuReset(){
+  const current=MEISHOKU[player.meishoku];
+  if(gmMeishokuResetBusy||!current)return;
+  if(!window.EnmaAccountBridge?.consumeGmMeishokuReset){
+    log('魂籍台帳に接続できないため、札を使えない','sys');return;
+  }
+  if(!confirm(`冥職「${current.name}」を解除し、選び直しますか？\n冥職やり直しの札を1個使います。`))return;
+  gmMeishokuResetBusy=true;renderItemTab();
+  try{
+    gmMeishokuResetCount=await window.EnmaAccountBridge.consumeGmMeishokuReset();
+    if(current.starter&&player.eq.weapon===current.starter)player.eq.weapon='dagger';
+    player.meishoku='';player.meishokuLv=0;
+    recalcMax();save();hud();
+    $('equip').classList.add('hidden');
+    openMeishokuSelect();
+    log(`冥職やり直しの札を使い、冥職「${current.name}」の刻印を解いた`,'gain');
+  }catch(error){
+    log(error?.message||'冥職やり直しの札を使えなかった','sys');
+  }finally{
+    gmMeishokuResetBusy=false;
+    if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
   }
 }
 function renderStatTab(){
@@ -8602,6 +8643,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722j"></script>
+<script type="module" src="online/account.js?v=20260722k"></script>
 </body>
 </html>
