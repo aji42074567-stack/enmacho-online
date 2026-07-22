@@ -10,12 +10,6 @@ create table if not exists public.gm_item_inventory (
 
 alter table public.gm_item_inventory enable row level security;
 
--- テスト担当GM「あじ」の魂籍だけに30個付与する。
-insert into public.gm_item_inventory (soul_code, item_key, quantity)
-values ('KON-1BA90A84', 'meishoku_reset', 30)
-on conflict (soul_code, item_key)
-do update set quantity = excluded.quantity, updated_at = now();
-
 -- テーブルを直接更新させず、GM権限を確認するRPCだけを公開する。
 revoke all on table public.gm_item_inventory from public, anon, authenticated;
 
