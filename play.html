@@ -3425,7 +3425,7 @@ function renderItemTab(){
     const canReset=Boolean(player.meishoku)&&!gmMeishokuResetBusy;
     html+=`<div class="itemrow"><span class="icn gm-meishoku-reset-icon" aria-hidden="true">職</span>
       <span class="nm">冥職やり直しの札 ×${gmMeishokuResetCount}
-        <span class="fx">GM専用・現在の冥職を解除して選び直す</span></span>
+        <span class="fx">個別付与品・現在の冥職を解除して選び直す</span></span>
       <button class="buyb" data-gm-meishoku-reset ${canReset?'':'disabled'}>${gmMeishokuResetBusy?'使用中…':player.meishoku?'使う':'転職後に使用'}</button></div>`;
   }
   if(gmGenderChangeCount>0){
