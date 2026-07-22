@@ -1,7 +1,7 @@
 const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
-const VALID_ZONE = /^(field|rinne|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
+const VALID_ZONE = /^(field|rinne|rinne_coast|rinne_wilds|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
 const VALID_MEISHOKU = new Set(['', 'rasetsu']);
 const VALID_ATTACK_KIND = new Set([
