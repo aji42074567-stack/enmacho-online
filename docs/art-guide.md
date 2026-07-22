@@ -181,6 +181,17 @@ enmacho-online/
 - `map_rinne_props_atlas.png` = 4列×2行。荷箱 / 供物籠 / 旅包み / 青磁壺 / 壺片 / 護符杭 / 橋 / 灯籠
 - `map_rinne_buildings_atlas.png` = 3列×2行。商家 / 結社堂 / 茶屋 / 町家 / 城門 / 祠
 - 旧建物アトラスは1024px÷3列の分割で中央列が切断されるためv0.28で隔離。新素材は個別透過PNGで検品し、余白付きで機械的に梱包する
+
+### 輪廻大陸の新素材パイプライン(v0.29以降)
+
+1. 必ず1ファイル1対象で生成し、上下左右に十分な余白を持たせる
+2. 竹や樹木など緑の対象は均一な`#ff00ff`背景で生成する
+3. imagegenスキルの`remove_chroma_key.py --auto-key border --soft-matte --despill`で個別PNGへ透過化する
+4. `python3 scripts/normalize_rinne_asset.py --input <asset.png> --output <asset.png>`で対象の周囲を均等64px透明余白に正規化する
+5. `python3 scripts/validate_rinne_asset.py <asset.png>`で四辺透過・48px以上の余白・半透過輪郭・キー色残留を検査する
+6. 個別PNGを実画面の草地と石畳、昼と夜で確認し、合格後にのみ本編へ配置する
+
+第一段階の検品用素材は`rinne_bamboo_pilot.png`と`rinne_machiya_pilot.png`。アトラスにはせず個別に読み込む。
 - 地面は120×120の単一座標系。南岸・街道・都の間にロード画面は入れない
 - 関西地形版では橋セルを実マップに配置せず、都=銀杏・楓、街道=竹、紀伊内陸=楠、沿岸・山稜=黒松に植生を分ける
 - 当たり判定はマスのまま、地面テクスチャは隣接マスを不規則な連続マスクで塗る。
