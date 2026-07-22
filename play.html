@@ -4889,10 +4889,6 @@ function addRinneTree(world,x,y,type,scale=1){
   rinneSetBlocked(world,x,y,1);
   world.props.push({x,y,kind:'rinne_tree',type,s:scale});
 }
-function addRinneBuilding(world,x,y,w,h,style='house'){
-  for(let dy=0;dy<h;dy++)for(let dx=0;dx<w;dx++)rinneSetBlocked(world,x+dx,y+dy,1);
-  world.props.push({x:x+(w-1)/2,y:y+(h-1)/2,kind:'rinne_building',style,footprintW:w,footprintH:h});
-}
 function buildRinneContinent(){
   // 関西地方を1枚の120×120マップに置く。地域境界でswitchZoneしない。
   // u=x-yが東西、v=x+yが南北。北に都、北東に琵琶湖、南に紀伊半島と渡船場を置く。
@@ -4955,28 +4951,16 @@ function buildRinneContinent(){
     city.props.push({x:x+(side==='west'?1:-1),y:y+(side==='west'?-1:1),kind:'rinne_clutter',v:'talisman'});
   }
 
-  addRinneBuilding(city,17,25,4,4,'market');
-  addRinneBuilding(city,25,17,4,4,'guild');
-  addRinneBuilding(city,22,33,4,4,'tea');
-  addRinneBuilding(city,33,22,4,4,'house');
-  addRinneBuilding(city,31,43,4,4,'house');
-  addRinneBuilding(city,43,31,4,4,'market');
-  addRinneBuilding(city,14,28,3,3,'shrine');
-  city.props.push({x:17,y:17,kind:'rinne_gate'});
+  // 旧建物アトラスはセル越境と透過不良があるため、再制作まで配置と当たり判定を止める。
   for(const seal of MEISHOKU_SEALS)city.props.push({...seal,kind:'jobseal'});
   for(const [x,y,type,s] of [
     [19,29,'ginkgo',1],[29,19,'maple',.95],[25,36,'ginkgo',.85],[36,25,'ginkgo',.9],
     [34,47,'maple',.82],[47,34,'maple',.9],[20,38,'maple',1.04],[38,20,'ginkgo',1.05],
   ])addRinneTree(city,x,y,type,s);
-  for(const p of [
-    {x:28,y:39,v:'crate'},{x:39,y:28,v:'offering'},{x:32,y:46,v:'jar'},
-    {x:46,y:32,v:'parcel'},{x:24,y:35,v:'talisman'},{x:36,y:24,v:'pottery'},
-    {x:45,y:38,v:'crate'},{x:38,y:45,v:'jar'},
-  ])city.props.push({...p,kind:'rinne_clutter'});
   for(const [x,y] of [[48,48],[44,44],[40,40],[36,36],[32,32],[28,28]])
     city.props.push({x:x+.8,y:y-.8,kind:'rinne_lantern'});
 
-  // 植生を地域ごとにまとめる。街道沿いは竹林、紀伊の内陸は樟、海岸と山稜は黒松。
+  // 旧竹・樟セルは白残りと切断があるため隔離。再制作まで黒松とススキだけで植生を構成する。
   for(let y=4;y<size-4;y+=3)for(let x=4;x<size-4;x+=3){
     const index=y*size+x,kind=city.tileKind[index],region=rinneRegionAt(x,y);
     if(kind!==0||region==='city')continue;
@@ -4985,21 +4969,14 @@ function buildRinneContinent(){
     const d=Math.min(...mainTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,mainTrail[i],p)));
     const h=rinneHash(x,y,41),grove=rinneHash(Math.floor(x/9),Math.floor(y/9),52);
     const nearCoast=region==='coast'||(v>124&&(Math.abs(u)>22||v>174));
-    const bambooBelt=!nearCoast&&v>=108&&v<154;
-    const treeType=nearCoast?'pine':bambooBelt?'bamboo':'camphor';
-    const treeThreshold=restricted?.54:nearCoast?.66:.6;
+    const treeThreshold=restricted?.58:nearCoast?.7:.68;
     if(d>5.2&&grove>.43&&h>treeThreshold){
       addRinneTree(city,x+(rinneHash(x,y,42)-.5)*.9,y+(rinneHash(y,x,43)-.5)*.9,
-        treeType,.78+rinneHash(y,x,44)*.38);
+        'pine',.78+rinneHash(y,x,44)*.34);
     }else if(d>3.2&&h>.5){
       city.props.push({x:x+.3,y:y+.2,kind:'rinne_pampas',s:.65+rinneHash(x,y,45)*.48});
     }
   }
-  for(const [x,y,s] of [[58,72,1.08],[61,72,.9],[60,76,.84],[64,74,.92]])
-    addRinneTree(city,x,y,'bamboo',s);
-  for(const [x,y,s] of [[94,76,.94],[97,78,.84],[90,77,.9]])
-    addRinneTree(city,x,y,'camphor',s);
-
   // 琵琶湖の湖岸は建物を置かず、石と薄だけで縁取る。
   for(const [x,y] of [[46,18],[52,22],[58,28],[56,35],[49,36],[43,29]]){
     city.props.push({x,y,kind:'rinne_rock',coastal:false,s:.64+rinneHash(x,y,71)*.18});
@@ -5008,11 +4985,6 @@ function buildRinneContinent(){
 
   city.props.push({x:101,y:101,kind:'rinne_pier'});
   city.npcs.push({x:97,y:93,kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
-  for(const p of [
-    {x:94,y:94,v:'crate'},{x:98,y:96,v:'jar'},{x:91,y:89,v:'parcel'},
-    {x:99,y:92,v:'offering'},{x:88,y:84,v:'talisman'},
-    {x:70,y:60,v:'offering'},{x:85,y:78,v:'parcel'},{x:62,y:62,v:'jar'},
-  ])city.props.push({...p,kind:'rinne_clutter'});
   city.props.push({x:92,y:89,kind:'rinne_lantern'},{x:69,y:61,kind:'rinne_lantern'});
   for(const [x,y] of [[109,96],[105,101],[99,104],[92,103],[111,91]])
     city.props.push({x,y,kind:'rinne_rock',s:.72+rinneHash(x,y)*.34});
@@ -5413,7 +5385,7 @@ loadSprite('map_enmacho_3f',MOBILE_RENDER?'assets/map_enmacho_3f_mobile.jpg':'as
 loadSprite('rinne_terrain_atlas','assets/map_rinne_terrain_atlas.png');
 loadSprite('rinne_vegetation_atlas','assets/map_rinne_vegetation_atlas.png');
 loadSprite('rinne_props_atlas','assets/map_rinne_props_atlas.png');
-loadSprite('rinne_buildings_atlas','assets/map_rinne_buildings_atlas.png');
+// map_rinne_buildings_atlas.pngはセル越境と透過不良の修復後に個別素材として再導入する。
 loadSprite('npc_enma','assets/npc_enma.png');
 loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
 loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
@@ -6271,40 +6243,40 @@ function drawRinneAtlasCell(key,cols,rows,index,sx,sy,width,anchor=.88){
     sx-width/2,sy-h*anchor,width,h);
   return true;
 }
-const RINNE_VEGETATION_CELL={pine:0,ginkgo:1,maple:2,camphor:3,pampas:4,bamboo:5,coast_rock:6,standing_rock:7};
+function drawRinneAtlasRegion(key,region,sx,sy,width,anchor=.88){
+  const img=SPRITES[key];if(!img)return false;
+  const [x,y,w,h]=region,drawH=width*h/w;
+  ctx.drawImage(img,x,y,w,h,sx-width/2,sy-drawH*anchor,width,drawH);
+  return true;
+}
+const RINNE_VEGETATION_REGION={
+  pine:[0,100,256,412],ginkgo:[256,100,256,412],maple:[512,100,228,412],
+  pampas:[0,512,256,390],coast_rock:[512,512,256,390],standing_rock:[768,512,256,390],
+};
 function drawRinneTree(sx,sy,p){
-  const width=(p.type==='camphor'?176:p.type==='pine'?132:144)*(p.s||1);
-  if(drawRinneAtlasCell('rinne_vegetation_atlas',4,2,RINNE_VEGETATION_CELL[p.type]??0,sx,sy,width,.83))return;
+  const width=(p.type==='pine'?132:144)*(p.s||1);
+  const region=RINNE_VEGETATION_REGION[p.type]||RINNE_VEGETATION_REGION.pine;
+  if(drawRinneAtlasRegion('rinne_vegetation_atlas',region,sx,sy,width,.84))return;
   drawTree(sx,sy,{s:(p.s||1)*1.05});
 }
 function drawRinnePampas(sx,sy,p){
-  if(drawRinneAtlasCell('rinne_vegetation_atlas',4,2,4,sx,sy,72*(p.s||1),.82))return;
+  if(drawRinneAtlasRegion('rinne_vegetation_atlas',RINNE_VEGETATION_REGION.pampas,
+    sx,sy,72*(p.s||1),.84))return;
   ctx.strokeStyle='#ddd0a1';ctx.lineWidth=1.2;
   for(let i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(sx+i*2,sy);ctx.lineTo(sx+i*4,sy-22-Math.abs(i)*2);ctx.stroke();}
 }
 function drawRinneRock(sx,sy,p){
-  const index=p.coastal===false?7:6;
-  if(drawRinneAtlasCell('rinne_vegetation_atlas',4,2,index,sx,sy,82*(p.s||1),.83))return;
+  const region=p.coastal===false?RINNE_VEGETATION_REGION.standing_rock:RINNE_VEGETATION_REGION.coast_rock;
+  if(drawRinneAtlasRegion('rinne_vegetation_atlas',region,sx,sy,82*(p.s||1),.84))return;
   drawRock(sx,sy,p);
 }
-const RINNE_PROP_CELL={crate:0,offering:1,parcel:2,jar:3,pottery:4,talisman:5,bridge:6,lantern:7};
 function drawRinneClutter(sx,sy,p){
-  const width={crate:58,offering:62,parcel:54,jar:60,pottery:50,talisman:46}[p.v]||54;
-  drawRinneAtlasCell('rinne_props_atlas',4,2,RINNE_PROP_CELL[p.v]??0,sx,sy,width,.87);
-}
-function drawRinneBridge(sx,sy){
-  drawRinneAtlasCell('rinne_props_atlas',4,2,6,sx,sy,112,.86);
+  // 現行で使うのは未開放境界の護符杭だけ。橋の破片が入らない範囲を直接切り出す。
+  if(p.v==='talisman')drawRinneAtlasRegion('rinne_props_atlas',[280,520,190,365],sx,sy,46,.87);
 }
 function drawRinneLantern(sx,sy){
-  drawRinneAtlasCell('rinne_props_atlas',4,2,7,sx,sy,62,.85);
-}
-const RINNE_BUILDING_CELL={market:0,guild:1,tea:2,house:3,gate:4,shrine:5};
-function drawRinneBuilding(sx,sy,p){
-  const width={market:190,guild:244,tea:182,house:194,shrine:170}[p.style]||190;
-  drawRinneAtlasCell('rinne_buildings_atlas',3,2,RINNE_BUILDING_CELL[p.style]??0,sx,sy,width,.92);
-}
-function drawRinneGate(sx,sy){
-  drawRinneAtlasCell('rinne_buildings_atlas',3,2,4,sx,sy,230,.91);
+  // 4×2等分では左隣の橋が混ざるため、灯籠の安全領域だけを使う。
+  drawRinneAtlasRegion('rinne_props_atlas',[808,512,172,380],sx,sy,52,.86);
 }
 function drawShoal(sx,sy,p){
   const img=SPRITES['shore_rock_'+p.v];
@@ -6749,10 +6721,7 @@ function render(){
       case 'rinne_pampas':drawRinnePampas(sx,sy,it.o);break;
       case 'rinne_rock':drawRinneRock(sx,sy,it.o);break;
       case 'rinne_clutter':drawRinneClutter(sx,sy,it.o);break;
-      case 'rinne_bridge':drawRinneBridge(sx,sy);break;
       case 'rinne_lantern':drawRinneLantern(sx,sy);break;
-      case 'rinne_building':drawRinneBuilding(sx,sy,it.o);break;
-      case 'rinne_gate':drawRinneGate(sx,sy);break;
       case 'rinne_pier':drawPierBase(sx,sy);break;
       case 'torch':drawTorch(sx,sy);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
