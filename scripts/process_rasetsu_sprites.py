@@ -216,6 +216,7 @@ def main() -> None:
     stand_group.add_argument("--stand", type=Path)
     stand_group.add_argument("--stand-from-walk", action="store_true")
     parser.add_argument("--walk", type=Path, required=True)
+    parser.add_argument("--walk-irregular-grid", action="store_true")
     parser.add_argument("--attack", type=Path, required=True)
     parser.add_argument("--attack-irregular-grid", action="store_true")
     parser.add_argument("--hitdeath", type=Path)
@@ -230,7 +231,10 @@ def main() -> None:
         parser.error("--hitdeath cannot be combined with --hit or --death")
     prefix = f"char_rasetsu_{args.gender}"
 
-    walk = normalize_grid(args.walk, columns=4, rows=4, cell_size=128, padding=4)
+    walk_normalizer = (
+        normalize_irregular_grid if args.walk_irregular_grid else normalize_grid
+    )
+    walk = walk_normalizer(args.walk, columns=4, rows=4, cell_size=128, padding=4)
     if args.stand_from_walk:
         stand = stand_from_walk(walk)
     else:
