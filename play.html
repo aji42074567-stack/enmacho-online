@@ -1140,7 +1140,7 @@
         <button class="meishoku-card" data-job="rasetsu"><b>羅刹</b><small>力と肉体を活かす近接戦闘</small></button>
         <button class="meishoku-card" data-job="kagehoshi"><b>影法師</b><small>速さ・会心・間合いを活かす遊撃</small></button>
         <button class="meishoku-card" data-job="jugonshi"><b>呪禁師</b><small>知力・術・状態異常を扱う制圧</small></button>
-        <button class="meishoku-card" data-job="gohousou" disabled><b>護法僧</b><small>防御・回復・支援を担う守護　準備中</small></button>
+        <button class="meishoku-card" data-job="gohousou"><b>護法僧</b><small>防御・回復・支援を担う守護</small></button>
       </div>
       <div class="meishoku-detail" id="meishokuDetail">四つの印へ触れ、魂に刻む役目を選んでください。</div>
       <button class="btn" id="meishokuConfirm" disabled>羅刹を魂に刻む</button>
@@ -1367,6 +1367,7 @@ const ITEMS={
   drake_slayer:{slot:'weapon',name:'業龍断ち',    atk:32,price:0,rare:true,source:'ゴウリュウ',repose:20,icon:'icon_greatsword.png'},
   kage_twin:   {slot:'weapon',name:'影断の双刀',  atk:9, price:0,icon:'icon_katana.png'},
   jugon_blade: {slot:'weapon',name:'呪禁の法刀',  atk:9, price:0,icon:'icon_katana.png'},
+  goho_staff:  {slot:'weapon',name:'護法の錫杖',  atk:8, price:0,icon:'icon_greatsword.png'},
   cloth:       {slot:'body',  name:'経帷子',      def:1, price:0,  icon:'items/armor_kyokatabira.png'},
   leather:     {slot:'body',  name:'鬼革の胴着',  def:3, price:100,icon:'items/armor_onigawa_dogi.png'},
   chain:       {slot:'body',  name:'冥鉄の段鎧',  def:6, price:350,icon:'items/armor_meitetsu_dan.png'},
@@ -1457,10 +1458,15 @@ const MEISHOKU={
     detail:'最大HP+10、MP+30、攻撃+2、印の再使用が3割早い。呪符と法刀で敵を制する術の冥職。',
     starter:'jugon_blade',
   },
-  gohousou:{name:'護法僧',role:'防御・回復・支援を担う守護',hp:0,mp:0,atk:0,def:0},
+  gohousou:{
+    name:'護法僧',role:'防御・回復・支援を担う守護',
+    hp:30,mp:20,atk:1,def:4,heal:1.5,
+    detail:'最大HP+30、MP+20、攻撃+1、防御+4、回向の癒しが5割深い。錫杖で仲間を守る守護の冥職。',
+    starter:'goho_staff',
+  },
 };
 const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
-const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi']);   // 冥装(スプライト)が揃い選択できる職
+const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   // 冥装(スプライト)が揃い選択できる職
 const meishokuReady=job=>MEISHOKU_READY.has(job);
 const sealCdMul=()=>meishokuDef(player)?.sealCd||1;   // 呪禁師など印のクールタイム補正
 
@@ -2806,7 +2812,7 @@ function castHeal(){
   player.mp-=12;player.cd.heal=1*sealCdMul();
   player.swing=0.32;player.swingMax=0.32;player.swingKind='cast';
   signalPlayerAction('heal');
-  const n=45+7*player.lv;
+  const n=Math.round((45+7*player.lv)*(meishokuDef(player)?.heal||1));
   player.hp=Math.min(player.maxHp,player.hp+n);
   if(player.hp<player.maxHp||!allyNear)addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
   addActionEffect('heal',player.x,player.y);
@@ -5456,6 +5462,16 @@ loadSprite('player_jugonshi_f_walk','assets/char_jugonshi_f_walk.png');
 loadSprite('player_jugonshi_f_attack','assets/char_jugonshi_f_attack.png');
 loadSprite('player_jugonshi_f_hit','assets/char_jugonshi_f_hit.png');
 loadSprite('player_jugonshi_f_death','assets/char_jugonshi_f_death.png');
+loadSprite('player_gohousou_m','assets/char_gohousou_m.png');
+loadSprite('player_gohousou_m_walk','assets/char_gohousou_m_walk.png');
+loadSprite('player_gohousou_m_attack','assets/char_gohousou_m_attack.png');
+loadSprite('player_gohousou_m_hit','assets/char_gohousou_m_hit.png');
+loadSprite('player_gohousou_m_death','assets/char_gohousou_m_death.png');
+loadSprite('player_gohousou_f','assets/char_gohousou_f.png');
+loadSprite('player_gohousou_f_walk','assets/char_gohousou_f_walk.png');
+loadSprite('player_gohousou_f_attack','assets/char_gohousou_f_attack.png');
+loadSprite('player_gohousou_f_hit','assets/char_gohousou_f_hit.png');
+loadSprite('player_gohousou_f_death','assets/char_gohousou_f_death.png');
 loadSprite('mob_goblin','assets/mob_goblin.png');
 loadSprite('mob_goblin_red','assets/mob_goblin_red.png');
 loadSprite('mob_goblin_attack','assets/mob_goblin_attack.png');
@@ -5647,7 +5663,7 @@ function drawPlayer(sx,sy,e){
   const g=e.gender||'m';
   const jobSpriteId=MEISHOKU_READY.has(e.meishoku)?`${e.meishoku}_${g}`:'';
   const spriteId=jobSpriteId&&SPRITES['player_'+jobSpriteId]?jobSpriteId:g;
-  const bundledWeapon=spriteId.startsWith('rasetsu_')||spriteId.startsWith('kagehoshi_')||spriteId.startsWith('jugonshi_');
+  const bundledWeapon=spriteId.startsWith('rasetsu_')||spriteId.startsWith('kagehoshi_')||spriteId.startsWith('jugonshi_')||spriteId.startsWith('gohousou_');
   const base=SPRITES['player_'+spriteId]||SPRITES['player_'+g]||SPRITES.player_m;
   const walkS=SPRITES['player_'+spriteId+'_walk']||SPRITES['player_'+g+'_walk'];
   const atkS=SPRITES['player_'+spriteId+'_attack']||SPRITES['player_'+g+'_attack'];
@@ -8643,6 +8659,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260722k"></script>
+<script type="module" src="online/account.js?v=20260722l"></script>
 </body>
 </html>
