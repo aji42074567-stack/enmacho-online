@@ -153,11 +153,13 @@ enmacho-online/
 - `map_kosatsu.png` — 高札クエストの掲示板
 - `map_ferry.png` — 第一章クリア後に桟橋へ現れる渡し船
 - `map_pine_*.png` / `map_rock_*.png` — 森の樹木と岩
+- `map_shikoku_mountains_atlas.png` — 四国山地用の丘陵・山稜・高峰・杉山の2×2透過アトラス
 - `map_lamp_post.png` / `map_stone_well.png` — 灯籠と井戸
 - 画像の読み込み前または失敗時は、従来のコード描画へフォールバックする
 - 移動経路・当たり判定・深度ソートは従来のマップ座標をそのまま使用する
+- 山岳アトラスは imagegen で単色マゼンタ背景の原画を作り、クロマキー除去後にRGBA PNGとして組み込んだ
 
-### 実装済み(v0.23) — 羅刹と輪廻の都
+### 実装済み(v0.23〜v0.24) — 羅刹と輪廻大陸
 
 - `char_rasetsu_{m,f}.png` = 512×128。立ち姿4方向（下/上/左/右）
 - `char_rasetsu_{m,f}_walk.png` = 512×512。128pxセル、4方向×4コマ
@@ -169,5 +171,14 @@ enmacho-online/
   女性素材のように待機を歩行から作る場合は `--stand-from-walk`、不等間隔の歩行・攻撃原画は
   `--walk-irregular-grid` / `--attack-irregular-grid`、被弾と死亡が別画像なら
   `--hit` / `--death` を指定する
-- `map_rinne_hub_day.jpg` = 輪廻の都の昼背景。コード側の歩行判定とは分離し、
-  夜は別画像を持たずリアルタイムの色調・月光・灯籠光を合成する
+- `map_rinne_terrain_atlas.png` = 3列×2行。黄金草原 / 土道 / 貝砂 / 浅海 / 川 / 象牙石畳
+- `map_rinne_vegetation_atlas.png` = 4列×2行。黒松 / 銀杏 / 楓 / 楠 / ススキ / 竹 / 海岸岩 / 立石
+- `map_rinne_props_atlas.png` = 4列×2行。荷箱 / 供物籠 / 旅包み / 青磁壺 / 壺片 / 護符杭 / 橋 / 灯籠
+- `map_rinne_buildings_atlas.png` = 3列×2行。商家 / 結社堂 / 茶屋 / 町家 / 城門 / 祠
+- 地面は賽の森と同じ72×72のマス式。背景一枚絵へ歩行判定を重ねる方式ではない
+- 夜用画像は持たず、南岸・街道・都へリアルタイムの色調・月光を合成する。
+  都では灯籠の暖色光も重ねる
+- 画像生成時に市松模様が実画素として焼き込まれた場合は
+  `scripts/remove_checker_alpha.cjs` で外周と連結した無彩色背景だけを透過する
+- 構図検討用の南岸・街道・都の一枚絵は `_wip_src/rinne_continent_concepts/` に保管し、
+  配信素材には使わない

@@ -9,7 +9,8 @@ const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
 const WORLD_VERSION = 2;
 const PLAYER_LIMIT = 80;
-const MAP = 72;
+const ZONE_SIZE = 72;
+const FIELD_SIZE = 120;
 // field以外のゾーンは、最初に入ったクライアントが敵配置・壁データを渡す(zone_init)。
 const VALID_ZONE = /^(field|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 
@@ -64,19 +65,39 @@ function cleanText(value, maxLength) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
 }
 
+const SHIKOKU_OUTLINE = [
+  [2, 7], [9, 13], [17, 26], [15, 39], [12, 52], [4, 66], [-9, 72],
+  [-25, 75], [-37, 68], [-43, 60], [-52, 56], [-47, 51], [-36, 48],
+  [-33, 39], [-28, 29], [-20, 22], [-9, 14],
+];
+
+function segmentDistance(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (!len2) return Math.hypot(px - ax, py - ay);
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / len2, 0, 1);
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+}
+
 function islandDistance(x, y) {
-  const dx = x - 31;
-  const dy = y - 32;
-  const theta = Math.atan2(dy, dx);
-  const radius = 29.6
-    + Math.sin(theta * 2.3 + 1.7)
-    + Math.sin(theta * 4.7 + 0.6) * 0.7
-    + Math.sin(theta * 1.1 + 4) * 0.6;
-  return Math.max(Math.abs(dx), Math.abs(dy)) - radius;
+  const u = (x - y) / 2;
+  const v = (x + y) / 2;
+  let inside = false;
+  let minDistance = Infinity;
+  for (let i = 0; i < SHIKOKU_OUTLINE.length; i += 1) {
+    const a = SHIKOKU_OUTLINE[i];
+    const b = SHIKOKU_OUTLINE[(i + 1) % SHIKOKU_OUTLINE.length];
+    if (((a[1] > v) !== (b[1] > v))
+      && u < ((b[0] - a[0]) * (v - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+    minDistance = Math.min(minDistance, segmentDistance(u, v, a[0], a[1], b[0], b[1]));
+  }
+  return (inside ? -1 : 1) * minDistance * Math.SQRT2;
 }
 
 function onIsland(x, y) {
-  return x >= 2 && y >= 2 && x <= 69 && y <= 69 && islandDistance(x, y) <= 1.7;
+  return x >= 2 && y >= 2 && x <= FIELD_SIZE - 3 && y <= FIELD_SIZE - 3
+    && islandDistance(x, y) <= 1.7;
 }
 
 // クライアントの敵配置が更新されたら部屋データを差し替えるための署名
@@ -92,9 +113,9 @@ function validateZoneInit(zone, data) {
   if (cleanText(data.zone, 16) !== zone) return null;
 
   const walls = data.walls;
-  if (!Array.isArray(walls) || walls.length !== MAP) return null;
+  if (!Array.isArray(walls) || walls.length !== ZONE_SIZE) return null;
   for (const row of walls) {
-    if (typeof row !== 'string' || row.length !== MAP || /[^01]/.test(row)) return null;
+    if (typeof row !== 'string' || row.length !== ZONE_SIZE || /[^01]/.test(row)) return null;
   }
 
   if (!data.defs || typeof data.defs !== 'object') return null;
@@ -119,8 +140,8 @@ function validateZoneInit(zone, data) {
   const spawns = [];
   for (const raw of data.spawns) {
     if (!raw || typeof raw !== 'object' || !defs[raw.type]) return null;
-    const x = clamp(Math.round(finite(raw.x, 0)), 1, MAP - 2);
-    const y = clamp(Math.round(finite(raw.y, 0)), 1, MAP - 2);
+    const x = clamp(Math.round(finite(raw.x, 0)), 1, ZONE_SIZE - 2);
+    const y = clamp(Math.round(finite(raw.y, 0)), 1, ZONE_SIZE - 2);
     const isDrake = zone === 'dg5' && raw.type === 'drake';
     spawns.push({
       type: raw.type,
@@ -207,7 +228,7 @@ export default {
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
     // dg5だけ新しい部屋へ切り替え、今回の更新時にゴウリュウを即時復活させる。
-    const roomName = zone === 'field' ? 'field-v1' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
+    const roomName = zone === 'field' ? 'field-v2' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
     const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
@@ -262,7 +283,7 @@ export class WorldRoom {
     if (!walls) return false;
     const tx = Math.round(x);
     const ty = Math.round(y);
-    if (tx < 1 || ty < 1 || tx > MAP - 2 || ty > MAP - 2) return false;
+    if (tx < 1 || ty < 1 || tx > ZONE_SIZE - 2 || ty > ZONE_SIZE - 2) return false;
     return walls[ty][tx] === '0';
   }
 
@@ -394,8 +415,9 @@ export class WorldRoom {
   updatePlayer(socket, data) {
     const attachment = socket.deserializeAttachment?.();
     if (!attachment) return;
-    const x = clamp(finite(data.x, attachment.x), 1, MAP - 2);
-    const y = clamp(finite(data.y, attachment.y), 1, MAP - 2);
+    const size = this.zone === 'field' ? FIELD_SIZE : ZONE_SIZE;
+    const x = clamp(finite(data.x, attachment.x), 1, size - 2);
+    const y = clamp(finite(data.y, attachment.y), 1, size - 2);
     if (!this.walkable(x, y)) return;
     socket.serializeAttachment({
       ...attachment,
@@ -417,8 +439,9 @@ export class WorldRoom {
 
     // 通常の位置通知を待たず、攻撃した瞬間の座標で射程を判定する。
     // 低速回線やスマホでも古い座標を理由に攻撃が消えないようにする。
-    const hitX = clamp(finite(data.x, player.x), 1, MAP - 2);
-    const hitY = clamp(finite(data.y, player.y), 1, MAP - 2);
+    const size = this.zone === 'field' ? FIELD_SIZE : ZONE_SIZE;
+    const hitX = clamp(finite(data.x, player.x), 1, size - 2);
+    const hitY = clamp(finite(data.y, player.y), 1, size - 2);
     if (this.walkable(hitX, hitY)) {
       player.x = hitX;
       player.y = hitY;
