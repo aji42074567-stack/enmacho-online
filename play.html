@@ -4345,6 +4345,8 @@ function prepareGroundCanvas(tgt,size=mapSize){
 }
 function releaseGroundCanvas(tgt){
   if(!tgt||!tgt._groundReady)return;
+  if(tgt._groundChunks){tgt._groundChunks.clear();tgt._groundChunks=null;}
+  tgt._chunked=false;
   tgt.width=1;tgt.height=1;
   tgt._groundReady=false;
 }
@@ -4683,19 +4685,36 @@ function rinneTerrainCells(){
   });
   return RINNE_TERRAIN_CELLS;
 }
-function renderGroundRinne(world){
-  const W2=world||worldByZone(zone);
-  if(!W2)return;
-  const tgt=W2.ground,size=W2.size||RINNE_SIZE;
-  const prepared=prepareGroundCanvas(tgt,size);
-  const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
+const RINNE_GROUND_CHUNK_PX=1024,RINNE_GROUND_CHUNK_CACHE=12;
+function rinneGroundTileBounds(clip,gW,size,pad=120){
+  const points=[
+    [clip.x-pad,clip.y-pad],[clip.x+clip.w+pad,clip.y-pad],
+    [clip.x-pad,clip.y+clip.h+pad],[clip.x+clip.w+pad,clip.y+clip.h+pad],
+  ].map(([gx,gy])=>{
+    const u=(gx-gW/2)/(TW/2),v=(gy-TH/2)/(TH/2);
+    return[(u+v)/2,(v-u)/2];
+  });
+  return{
+    x0:clamp(Math.floor(Math.min(...points.map(p=>p[0]))),0,size-1),
+    x1:clamp(Math.ceil(Math.max(...points.map(p=>p[0]))),0,size-1),
+    y0:clamp(Math.floor(Math.min(...points.map(p=>p[1]))),0,size-1),
+    y1:clamp(Math.ceil(Math.max(...points.map(p=>p[1]))),0,size-1),
+  };
+}
+function paintRinneGroundChunk(W2,clip,canvas){
+  const size=W2.size||RINNE_SIZE,gW=W2.ground._logicalWidth;
+  const scale=groundRenderScale();
+  canvas.width=Math.ceil(clip.w*scale);canvas.height=Math.ceil(clip.h*scale);
+  const g=canvas.getContext('2d');
+  g.setTransform(scale,0,0,scale,-clip.x*scale,-clip.y*scale);
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   const cells=rinneTerrainCells();
   const patterns=cells.map(cell=>g.createPattern(cell,'repeat'));
   const fallback=['#a99b49','#b99c67','#e8ddbf','#3baeb6','#8db79a','#cfc3a8'];
   const cellForKind=kind=>kind===1?1:kind===3?2:kind===4?3:kind===8?4:kind===2?5:0;
-  g.fillStyle='#17343b';g.fillRect(0,0,gW,gH);
+  const bounds=rinneGroundTileBounds(clip,gW,size);
+  g.fillStyle='#17343b';g.fillRect(clip.x,clip.y,clip.w,clip.h);
 
   // マップ全体のひし形だけを草原で塗る。マスごとのひし形は描かない。
   g.save();
@@ -4703,8 +4722,8 @@ function renderGroundRinne(world){
   g.moveTo(GX(0,0),GY(0,0));g.lineTo(GX(size,0),GY(size,0));
   g.lineTo(GX(size,size),GY(size,size));g.lineTo(GX(0,size),GY(0,size));g.closePath();
   g.clip();
-  g.fillStyle=patterns[0]||fallback[0];g.fillRect(0,0,gW,gH);
-  g.fillStyle='rgba(151,126,48,.13)';g.fillRect(0,0,gW,gH);
+  g.fillStyle=patterns[0]||fallback[0];g.fillRect(clip.x,clip.y,clip.w,clip.h);
+  g.fillStyle='rgba(151,126,48,.13)';g.fillRect(clip.x,clip.y,clip.w,clip.h);
   g.restore();
 
   // 同じ地形の隣接マスを不規則な楕円で連結し、1枚の連続マスクとして塗る。
@@ -4712,7 +4731,7 @@ function renderGroundRinne(world){
     const cell=cellForKind(kind),color=fallback[cell],pattern=patterns[cell];
     const trace=(extra=0)=>{
       g.beginPath();
-      for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      for(let y=bounds.y0;y<=bounds.y1;y++)for(let x=bounds.x0;x<=bounds.x1;x++){
         if(W2.tileKind[y*size+x]!==kind)continue;
         const h=rinneHash(x,y,kind*19+3),h2=rinneHash(y,x,kind*23+7);
         const jx=(h-.5)*7,jy=(h2-.5)*3;
@@ -4721,9 +4740,9 @@ function renderGroundRinne(world){
       }
     };
     g.save();g.globalAlpha=edgeAlpha;g.fillStyle=color;trace(7);g.fill();g.restore();
-    g.save();trace(0);g.clip();g.fillStyle=pattern||color;g.fillRect(0,0,gW,gH);
+    g.save();trace(0);g.clip();g.fillStyle=pattern||color;g.fillRect(clip.x,clip.y,clip.w,clip.h);
     g.fillStyle=kind===4?'rgba(17,116,131,.16)':kind===8?'rgba(45,112,97,.12)':'rgba(255,244,209,.035)';
-    g.fillRect(0,0,gW,gH);g.restore();
+    g.fillRect(clip.x,clip.y,clip.w,clip.h);g.restore();
   };
 
   paintKind(4,43,22,.52); // 海
@@ -4736,15 +4755,17 @@ function renderGroundRinne(world){
   for(let i=0;i<180;i++){
     const x=2+rinneHash(i,4,21)*(size-4),y=2+rinneHash(i,8,22)*(size-4);
     const kind=W2.tileKind[Math.floor(y)*size+Math.floor(x)],r=24+rinneHash(i,3,23)*86;
+    const px=GX(x,y),py=GY(x,y);
+    if(px+r<clip.x||px-r>clip.x+clip.w||py+r*.5<clip.y||py-r*.5>clip.y+clip.h)continue;
     if(kind===0){
       g.fillStyle=rinneRegionAt(x,y)==='coast'?'rgba(65,94,48,.032)':'rgba(171,126,35,.038)';
-      g.beginPath();g.ellipse(GX(x,y),GY(x,y),r,r*.42,rinneHash(i,9,24)*.35,0,6.29);g.fill();
+      g.beginPath();g.ellipse(px,py,r,r*.42,rinneHash(i,9,24)*.35,0,6.29);g.fill();
     }else if(kind!==4&&kind!==8&&rinneHash(i,7,25)>.58){
       g.fillStyle=kind===2?'rgba(73,102,108,.14)':'rgba(97,72,35,.12)';
-      g.beginPath();g.ellipse(GX(x,y),GY(x,y),2.5+rinneHash(i,2,26)*4,1.1,0,0,6.29);g.fill();
+      g.beginPath();g.ellipse(px,py,2.5+rinneHash(i,2,26)*4,1.1,0,0,6.29);g.fill();
     }
   }
-  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+  for(let y=bounds.y0;y<=bounds.y1;y++)for(let x=bounds.x0;x<=bounds.x1;x++){
     const kind=W2.tileKind[y*size+x],h=rinneHash(x,y,11);
     if((kind===4||kind===8)&&h>.38){
       g.strokeStyle=kind===4?'rgba(230,255,246,.22)':'rgba(245,255,238,.15)';
@@ -4753,6 +4774,44 @@ function renderGroundRinne(world){
       g.quadraticCurveTo(GX(x,y),GY(x,y)-3+(h-.5)*5,GX(x,y)+12+h*6,GY(x,y)+(h-.5)*5);g.stroke();
     }
   }
+}
+function rinneGroundChunk(W2,cx,cy){
+  const tgt=W2.ground,key=`${cx},${cy}`,cached=tgt._groundChunks.get(key);
+  if(cached){tgt._groundChunks.delete(key);tgt._groundChunks.set(key,cached);return cached;}
+  const baseX=cx*RINNE_GROUND_CHUNK_PX,baseY=cy*RINNE_GROUND_CHUNK_PX;
+  const baseW=Math.min(RINNE_GROUND_CHUNK_PX,tgt._logicalWidth-baseX);
+  const baseH=Math.min(RINNE_GROUND_CHUNK_PX,tgt._logicalHeight-baseY);
+  // 1pxの塗り足しを重ね、カメラが小数座標でもチャンク境界に隙間を作らない。
+  const x=Math.max(0,baseX-1),y=Math.max(0,baseY-1);
+  const w=Math.min(tgt._logicalWidth,baseX+baseW+1)-x;
+  const h=Math.min(tgt._logicalHeight,baseY+baseH+1)-y;
+  const chunk={x,y,w,h,canvas:document.createElement('canvas')};
+  paintRinneGroundChunk(W2,chunk,chunk.canvas);
+  tgt._groundChunks.set(key,chunk);
+  while(tgt._groundChunks.size>RINNE_GROUND_CHUNK_CACHE)
+    tgt._groundChunks.delete(tgt._groundChunks.keys().next().value);
+  return chunk;
+}
+function drawRinneGroundChunks(W2,camX,camY,shakeX,shakeY,viewExtraX,viewExtraY){
+  const tgt=W2.ground,gW=tgt._logicalWidth,gH=tgt._logicalHeight;
+  const ox=W/2-camX-gW/2+shakeX,oy=H/2-camY-TH/2+shakeY;
+  const x0=clamp(-viewExtraX-ox,0,gW-1),x1=clamp(W+viewExtraX-ox,0,gW-1);
+  const y0=clamp(-viewExtraY-oy,0,gH-1),y1=clamp(H+viewExtraY-oy,0,gH-1);
+  const cx0=Math.floor(x0/RINNE_GROUND_CHUNK_PX),cx1=Math.floor(x1/RINNE_GROUND_CHUNK_PX);
+  const cy0=Math.floor(y0/RINNE_GROUND_CHUNK_PX),cy1=Math.floor(y1/RINNE_GROUND_CHUNK_PX);
+  for(let cy=cy0;cy<=cy1;cy++)for(let cx=cx0;cx<=cx1;cx++){
+    const chunk=rinneGroundChunk(W2,cx,cy);
+    ctx.drawImage(chunk.canvas,ox+chunk.x,oy+chunk.y,chunk.w,chunk.h);
+  }
+}
+function renderGroundRinne(world){
+  const W2=world||worldByZone(zone);
+  if(!W2)return;
+  const tgt=W2.ground,size=W2.size||RINNE_SIZE;
+  if(tgt._groundChunks)tgt._groundChunks.clear();
+  tgt.width=1;tgt.height=1;
+  tgt._logicalWidth=size*TW+TW;tgt._logicalHeight=size*TH+TH*2;
+  tgt._renderScale=groundRenderScale();tgt._groundChunks=new Map();tgt._chunked=true;
   tgt._groundReady=true;
 }
 function buildCave(){
@@ -6641,9 +6700,11 @@ function render(){
   ctx.translate(-W/2,-H/2);
   const groundW=ground._logicalWidth||ground.width;
   const groundH=ground._logicalHeight||ground.height;
-  ctx.drawImage(ground,
-    W/2-camX-groundW/2+shakeX,H/2-camY-TH/2+shakeY,
-    groundW,groundH);
+  if(zone==='rinne'&&ground._chunked)
+    drawRinneGroundChunks(RINNE,camX,camY,shakeX,shakeY,viewExtraX,viewExtraY);
+  else ctx.drawImage(ground,
+      W/2-camX-groundW/2+shakeX,H/2-camY-TH/2+shakeY,
+      groundW,groundH);
 
   const SX=(x,y)=>isoX(x,y)-camX+W/2+shakeX;
   const SY=(x,y)=>isoY(x,y)-camY+H/2+shakeY;
