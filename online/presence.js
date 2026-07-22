@@ -3,7 +3,7 @@ const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
 const VALID_ZONE = /^(field|rinne|rinne_coast|rinne_wilds|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
-const VALID_MEISHOKU = new Set(['', 'rasetsu', 'kagehoshi']);
+const VALID_MEISHOKU = new Set(['', 'rasetsu', 'kagehoshi', 'jugonshi']);
 const VALID_ATTACK_KIND = new Set([
   'melee', 'bolt', 'fire', 'heal',
   'potion_s', 'potion_m', 'potion_l', 'haste', 'crit',
