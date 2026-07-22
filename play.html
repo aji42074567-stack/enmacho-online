@@ -356,11 +356,11 @@
   .boss-cutin.video-ready .boss-cutin-art{visibility:hidden}
   .boss-cutin.has-video .boss-cutin-kicker,.boss-cutin.has-video h2,
   .boss-cutin.has-video .boss-cutin-epithet,.boss-cutin.has-video .boss-cutin-message span{opacity:0}
-  .boss-cutin.video-playing .boss-cutin-kicker{animation:bossVideoTextIn .5s .35s both}
-  .boss-cutin.video-playing h2{animation:bossVideoTextIn .62s .85s both}
-  .boss-cutin.video-playing .boss-cutin-epithet{animation:bossVideoTextIn .55s 1.9s both}
-  .boss-cutin.video-playing .boss-cutin-message-lead{animation:bossVideoTextIn .65s 4.35s both}
-  .boss-cutin.video-playing .boss-cutin-message-tail{animation:bossVideoTextIn .75s 5.65s both}
+  .boss-cutin.video-playing .boss-cutin-kicker{animation:bossVideoTextIn .5s var(--boss-kicker-at,.35s) both}
+  .boss-cutin.video-playing h2{animation:bossVideoTextIn .62s var(--boss-name-at,.85s) both}
+  .boss-cutin.video-playing .boss-cutin-epithet{animation:bossVideoTextIn .55s var(--boss-epithet-at,1.9s) both}
+  .boss-cutin.video-playing .boss-cutin-message-lead{animation:bossVideoTextIn .65s var(--boss-lead-at,4.35s) both}
+  .boss-cutin.video-playing .boss-cutin-message-tail{animation:bossVideoTextIn .75s var(--boss-tail-at,5.65s) both}
   .boss-cutin[data-boss="drake"] .boss-cutin-art{right:-5vw;width:min(68vw,860px);
     filter:brightness(.44) saturate(.82) drop-shadow(0 0 30px var(--boss-accent))}
   .boss-cutin-skip{position:absolute;z-index:7;right:max(22px,env(safe-area-inset-right));
@@ -827,7 +827,7 @@
     .boss-cutin.has-video .boss-cutin-copy{margin:0 20px 15vh}
     .boss-cutin.has-video .boss-cutin-copy::before{inset:-5vh -22px -4vh -20px;
       background:linear-gradient(0deg,rgba(1,2,4,.92),rgba(1,2,4,.66) 72%,transparent)}
-    .boss-cutin.has-video .boss-cutin-video{object-position:64% center}
+    .boss-cutin.has-video .boss-cutin-video{object-position:var(--boss-video-position,64% center)}
     .boss-cutin-art,.boss-cutin[data-boss="drake"] .boss-cutin-art{--boss-art-opacity:.36;
       right:-18vw;bottom:17vh;width:95vw;height:64vh;
       filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
@@ -1861,7 +1861,8 @@ const player={
   qb:emptyQuestBoard(),                     // 受注中 {クエストID:進捗} / 達成済み
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false,
-    oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false,oniVideoIntroSeen:false},
+    oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false,
+    oniVideoIntroSeen:false,gashaoVideoIntroSeen:false,dragonVideoIntroSeen:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
   giftsUsed:{},                             // 運営ギフトの受取記録 {id:true}
@@ -2010,6 +2011,8 @@ function load(){
       gashaoIntroSeen:!!st.gashaoIntroSeen,
       dragonIntroSeen:!!st.dragonIntroSeen,
       oniVideoIntroSeen:!!st.oniVideoIntroSeen,
+      gashaoVideoIntroSeen:!!st.gashaoVideoIntroSeen,
+      dragonVideoIntroSeen:!!st.dragonVideoIntroSeen,
     };
     // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
     if(oldKazuDone){
@@ -4608,14 +4611,22 @@ const BOSS_CUTINS={
   cave3:{flag:'oniVideoIntroSeen',boss:'oni',kicker:'試練の洞窟 最深部　／　因果顕現',
     name:'鬼王 オニオウ',epithet:'怒りの成れの果て',art:'assets/mob_orc_blue.png',
     video:'assets/boss_oni_intro.mp4',
+    textAt:{lead:4.35,tail:5.65},
     messageLead:'その怒りは誰かを傷つけた。',
     messageTail:'だが、痛みを越えた者は以前より強くなった。傷つけた罪と、生まれた強さ——因果は善悪だけでは割り切れない。'},
-  muen3:{flag:'gashaoIntroSeen',boss:'gashao',kicker:'無縁塚 最深部　／　因果顕現',
+  muen3:{flag:'gashaoVideoIntroSeen',boss:'gashao',kicker:'無縁塚 最深部　／　因果顕現',
     name:'骨王 ガシャオウ',epithet:'孤独の成れの果て',art:'assets/mob_skeleton.png',
-    message:'孤独に耐え切れなかった。それだけで悪と呼べるのか。誰の胸にも同じ空洞はある。違ったのは、差し伸べる手がなかったことだけだ。'},
-  dg5:{flag:'dragonIntroSeen',boss:'drake',kicker:'竜の洞窟 最深部　／　因果顕現',
+    video:'assets/boss_gashao_intro.mp4',
+    textAt:{lead:3.75,tail:5.15},
+    messageLead:'孤独に耐え切れなかった。',
+    messageTail:'それだけで悪と呼べるのか。誰の胸にも同じ空洞はある。違ったのは、差し伸べる手がなかったことだけだ。'},
+  dg5:{flag:'dragonVideoIntroSeen',boss:'drake',kicker:'竜の洞窟 最深部　／　因果顕現',
     name:'業龍 ゴウリュウ',epithet:'災厄にして、最後の守護者',art:'assets/mob_drake.png',
-    message:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。災厄であることと、守護者であることは両立する。'},
+    video:'assets/boss_dragon_intro.mp4',
+    mobileVideoPosition:'40% center',
+    textAt:{lead:3.4,tail:4.8},
+    messageLead:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。',
+    messageTail:'災厄であることと、守護者であることは両立する。'},
 };
 let bossCutinActive=false,bossCutinTimer=0;
 function duckBossCutinBgm(duck){
@@ -4682,8 +4693,15 @@ function showBossCutinForZone(zoneName){
   player.attackDur=0;player.attackT=0;player.combatT=0;
   const panel=$('bossCutin');
   const useVideo=!!scene.video&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const textAt=scene.textAt||{};
   panel.classList.remove('has-video','video-ready','video-playing','video-ended');
   panel.classList.toggle('has-video',useVideo);
+  panel.style.setProperty('--boss-kicker-at',`${textAt.kicker||.35}s`);
+  panel.style.setProperty('--boss-name-at',`${textAt.name||.85}s`);
+  panel.style.setProperty('--boss-epithet-at',`${textAt.epithet||1.9}s`);
+  panel.style.setProperty('--boss-lead-at',`${textAt.lead||4.35}s`);
+  panel.style.setProperty('--boss-tail-at',`${textAt.tail||5.65}s`);
+  panel.style.setProperty('--boss-video-position',scene.mobileVideoPosition||'64% center');
   panel.dataset.boss=scene.boss;
   $('bossCutinKicker').textContent=scene.kicker;
   $('bossCutinName').textContent=scene.name;
