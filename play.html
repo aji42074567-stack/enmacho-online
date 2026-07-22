@@ -1281,8 +1281,8 @@
 <script>
 'use strict';
 /* ================= 基本設定 ================= */
-const TW=64, TH=32, WORLD_SIZE=72, FIELD_SIZE=120;
-let mapSize=FIELD_SIZE;   // 賽の森だけ四国全土。屋内・洞窟・第二章は従来の72マス。
+const TW=64, TH=32, WORLD_SIZE=72, FIELD_SIZE=120, RINNE_SIZE=120;
+let mapSize=FIELD_SIZE;   // 賽の森と輪廻大陸は120マス、屋内・洞窟は72マス。
 const RANGE=1.4;
 const AUTO_RANGE=8;
 const COMBAT_HOLD_SECONDS=4;
@@ -1449,7 +1449,7 @@ const rasetsuAvailable=gender=>gender==='m'||gender==='f';
 let blocked=new Uint8Array(FIELD_SIZE*FIELD_SIZE);
 let tileKind=new Uint8Array(FIELD_SIZE*FIELD_SIZE);   // 0草 1道 2石畳 3砂浜 4海 5洞窟床
 let zone='field',FIELD=null,CAVE=null,CAVE2=null,CAVE3=null;
-let ENMA1=null,ENMA2=null,ENMA3=null,RINNE_COAST=null,RINNE_WILDS=null,RINNE=null;
+let ENMA1=null,ENMA2=null,ENMA3=null,RINNE=null;
 const CAVE_DOOR={x:50.5,y:21.8};   // 試練の洞窟の入口(フィールド東)
 const CAVE_TRIG={x:49.2,y:23.2};   // ここに触れると洞窟へ
 // 階層間の階段(from階のat地点に触れるとto階のentryへ)
@@ -1497,28 +1497,16 @@ const ENMA_LINKS=[
   {from:'enma2',at:{x:23,y:20},   to:'enma3',entry:{x:39,y:41},label:'三階へ',tone:'up'},
   {from:'enma3',at:{x:40,y:43},   to:'enma2',entry:{x:22,y:21},label:'二階へ',tone:'down'},
 ];
-const RINNE_COAST_ENTRY={x:58,y:40};
-const RINNE_COAST_FERRY={x:65,y:46};
-const RINNE_COAST_INLAND={x:8,y:26};
-const RINNE_WILDS_SOUTH_ENTRY={x:61,y:46};
-const RINNE_WILDS_SOUTH_EXIT={x:64,y:48};
-const RINNE_WILDS_CITY_ENTRY={x:7,y:25};
-const RINNE_WILDS_CITY_EXIT={x:5,y:24};
+const RINNE_COAST_ENTRY={x:96,y:94};
+const RINNE_COAST_FERRY={x:104,y:104};
 const RINNE_ENTRY={x:51,y:51};
-const RINNE_EXIT={x:53,y:53};
 const MEISHOKU_SEALS=[
   {x:37,y:45,job:'rasetsu', label:'羅刹'},
   {x:45,y:37,job:'kagehoshi',label:'影法師'},
   {x:43,y:49,job:'jugonshi', label:'呪禁師'},
   {x:49,y:43,job:'gohousou', label:'護法僧'},
 ];
-const RINNE_LINKS=[
-  {from:'rinne_coast',at:RINNE_COAST_INLAND,to:'rinne_wilds',entry:RINNE_WILDS_SOUTH_ENTRY},
-  {from:'rinne_wilds',at:RINNE_WILDS_SOUTH_EXIT,to:'rinne_coast',entry:{x:10,y:27}},
-  {from:'rinne_wilds',at:RINNE_WILDS_CITY_EXIT,to:'rinne',entry:RINNE_ENTRY},
-  {from:'rinne',at:RINNE_EXIT,to:'rinne_wilds',entry:RINNE_WILDS_CITY_ENTRY},
-];
-const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS,RINNE_LINKS);
+const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
@@ -2036,8 +2024,9 @@ const player={
 const remotePlayers=new Map();
 const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
 const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5','muen1','muen2','muen3']);
-const worldByZone=z=>({field:FIELD,rinne_coast:RINNE_COAST,rinne_wilds:RINNE_WILDS,
-  rinne:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
+const worldByZone=z=>({field:FIELD,rinne:RINNE,
+  // 旧版クライアントの地域名は、同じ連続大陸として受ける。
+  rinne_coast:RINNE,rinne_wilds:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
   ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]
   :z&&z.startsWith('muen')?MUENW[+z.slice(4)-1]:null));
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
@@ -3784,7 +3773,7 @@ function openFerry(){
     setTalkAction('輪廻大陸へ出航',()=>{
       $('talk').classList.add('hidden');
       setTalkAction();
-      switchZone('rinne_coast',RINNE_COAST_ENTRY.x,RINNE_COAST_ENTRY.y);
+      switchZone('rinne',RINNE_COAST_ENTRY.x,RINNE_COAST_ENTRY.y);
       banner={txt:'第二章　輪廻大陸',age:0};
     });
   }
@@ -4169,7 +4158,8 @@ function update(dt){
         }
       }
     }
-    const inVillage=(zone==='field'&&dist(player,SPAWN)<6.5)||zone==='rinne';
+    const inVillage=(zone==='field'&&dist(player,SPAWN)<6.5)
+      ||(zone==='rinne'&&rinneRegionAt(player.x,player.y)==='city');
     player.mp=Math.min(player.maxMp,player.mp+dt*(inVillage?3.6:1.2)*mpRegenMul());
     if(inVillage||!player.moving)
       player.hp=Math.min(player.maxHp,player.hp+dt*(inVillage?6:1.5));
@@ -4686,8 +4676,8 @@ function rinneTerrainCells(){
 function renderGroundRinne(world){
   const W2=world||worldByZone(zone);
   if(!W2)return;
-  const tgt=W2.ground;
-  const prepared=prepareGroundCanvas(tgt,WORLD_SIZE);
+  const tgt=W2.ground,size=W2.size||RINNE_SIZE;
+  const prepared=prepareGroundCanvas(tgt,size);
   const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
@@ -4695,34 +4685,63 @@ function renderGroundRinne(world){
   const patterns=cells.map(cell=>g.createPattern(cell,'repeat'));
   const fallback=['#a99b49','#b99c67','#e8ddbf','#3baeb6','#8db79a','#cfc3a8'];
   const cellForKind=kind=>kind===1?1:kind===3?2:kind===4?3:kind===8?4:kind===2?5:0;
-  g.fillStyle=W2.zone==='rinne_coast'?'#2f909b':'#9f9145';g.fillRect(0,0,gW,gH);
-  const dia=(x,y)=>{
-    const cx=GX(x,y),cy=GY(x,y);
-    g.beginPath();g.moveTo(cx,cy-TH/2-1);g.lineTo(cx+TW/2+1.5,cy);
-    g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1.5,cy);g.closePath();
+  g.fillStyle='#17343b';g.fillRect(0,0,gW,gH);
+
+  // マップ全体のひし形だけを草原で塗る。マスごとのひし形は描かない。
+  g.save();
+  g.beginPath();
+  g.moveTo(GX(0,0),GY(0,0));g.lineTo(GX(size,0),GY(size,0));
+  g.lineTo(GX(size,size),GY(size,size));g.lineTo(GX(0,size),GY(0,size));g.closePath();
+  g.clip();
+  g.fillStyle=patterns[0]||fallback[0];g.fillRect(0,0,gW,gH);
+  g.fillStyle='rgba(151,126,48,.13)';g.fillRect(0,0,gW,gH);
+  g.restore();
+
+  // 同じ地形の隣接マスを不規則な楕円で連結し、1枚の連続マスクとして塗る。
+  const paintKind=(kind,rx,ry,edgeAlpha=.3)=>{
+    const cell=cellForKind(kind),color=fallback[cell],pattern=patterns[cell];
+    const trace=(extra=0)=>{
+      g.beginPath();
+      for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+        if(W2.tileKind[y*size+x]!==kind)continue;
+        const h=rinneHash(x,y,kind*19+3),h2=rinneHash(y,x,kind*23+7);
+        const jx=(h-.5)*7,jy=(h2-.5)*3;
+        g.moveTo(GX(x,y)+jx+rx+extra,GY(x,y)+jy);
+        g.ellipse(GX(x,y)+jx,GY(x,y)+jy,rx+extra,ry+extra*.42,0,0,6.29);
+      }
+    };
+    g.save();g.globalAlpha=edgeAlpha;g.fillStyle=color;trace(7);g.fill();g.restore();
+    g.save();trace(0);g.clip();g.fillStyle=pattern||color;g.fillRect(0,0,gW,gH);
+    g.fillStyle=kind===4?'rgba(17,116,131,.16)':kind===8?'rgba(45,112,97,.12)':'rgba(255,244,209,.035)';
+    g.fillRect(0,0,gW,gH);g.restore();
   };
-  for(let y=0;y<WORLD_SIZE;y++)for(let x=0;x<WORLD_SIZE;x++){
-    const kind=W2.tileKind[y*WORLD_SIZE+x],cell=cellForKind(kind);
-    g.fillStyle=patterns[cell]||fallback[cell];dia(x,y);g.fill();
-    const h=rinneHash(x,y,11);
-    if(kind===4||kind===8){
-      g.strokeStyle=kind===4?'rgba(230,255,246,.24)':'rgba(245,255,238,.16)';
-      g.lineWidth=.7+h*.8;
-      g.beginPath();g.moveTo(GX(x,y)-13, GY(x,y)+(h-.5)*5);
-      g.quadraticCurveTo(GX(x,y),GY(x,y)-3+(h-.5)*5,GX(x,y)+13,GY(x,y)+(h-.5)*5);g.stroke();
-    }else if(h>.86){
-      g.fillStyle=kind===2?'rgba(94,119,123,.17)':'rgba(104,78,39,.13)';
-      g.beginPath();g.ellipse(GX(x,y)+(h-.5)*18,GY(x,y)+(rinneHash(y,x,12)-.5)*8,2.2,1.1,0,0,6.29);g.fill();
+
+  paintKind(4,43,22,.52); // 海
+  paintKind(3,42,21,.42); // 貝砂
+  paintKind(8,39,19,.38); // 川・水路
+  paintKind(1,40,20,.28); // 土道
+  paintKind(2,38,19,.22); // 都の石畳
+
+  // 広い色むらと小さな草土の斑点で、同じテクスチャの繰り返しも崩す。
+  for(let i=0;i<180;i++){
+    const x=2+rinneHash(i,4,21)*(size-4),y=2+rinneHash(i,8,22)*(size-4);
+    const kind=W2.tileKind[Math.floor(y)*size+Math.floor(x)],r=24+rinneHash(i,3,23)*86;
+    if(kind===0){
+      g.fillStyle=rinneRegionAt(x,y)==='coast'?'rgba(65,94,48,.032)':'rgba(171,126,35,.038)';
+      g.beginPath();g.ellipse(GX(x,y),GY(x,y),r,r*.42,rinneHash(i,9,24)*.35,0,6.29);g.fill();
+    }else if(kind!==4&&kind!==8&&rinneHash(i,7,25)>.58){
+      g.fillStyle=kind===2?'rgba(73,102,108,.14)':'rgba(97,72,35,.12)';
+      g.beginPath();g.ellipse(GX(x,y),GY(x,y),2.5+rinneHash(i,2,26)*4,1.1,0,0,6.29);g.fill();
     }
   }
-  // マスの境界を隠す大きな色むら。判定はマスのまま、見た目だけ自然につなぐ。
-  for(let i=0;i<90;i++){
-    const x=2+rinneHash(i,4,21)*(WORLD_SIZE-4),y=2+rinneHash(i,8,22)*(WORLD_SIZE-4);
-    const kind=W2.tileKind[Math.floor(y)*WORLD_SIZE+Math.floor(x)];
-    if(kind!==0)continue;
-    const r=30+rinneHash(i,3,23)*70;
-    g.fillStyle=W2.zone==='rinne_wilds'?'rgba(174,128,43,.035)':'rgba(57,96,46,.035)';
-    g.beginPath();g.ellipse(GX(x,y),GY(x,y),r,r*.42,0,0,6.29);g.fill();
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const kind=W2.tileKind[y*size+x],h=rinneHash(x,y,11);
+    if((kind===4||kind===8)&&h>.38){
+      g.strokeStyle=kind===4?'rgba(230,255,246,.22)':'rgba(245,255,238,.15)';
+      g.lineWidth=.65+h*.8;g.beginPath();
+      g.moveTo(GX(x,y)-12-h*6,GY(x,y)+(h-.5)*5);
+      g.quadraticCurveTo(GX(x,y),GY(x,y)-3+(h-.5)*5,GX(x,y)+12+h*6,GY(x,y)+(h-.5)*5);g.stroke();
+    }
   }
   tgt._groundReady=true;
 }
@@ -4829,23 +4848,24 @@ function rinneTrailDistance(px,py,a,b){
   return Math.hypot(px-(a[0]+dx*t),py-(a[1]+dy*t));
 }
 function carveRinneTrail(world,points,radius,kind=7){
-  for(let y=0;y<WORLD_SIZE;y++)for(let x=0;x<WORLD_SIZE;x++){
+  const size=world.size||RINNE_SIZE;
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     let near=false;
     for(let i=1;i<points.length;i++){
       if(rinneTrailDistance(x,y,points[i-1],points[i])<=radius){near=true;break;}
     }
-    if(near){world.blocked[y*WORLD_SIZE+x]=0;world.tileKind[y*WORLD_SIZE+x]=kind;}
+    if(near){world.blocked[y*size+x]=0;world.tileKind[y*size+x]=kind;}
   }
 }
-function newRinneWorld(zoneName,artKey){
+function newRinneWorld(){
   const world={
-    blocked:new Uint8Array(WORLD_SIZE*WORLD_SIZE),tileKind:new Uint8Array(WORLD_SIZE*WORLD_SIZE),
+    blocked:new Uint8Array(RINNE_SIZE*RINNE_SIZE),tileKind:new Uint8Array(RINNE_SIZE*RINNE_SIZE),
     props:[],npcs:[],mobs:[],ground:document.createElement('canvas'),
-    zone:zoneName,
+    zone:'rinne',size:RINNE_SIZE,
   };
-  for(let i=0;i<WORLD_SIZE;i++){
-    world.blocked[i]=1;world.blocked[(WORLD_SIZE-1)*WORLD_SIZE+i]=1;
-    world.blocked[i*WORLD_SIZE]=1;world.blocked[i*WORLD_SIZE+WORLD_SIZE-1]=1;
+  for(let i=0;i<RINNE_SIZE;i++){
+    world.blocked[i]=1;world.blocked[(RINNE_SIZE-1)*RINNE_SIZE+i]=1;
+    world.blocked[i*RINNE_SIZE]=1;world.blocked[i*RINNE_SIZE+RINNE_SIZE-1]=1;
   }
   return world;
 }
@@ -4853,9 +4873,14 @@ const rinneHash=(x,y,s=0)=>{
   const n=Math.sin(x*127.1+y*311.7+s*73.9)*43758.5453;
   return n-Math.floor(n);
 };
+function rinneRegionAt(x,y){
+  const depth=x+y;
+  return depth<112?'city':depth>184?'coast':'wilds';
+}
 function rinneSetBlocked(world,x,y,value=1){
+  const size=world.size||RINNE_SIZE;
   const gx=Math.round(x),gy=Math.round(y);
-  if(gx>0&&gy>0&&gx<WORLD_SIZE-1&&gy<WORLD_SIZE-1)world.blocked[gy*WORLD_SIZE+gx]=value;
+  if(gx>0&&gy>0&&gx<size-1&&gy<size-1)world.blocked[gy*size+gx]=value;
 }
 function addRinneTree(world,x,y,type,scale=1){
   rinneSetBlocked(world,x,y,1);
@@ -4866,82 +4891,47 @@ function addRinneBuilding(world,x,y,w,h,style='house'){
   world.props.push({x:x+(w-1)/2,y:y+(h-1)/2,kind:'rinne_building',style,footprintW:w,footprintH:h});
 }
 function buildRinneContinent(){
-  // 南岸。白い貝砂・浅瀬・黄土の街道をマスで作り、桟橋と植生は別プロップにする。
-  const coast=newRinneWorld('rinne_coast');
-  for(let y=1;y<WORLD_SIZE-1;y++)for(let x=1;x<WORLD_SIZE-1;x++){
-    const shore=x+y+(x-y)*0.25+Math.sin(x*.31)*1.8+Math.sin(y*.23)*1.2;
-    if(shore>109){coast.tileKind[y*WORLD_SIZE+x]=4;coast.blocked[y*WORLD_SIZE+x]=1;}
-    else if(shore>99)coast.tileKind[y*WORLD_SIZE+x]=3;
-  }
-  const coastTrail=[[58,40],[53,39],[47,38],[40,36],[33,34],[25,31],[17,28],[10,27],[8,26]];
-  carveRinneTrail(coast,coastTrail,2.7,1);
-  coast.props.push({x:RINNE_COAST_INLAND.x,y:RINNE_COAST_INLAND.y,kind:'hallportal',label:'大陸街道へ',tone:'up'});
-  coast.props.push({x:63,y:44,kind:'rinne_pier'});
-  coast.npcs.push({x:59,y:41,kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
-  for(let y=3;y<60;y+=2)for(let x=3;x<66;x+=2){
-    if(coast.tileKind[y*WORLD_SIZE+x]!==0||coast.blocked[y*WORLD_SIZE+x])continue;
-    const d=Math.min(...coastTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,coastTrail[i],p)));
-    const h=rinneHash(x,y,1);
-    if(d>4.4&&h>.77)addRinneTree(coast,x+.15,y-.1,'pine',.82+rinneHash(y,x,2)*.32);
-    else if(d>3&&h>.55)coast.props.push({x:x+.35,y:y+.15,kind:'rinne_pampas',s:.75+rinneHash(x,y,3)*.45});
-  }
-  for(const p of [
-    {x:56,y:42,v:'crate'},{x:58,y:43,v:'jar'},{x:54,y:40,v:'parcel'},
-    {x:61,y:42,v:'offering'},{x:52,y:38,v:'talisman'},
-  ])coast.props.push({...p,kind:'rinne_clutter'});
-  coast.props.push({x:55,y:40,kind:'rinne_lantern'});
-  addRinneTree(coast,28,21,'camphor',1.15);
-  for(const [x,y] of [[66,39],[62,38],[57,46],[52,47]])coast.props.push({x,y,kind:'rinne_rock',s:.75+rinneHash(x,y)*.3});
-  RINNE_COAST=coast;
+  // 南岸・街道・都を1枚の120×120マップに置く。地域境界でswitchZoneしない。
+  const city=newRinneWorld(),size=RINNE_SIZE;
+  const mainTrail=[[51,51],[58,52],[66,57],[75,68],[83,74],[89,83],[96,94]];
 
-  // 南部街道。黄金草原を横切る川と支道も独立したマスなので、後から東西へ拡張できる。
-  const wilds=newRinneWorld('rinne_wilds');
-  for(let y=1;y<WORLD_SIZE-1;y++)for(let x=1;x<WORLD_SIZE-1;x++){
-    const riverY=47-x*.35+Math.sin(x*.22)*1.3;
-    if(Math.abs(y-riverY)<1.35){wilds.tileKind[y*WORLD_SIZE+x]=8;wilds.blocked[y*WORLD_SIZE+x]=1;}
+  // 曲がった海岸線と貝砂帯。判定はマス、表示は後で連続マスクにする。
+  for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
+    const shore=x+y+Math.sin(x*.17)*2.8+Math.sin(y*.21+1.3)*2.2;
+    if(shore>205){city.tileKind[y*size+x]=4;city.blocked[y*size+x]=1;}
+    else if(shore>187)city.tileKind[y*size+x]=3;
   }
-  const wildTrail=[[64,48],[58,44],[51,41],[43,38],[35,35],[27,32],[18,29],[10,26],[5,24]];
-  carveRinneTrail(wilds,wildTrail,2.8,1);
-  carveRinneTrail(wilds,[[43,38],[46,31],[49,24]],2.2,1);
-  carveRinneTrail(wilds,[[35,35],[30,40],[24,44]],2.2,1);
-  wilds.props.push(
-    {x:RINNE_WILDS_SOUTH_EXIT.x,y:RINNE_WILDS_SOUTH_EXIT.y,kind:'hallportal',label:'南岸船着場へ',tone:'down'},
-    {x:RINNE_WILDS_CITY_EXIT.x,y:RINNE_WILDS_CITY_EXIT.y,kind:'hallportal',label:'輪廻の都へ',tone:'up'},
-    {x:35,y:35,kind:'rinne_bridge'},
-  );
-  for(let y=3;y<WORLD_SIZE-3;y+=2)for(let x=3;x<WORLD_SIZE-3;x+=2){
-    if(wilds.tileKind[y*WORLD_SIZE+x]!==0||wilds.blocked[y*WORLD_SIZE+x])continue;
-    const d=Math.min(...wildTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,wildTrail[i],p)));
-    const h=rinneHash(x,y,6);
-    if(d>4.2&&h>.82)addRinneTree(wilds,x+.15,y-.1,h>.9?'ginkgo':'pine',.86+rinneHash(y,x,7)*.4);
-    else if(h>.52)wilds.props.push({x:x+.25,y:y+.2,kind:'rinne_pampas',s:.72+rinneHash(x,y,8)*.48});
-  }
-  for(const p of [
-    {x:40,y:36,v:'talisman'},{x:31,y:37,v:'offering'},
-    {x:25,y:33,v:'jar'},{x:47,y:30,v:'parcel'},
-  ])wilds.props.push({...p,kind:'rinne_clutter'});
-  addRinneTree(wilds,48,20,'bamboo',.9);
-  addRinneTree(wilds,51,22,'bamboo',.82);
-  addRinneTree(wilds,45,18,'camphor',1.18);
-  wilds.props.push({x:39,y:36,kind:'rinne_lantern'});
-  RINNE_WILDS=wilds;
 
-  // 輪廻の都。水路・白い石畳・建物・植生・落とし物をすべて個別のマス／プロップで構成する。
-  const city=newRinneWorld('rinne');
-  for(let y=0;y<WORLD_SIZE;y++)for(let x=0;x<WORLD_SIZE;x++){
+  carveRinneTrail(city,mainTrail,3.15,1);
+  carveRinneTrail(city,[[66,57],[60,65],[53,72]],2.35,1);
+  carveRinneTrail(city,[[83,74],[88,65],[96,60]],2.35,1);
+
+  // 街道を横切る翡翠の川。一か所だけ橋で自然に越える。
+  for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
+    const depth=x+y,riverDepth=140+Math.sin((x-y)*.22)*3;
+    if(depth>116&&depth<168&&Math.abs(x-y)<36&&Math.abs(depth-riverDepth)<1.55){
+      city.tileKind[y*size+x]=8;city.blocked[y*size+x]=1;
+    }
+  }
+  for(let y=64;y<=72;y++)for(let x=71;x<=79;x++)if(Math.hypot(x-75,y-68)<=2.55){
+    city.tileKind[y*size+x]=1;city.blocked[y*size+x]=0;
+  }
+  city.props.push({x:75,y:68,kind:'rinne_bridge'});
+
+  // 輪廻の都。従来の広場を大陸の北西部にそのままつなぐ。
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const depth=x+y,side=Math.abs(x-y);
     const mainApproach=depth>=44&&depth<=108&&side<=5;
     const upperCourt=depth>=56&&depth<72&&side<=9;
     const grandCourt=depth>=68&&depth<=100&&side<=15;
     if(mainApproach||upperCourt||grandCourt){
-      city.blocked[y*WORLD_SIZE+x]=0;city.tileKind[y*WORLD_SIZE+x]=2;
+      city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;
     }
     const canal=(Math.abs(side-13)<1.25&&depth>=54&&depth<=98);
-    if(canal){city.blocked[y*WORLD_SIZE+x]=1;city.tileKind[y*WORLD_SIZE+x]=8;}
+    if(canal){city.blocked[y*size+x]=1;city.tileKind[y*size+x]=8;}
   }
-  // 水路を渡る横丁。都の中心街を一方通行にせず、左右の店へ回遊できる。
-  for(const depth0 of [66,84,96])for(let y=1;y<WORLD_SIZE-1;y++)for(let x=1;x<WORLD_SIZE-1;x++){
-    if(Math.abs(x+y-depth0)<=1&&Math.abs(x-y)<=18){city.blocked[y*WORLD_SIZE+x]=0;city.tileKind[y*WORLD_SIZE+x]=2;}
+  for(const depth0 of [66,84,96])for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
+    if(Math.abs(x+y-depth0)<=1&&Math.abs(x-y)<=18){city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;}
   }
   city.props.push({x:33,y:33,kind:'rinne_bridge'});
   city.props.push({x:42,y:42,kind:'rinne_bridge'});
@@ -4953,7 +4943,6 @@ function buildRinneContinent(){
   addRinneBuilding(city,43,31,4,4,'market');
   addRinneBuilding(city,14,28,3,3,'shrine');
   city.props.push({x:17,y:17,kind:'rinne_gate'});
-  city.props.push({x:RINNE_EXIT.x,y:RINNE_EXIT.y,kind:'hallportal',label:'大陸街道へ',tone:'exit'});
   for(const seal of MEISHOKU_SEALS)city.props.push({...seal,kind:'jobseal'});
   for(const [x,y,type,s] of [
     [19,29,'ginkgo',1],[29,19,'maple',.95],[25,36,'pine',.85],[36,25,'ginkgo',.9],
@@ -4966,6 +4955,35 @@ function buildRinneContinent(){
   ])city.props.push({...p,kind:'rinne_clutter'});
   for(const [x,y] of [[48,48],[44,44],[40,40],[36,36],[32,32],[28,28]])
     city.props.push({x:x+.8,y:y-.8,kind:'rinne_lantern'});
+
+  // 街道と海岸の植生は等間隔に並べず、ノイズで大小の塔を作る。
+  for(let y=4;y<size-4;y+=3)for(let x=4;x<size-4;x+=3){
+    const index=y*size+x,kind=city.tileKind[index],region=rinneRegionAt(x,y);
+    if(kind!==0||city.blocked[index]||region==='city')continue;
+    const d=Math.min(...mainTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,mainTrail[i],p)));
+    const h=rinneHash(x,y,region==='coast'?31:41);
+    if(region==='coast'){
+      if(d>5&&h>.72)addRinneTree(city,x+(rinneHash(x,y,32)-.5)*.8,y+(rinneHash(y,x,33)-.5)*.8,'pine',.78+rinneHash(y,x,34)*.38);
+      else if(d>3.5&&h>.43)city.props.push({x:x+.35,y:y+.1,kind:'rinne_pampas',s:.68+rinneHash(x,y,35)*.55});
+    }else if(d>5.2&&h>.78){
+      const type=h>.92?'ginkgo':h>.87?'bamboo':'pine';
+      addRinneTree(city,x+(rinneHash(x,y,42)-.5)*1.1,y+(rinneHash(y,x,43)-.5)*1.1,type,.8+rinneHash(y,x,44)*.45);
+    }else if(d>3&&h>.48)city.props.push({x:x+.3,y:y+.2,kind:'rinne_pampas',s:.65+rinneHash(x,y,45)*.58});
+  }
+  addRinneTree(city,58,72,'camphor',1.18);
+  addRinneTree(city,94,76,'bamboo',.9);
+  addRinneTree(city,97,78,'bamboo',.82);
+
+  city.props.push({x:101,y:101,kind:'rinne_pier'});
+  city.npcs.push({x:97,y:93,kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
+  for(const p of [
+    {x:94,y:94,v:'crate'},{x:98,y:96,v:'jar'},{x:91,y:89,v:'parcel'},
+    {x:99,y:92,v:'offering'},{x:88,y:84,v:'talisman'},
+    {x:70,y:60,v:'offering'},{x:85,y:78,v:'parcel'},{x:62,y:62,v:'jar'},
+  ])city.props.push({...p,kind:'rinne_clutter'});
+  city.props.push({x:92,y:89,kind:'rinne_lantern'},{x:69,y:61,kind:'rinne_lantern'});
+  for(const [x,y] of [[109,96],[105,101],[99,104],[92,103],[111,91]])
+    city.props.push({x,y,kind:'rinne_rock',s:.72+rinneHash(x,y)*.34});
   RINNE=city;
 }
 /* ---- 竜の洞窟(地下5階) ---- */
@@ -5176,20 +5194,22 @@ function showBossCutinForZone(zoneName){
 }
 $('bossCutin').addEventListener('click',dismissBossCutin);
 function switchZone(z,px,py){
+  if(z==='rinne_coast'||z==='rinne_wilds')z='rinne';
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
   const previousGround=ground;
   zone=z;
-  mapSize=z==='field'?FIELD_SIZE:WORLD_SIZE;
+  mapSize=z==='field'?FIELD_SIZE:z==='rinne'?RINNE_SIZE:WORLD_SIZE;
   const W2={
-    field:FIELD,rinne_coast:RINNE_COAST,rinne_wilds:RINNE_WILDS,rinne:RINNE,
+    field:FIELD,rinne:RINNE,
     cave:CAVE,cave2:CAVE2,cave3:CAVE3,
     enma1:ENMA1,enma2:ENMA2,enma3:ENMA3,
   }[z]||(z.startsWith('muen')?MUENW[+z.slice(4)-1]:DGW[+z.slice(2)-1]);
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
-  // スマホでは離れたエリアの巨大Canvasを保持せず、戻ったときに再生成する。
-  if(MOBILE_RENDER&&previousGround!==ground)releaseGroundCanvas(previousGround);
+  // 120マスの巨大マップは二枚同時に保持せず、船移動のときだけ再生成する。
+  if(previousGround!==ground&&(MOBILE_RENDER||previousGround===FIELD?.ground||previousGround===RINNE?.ground))
+    releaseGroundCanvas(previousGround);
   if(started&&!ground._groundReady){
     if(zone==='field')renderGround();
     else if(zone.startsWith('enma'))renderGroundEnma();
@@ -5216,9 +5236,7 @@ function switchZone(z,px,py){
   }
   const ZMSG={
     field:'賽の森へ戻ってきた',
-    rinne_coast:'輪廻大陸 南岸船着場——潮風の向こうに広い大地が続いている',
-    rinne_wilds:'輪廻大陸 南部街道——遠くに輪廻の都の城門が見える',
-    rinne:'輪廻大陸 内陸都市・輪廻の都へ入った',
+    rinne:'輪廻大陸——南岸から街道と都まで、一続きの大地が広がっている',
     cave:'試練の洞窟に足を踏み入れた…',
     cave2:'地下二層へ降りた。空気が冷たく、重い…',
     cave3:'地下三層——最深部。奥で何かが待っている…',
@@ -5264,7 +5282,7 @@ function startOneSprite(key,src,attempt=0){
     }
     if(key.startsWith('rinne_')){
       if(key==='rinne_terrain_atlas')RINNE_TERRAIN_CELLS=[];
-      for(const rw of [RINNE_COAST,RINNE_WILDS,RINNE])if(rw)rw.ground._groundReady=false;
+      if(RINNE)RINNE.ground._groundReady=false;
       if(started&&zone.startsWith('rinne'))renderGroundRinne(worldByZone(zone));
     }
   };
@@ -6640,7 +6658,7 @@ function render(){
     const ferry=ferryWorldPoint();
     drawFerry(SX(ferry.x,ferry.y),SY(ferry.x,ferry.y));
   }
-  if(zone==='rinne_coast'){
+  if(zone==='rinne'){
     drawFerry(SX(RINNE_COAST_FERRY.x,RINNE_COAST_FERRY.y),SY(RINNE_COAST_FERRY.x,RINNE_COAST_FERRY.y));
   }
   // 完成形の桟橋を1枚だけ背景側に描き、人物をその上へ重ねる
@@ -6917,8 +6935,9 @@ function hud(){
     const progress=q.n>1?`${q.name} ${questProg(q.id)}/${q.n}`:q.name;
     el.goal.textContent=tracking.length>1?`受注中${tracking.length}件｜${progress}`:progress;
   }else{
-    el.goal.textContent=zone==='rinne_coast'?'南岸の船着場から大陸街道へ'
-      :zone==='rinne_wilds'?'大陸街道を進み、輪廻の都へ'
+    const rinneRegion=zone==='rinne'?rinneRegionAt(player.x,player.y):'';
+    el.goal.textContent=rinneRegion==='coast'?'南岸から一続きの大陸街道へ'
+      :rinneRegion==='wilds'?'大陸街道を進み、輪廻の都へ'
       :zone==='rinne'
         ?player.meishoku?`冥職「${MEISHOKU[player.meishoku]?.name||'—'}」として第二審査へ`:'広場の四つの印から冥職を選ぼう'
       :player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
@@ -7348,8 +7367,7 @@ let activeInvite=null,inviteTimer=0;
 const genPartyId=()=>globalThis.crypto?.randomUUID
   ?crypto.randomUUID()
   :`${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,10)}`;
-const ZONE_LABELS={field:'賽の森',rinne_coast:'輪廻大陸・南岸',rinne_wilds:'輪廻大陸・街道',
-  rinne:'輪廻の都',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
+const ZONE_LABELS={field:'賽の森',rinne:'輪廻大陸',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
   dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5',
   muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3'};
 const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
