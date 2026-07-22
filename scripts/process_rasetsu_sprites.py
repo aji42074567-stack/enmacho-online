@@ -224,12 +224,14 @@ def main() -> None:
     parser.add_argument("--death", type=Path)
     parser.add_argument("--gender", choices=("m", "f"), default="m")
     parser.add_argument("--out-dir", type=Path, required=True)
+    # 職ごとの出力名(例: char_kagehoshi)。既定は従来どおり羅刹
+    parser.add_argument("--prefix", default="char_rasetsu")
     args = parser.parse_args()
     if not args.hitdeath and not (args.hit and args.death):
         parser.error("use --hitdeath or both --hit and --death")
     if args.hitdeath and (args.hit or args.death):
         parser.error("--hitdeath cannot be combined with --hit or --death")
-    prefix = f"char_rasetsu_{args.gender}"
+    prefix = f"{args.prefix}_{args.gender}"
 
     walk_normalizer = (
         normalize_irregular_grid if args.walk_irregular_grid else normalize_grid

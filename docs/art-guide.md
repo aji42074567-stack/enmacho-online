@@ -125,12 +125,17 @@ enmacho-online/
 - 緑透過→分割→シート化の再生成手順は `scripts/process_rasetsu_sprites.py` に保存している
 - `_wip_src/` は原画置き場としてgitignoreを維持し、配信には `assets/` の加工済み画像だけを使う
 
-### 影法師(第二章の職・2番目)素材 — `_wip_src/kagebo_*.png`(2026-07-22、未組込)
+### 影法師(第二章の職・2番目)素材 — `_wip_src/kagebo_*.png`(2026-07-22、組込済み)
 
 四職の2番目「影法師(かげぼうし)」(速さ・会心・間合いの遊撃職)の原画一式。
 羅刹と同じくローカルの `_wip_src/` にのみ存在する緑背景(#00FF00)クロマキー素材。
-**組込は羅刹と同じ手順・同じ出力仕様**(`scripts/process_rasetsu_sprites.py` を流用し、
-`assets/char_kagebo_{m,f}*.png` として出力する想定)。
+配信用は `assets/char_kagehoshi_{m,f}*.png` として組込済み(冥職IDの`kagehoshi`に合わせた)。
+再生成コマンド(男女とも立ちは歩行から生成):
+`python3 scripts/process_rasetsu_sprites.py --stand-from-walk --walk _wip_src/kagebo_m_walk.png
+ --attack _wip_src/kagebo_m_attack.png --hit _wip_src/kagebo_m_hit.png --death _wip_src/kagebo_m_death.png
+ --gender m --out-dir assets --prefix char_kagehoshi`(fも同様)。
+`--prefix` はこの組込で追加した引数(既定は従来どおり`char_rasetsu`)。
+描画サイズは通常主人公と同じ48px(羅刹だけ56px)。
 
 | ファイル | 内容 | 備考 |
 |---|---|---|
