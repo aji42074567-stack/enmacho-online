@@ -1,8 +1,8 @@
 // ?v= は旧キャッシュを飛ばすための目印(play.html側と揃える)
-import { createPresenceController } from './presence.js?v=20260722f';
-import { createWorldController } from './world.js?v=20260722c';
-import { createSocialController } from './social.js?v=20260722d';
-import { createGuildController } from './guild.js?v=20260722b';
+import { createPresenceController } from './presence.js?v=20260722g';
+import { createWorldController } from './world.js?v=20260722d';
+import { createSocialController } from './social.js?v=20260722e';
+import { createGuildController } from './guild.js?v=20260722c';
 
 const config = window.ENMA_ONLINE_CONFIG || {};
 const content = document.getElementById('accountContent');
@@ -27,6 +27,7 @@ const state = {
   profile: null,
   preferences: null,
   cloudSave: null,
+  gmMeishokuResetCount: 0,
   autoSyncState: 'checking',
   autoSyncMessage: 'クラウド記録を確認しています…',
   configured: Boolean(config.supabaseUrl && config.supabasePublishableKey),
@@ -51,6 +52,25 @@ let cloudSaveQueued = false;
 let cloudSaveUserId = '';
 let cloudReloadTimer = 0;
 const reportedSystemEvents = new Map();
+
+function publishGmMeishokuResetCount(value = 0) {
+  const count = Math.max(0, Math.trunc(Number(value) || 0));
+  state.gmMeishokuResetCount = count;
+  document.dispatchEvent(new CustomEvent('enma:gm-meishoku-reset-count', {
+    detail: { count },
+  }));
+}
+
+window.EnmaAccountBridge = {
+  async consumeGmMeishokuReset() {
+    if (!state.client || !state.session?.user?.id)
+      throw new Error('魂籍へログインしてください');
+    const { data, error } = await state.client.rpc('consume_gm_meishoku_reset');
+    if (error) throw error;
+    publishGmMeishokuResetCount(data);
+    return state.gmMeishokuResetCount;
+  },
+};
 
 async function reportSystemEvent(detail = {}, retry = false) {
   if (!state.client || !state.session?.user?.id) return;
@@ -429,14 +449,15 @@ function render() {
 }
 
 async function fetchAccountData(userId) {
-  const [profileResult, preferencesResult, cloudSaveResult] = await Promise.all([
+  const [profileResult, preferencesResult, cloudSaveResult, gmItemResult] = await Promise.all([
     state.client.from('profiles').select('*').eq('id', userId).single(),
     state.client.from('account_preferences').select('newsletter_opt_in')
       .eq('user_id', userId).single(),
     state.client.from('game_saves').select('save_version,revision,client_updated_at,updated_at,payload')
       .eq('user_id', userId).maybeSingle(),
+    state.client.rpc('gm_meishoku_reset_count'),
   ]);
-  return { profileResult, preferencesResult, cloudSaveResult };
+  return { profileResult, preferencesResult, cloudSaveResult, gmItemResult };
 }
 
 async function loadAccountData() {
@@ -451,6 +472,7 @@ async function loadAccountData() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    publishGmMeishokuResetCount(0);
     syncOnlineControllers(null, null);
     render();
     return;
@@ -471,6 +493,7 @@ async function loadAccountData() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    publishGmMeishokuResetCount(0);
     cloudSaveUserId = '';
     setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
     scheduleAccountReload();
@@ -498,6 +521,7 @@ async function loadAccountData() {
       );
     } catch (retryError) {
       if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
+      publishGmMeishokuResetCount(0);
       setFeedback('', `${retryError.message}。ゲームはそのまま開始できます`);
       setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
       scheduleAccountReload();
@@ -512,6 +536,7 @@ async function loadAccountData() {
     profileResult: { data: profile, error: profileError },
     preferencesResult: { data: preferences, error: preferencesError },
     cloudSaveResult: { data: cloudSave, error: saveError },
+    gmItemResult: { data: gmItemCount, error: gmItemError },
   } = results;
 
   if (profileError) {
@@ -536,6 +561,7 @@ async function loadAccountData() {
   state.profile = profile;
   state.preferences = preferences;
   state.cloudSave = cloudSave;
+  publishGmMeishokuResetCount(gmItemError ? 0 : gmItemCount);
   if (state.profile) {
     const lastSeenAt = new Date().toISOString();
     state.profile.last_seen_at = lastSeenAt;
@@ -884,6 +910,7 @@ async function signOut() {
     state.profile = null;
     state.preferences = null;
     state.cloudSave = null;
+    publishGmMeishokuResetCount(0);
     window.clearTimeout(cloudSaveTimer);
     window.clearTimeout(cloudReloadTimer);
     cloudSaveTimer = 0;
