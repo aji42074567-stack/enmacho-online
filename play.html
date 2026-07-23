@@ -26,7 +26,9 @@
   #plate{position:absolute;top:12px;left:12px;background:var(--panel);
     border:1px solid var(--panel-edge);border-radius:4px;padding:10px 14px;
     min-width:200px;pointer-events:none}
-  #plate .name{font-family:var(--serif);font-size:15px;color:var(--parchment);letter-spacing:.06em}
+  #plate .job,#plate .name{font-family:var(--serif);font-size:15px;letter-spacing:.06em}
+  #plate .job{color:var(--gold);margin-right:6px}
+  #plate .name{color:var(--parchment)}
   #plate .lv{color:var(--gold);font-family:var(--sans);font-size:12px;margin-left:6px;
     font-variant-numeric:tabular-nums}
   #plate .row{display:flex;align-items:center;gap:8px;margin-top:6px;
@@ -307,6 +309,9 @@
   .skill:active{transform:translateY(1px)}
   .skill:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   .skill .icon{font-size:18px;line-height:1}
+  .skill .icon.menu-job-icon.has-job{display:inline-block;width:28px;height:28px;
+    background-position:0 0;background-size:400% 100%;background-repeat:no-repeat;
+    image-rendering:pixelated;color:transparent}
   .skill .key{position:absolute;top:2px;left:4px;font-size:9px;color:var(--dim)}
   .skill .badge{position:absolute;bottom:2px;right:4px;font-size:10px;color:var(--gold);
     font-variant-numeric:tabular-nums}
@@ -798,6 +803,7 @@
     #partyFrames{top:92px}
     .pframe{min-width:122px;padding:4px 8px 5px}
     #plate .name{display:none}
+    #plate .job{margin-right:0;font-size:13px}
     #plate .lv{margin-left:0}
     #log{bottom:150px;font-size:10.5px}
     #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px))}
@@ -873,7 +879,7 @@
   <canvas id="game"></canvas>
 
   <div id="plate">
-    <span class="name" id="pname">亡者アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
+    <span class="job" id="pjob">亡者</span><span class="name" id="pname">アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
     <div class="row"><span>徳</span><div class="meter" id="xpbar"><i></i></div></div>
     <div class="row"><span>攻撃 <span class="v" id="atkv">8</span></span>
       <span>防御 <span class="v" id="defv">1</span></span>
@@ -990,7 +996,7 @@
         <span class="icon">▶</span><span>P<b id="quickPageNow">1</b>/3</span>
       </button>
       <button class="skill" id="btnEquip" title="メニュー (I)">
-        <span class="key">I</span><span class="icon">🛡</span><span>メニュー</span>
+        <span class="key">I</span><span class="icon menu-job-icon" id="menuJobIcon">🛡</span><span>メニュー</span>
         <span class="badge" id="ptN"></span>
       </button>
       <button class="skill" id="btnAuto" title="AUTO: 近くの敵を自動攻撃 (T)">
@@ -1478,6 +1484,13 @@ const MEISHOKU={
 const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
 const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   // 冥装(スプライト)が揃い選択できる職
 const meishokuReady=job=>MEISHOKU_READY.has(job);
+const meishokuLabel=e=>meishokuDef(e)?.name||'亡者';
+const playerSpriteAsset=e=>{
+  const gender=e?.gender==='f'?'f':'m';
+  return MEISHOKU_READY.has(e?.meishoku)
+    ?`assets/char_${e.meishoku}_${gender}.png`
+    :`assets/char_player_${gender}.png`;
+};
 const sealCdMul=()=>meishokuDef(player)?.sealCd||1;   // 呪禁師など印のクールタイム補正
 
 /* ================= マップ生成 ================= */
@@ -3373,8 +3386,8 @@ function renderEquip(){
 }
 function renderEquipTab(){
   const doll=$('doll');
-  // 人型は性別に合わせる(正面向きの1コマ目)
-  let html=`<div id="dollImg" style="background-image:url(assets/char_player_${player.gender}.png)"></div>`;
+  // 人型は性別と現在の冥職に合わせる(正面向きの1コマ目)
+  let html=`<div id="dollImg" style="background-image:url(${playerSpriteAsset(player)})"></div>`;
   for(const [slot,nm] of SLOTS){
     const id=player.eq[slot],it=ITEMS[id];
     const icn=it&&it.icon?`<img src="assets/${it.icon}" alt="">`:'';
@@ -3530,7 +3543,7 @@ function renderStatTab(){
       (player.statPts>0?`<button class="buyb" data-st="${k}">+1</button>`:'')+`</div>`;
   }
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px;margin-top:8px">
-    <span class="fx">─ 亡者 ${esc(player.name||'ナナシ')} の現在 ─</span></div>`;
+    <span class="fx">─ ${meishokuLabel(player)} ${esc(player.name||'ナナシ')} の現在 ─</span></div>`;
   html+=`<div class="statline"><span>攻撃</span><b>${atkTotal()}</b></div>`;
   html+=`<div class="statline"><span>防御</span><b>${defTotal()}</b></div>`;
   html+=`<div class="statline"><span>会心率</span><b>${Math.round(critRate()*100)}%</b></div>`;
@@ -7094,6 +7107,7 @@ const el={
   goal:document.querySelector('#quest .goal')
 };
 function hud(){
+  refreshPlayerIdentityUi();
   if(performance.now()-partyFramesAt>300){
     partyFramesAt=performance.now();
     renderPartyFrames();
@@ -7335,6 +7349,23 @@ const guildState={id:'',name:'',motto:'',myRole:'member',memberLimit:20,
 const GUILD_FOUND_COST=10000;   // 講の設立料(モン)
 const guildRoleLabel=r=>r==='master'?'講元':r==='officer'?'世話役':'講員';
 const inMyGuild=id=>!!guildState.id&&guildState.members.some(m=>m.userId===id);
+let identityUiKey='';
+function refreshPlayerIdentityUi(force=false){
+  const job=meishokuDef(player);
+  const key=[guildState.name,player.meishoku,player.gender,player.name].join('|');
+  if(!force&&key===identityUiKey)return;
+  identityUiKey=key;
+  $('pjob').textContent=job?.name||'亡者';
+  $('pname').textContent=(guildState.name?`【${guildState.name}】`:'')+(player.name||'ナナシ');
+  const icon=$('menuJobIcon');
+  icon.classList.toggle('has-job',Boolean(job));
+  icon.textContent=job?'':'🛡';
+  icon.style.backgroundImage=job?`url(${playerSpriteAsset(player)})`:'';
+  $('btnEquip').title=job?`${job.name}のメニュー (I)`:'メニュー (I)';
+  $('btnEquip').setAttribute('aria-label',job?`${job.name}のメニュー`:'メニュー');
+  const fixedName=$('nameFixed')?.querySelector('b');
+  if(fixedName)fixedName.textContent=`${job?.name||'亡者'} ${player.name||'ナナシ'}`;
+}
 const CHAT_CHANNELS={
   general:{label:'一般',color:'#c9a24a'},
   world:{label:'全体',color:'#e0824a'},
@@ -7615,11 +7646,10 @@ function updatePlayerCardButtons(){
 function openPlayerCard(e){
   if(!e||!e.userId)return;
   playerCard.userId=e.userId;
-  $('pcPortrait').style.backgroundImage=
-    `url(assets/char_player_${e.gender==='f'?'f':'m'}.png)`;
+  $('pcPortrait').style.backgroundImage=`url(${playerSpriteAsset(e)})`;
   $('pcName').textContent=e.name||'ナナシ';
   $('pcMeta').textContent=
-    `徳位${e.level||1}・${STAGE_LABELS[e.ach?.stage]||'亡者'}・${zoneLabel(e.zone)}`;
+    `徳位${e.level||1}・${meishokuDef(e)?.name||STAGE_LABELS[e.ach?.stage]||'亡者'}・${zoneLabel(e.zone)}`;
   $('pcTitle').textContent=playerTitle(e.ach,e.level);
   $('pcKills').textContent=e.ach?String(e.ach.kills):'—';
   setAchMark('pcTrial',e.ach?.trial);
@@ -8044,7 +8074,7 @@ for(const [id,g] of [['pickM','m'],['pickF','f']]){
 $('startBtn').addEventListener('click',()=>{
   const nm=$('nameIn').value.trim().slice(0,8);
   player.name=nm||player.name||'ナナシ';
-  $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+player.name;
+  refreshPlayerIdentityUi(true);
   save();
   $('intro').classList.add('hidden');
   started=true;
@@ -8058,7 +8088,7 @@ $('startBtn').addEventListener('click',()=>{
   }
   audio();startBgm();
   if(hasSaveData){
-    log(`おかえり、亡者${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
+    log(`おかえり、${meishokuLabel(player)} ${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
     if(migrationStatGrant>0)
       log(`毎徳位の新制度により、魂の資質ポイントを${migrationStatGrant}補填した`,'gain');
   }else{
@@ -8501,7 +8531,7 @@ window.EnmaGameBridge={
     guildState.members=Array.isArray(g?.members)?g.members:[];
     guildState.selfId=g?.selfId||guildState.selfId;
     guildState.error=String(next?.error||'');
-    $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+(player.name||'');
+    refreshPlayerIdentityUi(true);
     if(started&&guildState.id&&!hadId)
       notifyNet(`講【${guildState.name}】の一員として記帳されている（チャットの「講」タブ）`);
     if(started&&!guildState.id&&hadId&&next?.online)
@@ -8658,10 +8688,9 @@ document.dispatchEvent(new CustomEvent('enma-game-ready'));
 checkDrake();
 if(hasSaveData){
   $('nameIn').value=player.name;
-  $('pname').textContent=(guildState.name?`【${guildState.name}】`:'亡者')+player.name;
+  refreshPlayerIdentityUi(true);
   // キャラ作成後は名を変えられない: 入力欄を固定表示に差し替える
   $('nameIn').classList.add('hidden');
-  $('nameFixed').querySelector('b').textContent='亡者 '+player.name;
   $('nameFixed').classList.remove('hidden');
 }
 $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
