@@ -1460,7 +1460,7 @@ const HEAL_POTIONS={
   m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:HEAL_POTION_DELAY},
   l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:HEAL_POTION_DELAY},
 };
-const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','crit'];
+const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','crit','gmdash'];
 const defaultQuickItems=tier=>[
   QUICK_ITEM_IDS.includes(`heal_${tier}`)?`heal_${tier}`:'heal_s',
   'haste','crit',
@@ -2055,6 +2055,7 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
   stats:{str:0,con:0,agi:0,int:0,luck:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
+  gmDashT:0,gmDashPots:0,                   // GM専用「神足の御符」(10分 超高速)
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   quickItems:['heal_s','haste','crit'],quickPage:0,
   name:'',quests:{trial:0},
@@ -2116,7 +2117,7 @@ const dodgeRate=()=>Math.min(0.35,0.005*ST().agi+(meishokuDef(player)?.dodge||0)
 const mpRegenMul=()=>Math.min(2,1+0.02*ST().int);
 const dropMul=()=>Math.min(2,1+0.02*ST().luck);
 const dropChance=base=>base>=1?1:Math.min(0.75,base*dropMul());
-const speedNow=()=>player.speed*(player.hasteT>0?1.3:1);
+const speedNow=()=>player.speed*(player.gmDashT>0?2.6:player.hasteT>0?1.3:1);
 const sharedWorldActive=()=>sharedWorld.connected&&sharedWorld.zone===zone;
 function recalcMax(){
   const job=meishokuDef(player);
@@ -2921,6 +2922,34 @@ function drinkHaste(){
   burst(player.x,player.y,'#9fe0ff',12);
   sfx.potion();save();
 }
+async function useGmDash(){
+  if(player.dead||!started)return;
+  if(gmDashBusy)return;
+  if(player.gmDashPots<=0){log('神足の御符がない','sys');return;}
+  if(player.gmDashT>0){log('すでに神足の加護がある','sys');return;}
+  if(!window.EnmaAccountBridge?.consumeGmDash){
+    log('魂籍台帳へ接続してから使ってください','sys');return;
+  }
+  gmDashBusy=true;
+  if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+  hud();
+  try{
+    player.gmDashPots=await window.EnmaAccountBridge.consumeGmDash();
+    player.gmDashT=600;
+    player.swing=0.36;player.swingMax=0.36;player.swingKind='use';
+    signalPlayerAction('haste');
+    addFloat(player.x,player.y-0.6,'神足！','#8ff5d2');
+    addActionEffect('haste',player.x,player.y);
+    burst(player.x,player.y,'#8ff5d2',14);
+    sfx.potion();save();
+  }catch(error){
+    log(error?.message||'神足の御符を使えませんでした','sys');
+  }finally{
+    gmDashBusy=false;
+    if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+    hud();
+  }
+}
 function drinkCrit(){
   if(player.dead||!started)return;
   if(player.critPots<=0){log('修羅の酒がない','sys');return;}
@@ -2944,6 +2973,10 @@ function quickItemInfo(id){
   if(id==='haste')return{id,kind:'haste',name:'韋駄天の水',label:'韋駄天',
     icon:'assets/items/potion_idaten.png',count:player.hastePots,
     disabled:player.hastePots<=0||player.hasteT>0,title:'韋駄天の水 (Q) 5分 高速化'};
+  if(id==='gmdash')return{id,kind:'gmdash',name:'神足の御符',label:'神足',
+    icon:'assets/items/acc_kifuda_gofu.png',count:player.gmDashPots,
+    disabled:gmDashBusy||player.gmDashPots<=0||player.gmDashT>0,
+    title:'神足の御符 (Q) 10分 超高速 [GM]'};
   return{id:'crit',kind:'crit',name:'修羅の酒',label:'修羅',
     icon:'assets/items/potion_shura.png',count:player.critPots,
     disabled:player.critPots<=0||player.critT>0,title:'修羅の酒 (Q) 5分 会心+25%'};
@@ -2952,6 +2985,7 @@ function useQuickItem(){
   const q=quickItemInfo(player.quickItems[player.quickPage]);
   if(q.kind==='heal')drinkPotion(q.tier);
   else if(q.kind==='haste')drinkHaste();
+  else if(q.kind==='gmdash')void useGmDash();
   else drinkCrit();
 }
 function setQuickItem(id,page=player.quickPage){
@@ -3374,6 +3408,7 @@ let socialComposeId='',socialBusy=false;
 const knownCloudRequests=new Set(),knownMailIds=new Set();
 let gmMeishokuResetCount=0,gmMeishokuResetBusy=false;
 let gmGenderChangeCount=0,gmGenderChangeBusy=false;
+let gmDashBusy=false;
 document.addEventListener('enma:gm-meishoku-reset-count',event=>{
   gmMeishokuResetCount=Math.max(0,event.detail?.count|0);
   if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
@@ -3381,6 +3416,11 @@ document.addEventListener('enma:gm-meishoku-reset-count',event=>{
 document.addEventListener('enma:gm-gender-change-count',event=>{
   gmGenderChangeCount=Math.max(0,event.detail?.count|0);
   if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+});
+document.addEventListener('enma:gm-dash-count',event=>{
+  player.gmDashPots=Math.max(0,event.detail?.count|0);
+  if(menuTab==='item'&&!$('equip').classList.contains('hidden'))renderItemTab();
+  hud();
 });
 // 人型の周りの6ボックス位置(272x252の#doll内)
 const SLOT_POS={
@@ -3442,10 +3482,11 @@ function renderItemTab(){
     data-quick-page="${i}" aria-label="アイテムページ${i+1}">P${i+1}</button>`;
   html+='</div>';
   for(const id of QUICK_ITEM_IDS){
+    if(id==='gmdash'&&player.gmDashPots<=0)continue;  // GM専用: 持っていない魂には見せない
     const q=quickItemInfo(id),selected=player.quickItems[player.quickPage]===id;
     const fx=q.kind==='heal'
       ?`HP+${HEAL_POTIONS[q.tier].heal} / 共有ディレイ${HEAL_POTIONS[q.tier].delay}秒`
-      :q.kind==='haste'?'5分 高速化':'5分 会心+25%';
+      :q.kind==='haste'?'5分 高速化':q.kind==='gmdash'?'10分 超高速 [GM専用]':'5分 会心+25%';
     html+=`<div class="itemrow"><img class="icn" src="${q.icon}" alt="">
       <span class="nm">${q.name} ×${q.count} <span class="fx">${fx}</span></span>
       <button class="buyb ${selected?'on':''}" data-quick-item="${id}"
@@ -4201,6 +4242,7 @@ function update(dt){
     if(player.hitT>0)player.hitT-=dt;
     for(const k in player.cd)if(player.cd[k]>0)player.cd[k]-=dt;
     if(player.hasteT>0)player.hasteT-=dt;
+    if(player.gmDashT>0)player.gmDashT-=dt;
     if(player.partySupportT>0)player.partySupportT-=dt;
     if(player.critT>0)player.critT-=dt;
     if(player.foodAtkT>0)player.foodAtkT-=dt;
@@ -7221,6 +7263,7 @@ function hud(){
   let bf='';
   const fmtT=t=>{t=Math.ceil(t);return t>=60?`${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`:`${t}秒`;};
   if(player.hasteT>0)bf+=`⚡韋駄天 ${fmtT(player.hasteT)}　`;
+  if(player.gmDashT>0)bf+=`💨神足 ${fmtT(player.gmDashT)}　`;
   if(player.critT>0)bf+=`🔥修羅 ${fmtT(player.critT)}　`;
   if(player.foodAtkT>0)bf+=`🍙攻+4 ${Math.ceil(player.foodAtkT)}秒　`;
   if(player.foodDefT>0)bf+=`🍲防+4 ${Math.ceil(player.foodDefT)}秒　`;
@@ -8230,7 +8273,7 @@ $('reviveBtn').addEventListener('click',()=>{
   player.hp=player.maxHp;player.mp=player.maxMp;
   player.path=[];player.target=null;player.talkTarget=null;player.combatT=0;
   player.hitT=0;player.attackDur=0;player.attackT=0;player.pendingHit=null;
-  player.hasteT=0;player.critT=0;
+  player.hasteT=0;player.critT=0;player.gmDashT=0;
   $('death').classList.add('hidden');
   log('賽の石碑のもとで、魂が編み直された','sys');
 });
@@ -8823,6 +8866,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260723a"></script>
+<script type="module" src="online/account.js?v=20260723b"></script>
 </body>
 </html>

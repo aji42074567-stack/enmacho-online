@@ -29,6 +29,7 @@ const state = {
   cloudSave: null,
   gmMeishokuResetCount: 0,
   gmGenderChangeCount: 0,
+  gmDashCount: 0,
   autoSyncState: 'checking',
   autoSyncMessage: 'クラウド記録を確認しています…',
   configured: Boolean(config.supabaseUrl && config.supabasePublishableKey),
@@ -70,6 +71,14 @@ function publishGmGenderChangeCount(value = 0) {
   }));
 }
 
+function publishGmDashCount(value = 0) {
+  const count = Math.max(0, Math.trunc(Number(value) || 0));
+  state.gmDashCount = count;
+  document.dispatchEvent(new CustomEvent('enma:gm-dash-count', {
+    detail: { count },
+  }));
+}
+
 window.EnmaAccountBridge = {
   async consumeGmMeishokuReset() {
     if (!state.client || !state.session?.user?.id)
@@ -92,6 +101,14 @@ window.EnmaAccountBridge = {
     if (state.profile) state.profile = { ...state.profile, avatar_key: nextGender };
     syncOnlineControllers(state.session, state.profile);
     return state.gmGenderChangeCount;
+  },
+  async consumeGmDash() {
+    if (!state.client || !state.session?.user?.id)
+      throw new Error('魂籍へログインしてください');
+    const { data, error } = await state.client.rpc('consume_gm_dash');
+    if (error) throw error;
+    publishGmDashCount(data);
+    return state.gmDashCount;
   },
 };
 
@@ -481,7 +498,7 @@ function render() {
 }
 
 async function fetchAccountData(userId) {
-  const [profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult] = await Promise.all([
+  const [profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult, gmDashResult] = await Promise.all([
     state.client.from('profiles').select('*').eq('id', userId).single(),
     state.client.from('account_preferences').select('newsletter_opt_in')
       .eq('user_id', userId).single(),
@@ -489,8 +506,9 @@ async function fetchAccountData(userId) {
       .eq('user_id', userId).maybeSingle(),
     state.client.rpc('gm_meishoku_reset_count'),
     state.client.rpc('gm_gender_change_count'),
+    state.client.rpc('gm_dash_count'),
   ]);
-  return { profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult };
+  return { profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult, gmDashResult };
 }
 
 async function loadAccountData() {
@@ -507,6 +525,7 @@ async function loadAccountData() {
     state.cloudSave = null;
     publishGmMeishokuResetCount(0);
     publishGmGenderChangeCount(0);
+    publishGmDashCount(0);
     syncOnlineControllers(null, null);
     render();
     return;
@@ -529,6 +548,7 @@ async function loadAccountData() {
     state.cloudSave = null;
     publishGmMeishokuResetCount(0);
     publishGmGenderChangeCount(0);
+    publishGmDashCount(0);
     cloudSaveUserId = '';
     setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
     scheduleAccountReload();
@@ -558,6 +578,7 @@ async function loadAccountData() {
       if (revision !== accountLoadRevision || state.session?.user?.id !== userId) return;
       publishGmMeishokuResetCount(0);
       publishGmGenderChangeCount(0);
+      publishGmDashCount(0);
       setFeedback('', `${retryError.message}。ゲームはそのまま開始できます`);
       setAutoSyncState('retrying', 'クラウド記録を確認できません。通信復帰後に再試行します');
       scheduleAccountReload();
@@ -574,6 +595,7 @@ async function loadAccountData() {
     cloudSaveResult: { data: cloudSave, error: saveError },
     gmItemResult: { data: gmItemCount, error: gmItemError },
     gmGenderResult: { data: gmGenderCount, error: gmGenderError },
+    gmDashResult: { data: gmDashCount, error: gmDashError },
   } = results;
 
   if (profileError) {
@@ -600,6 +622,7 @@ async function loadAccountData() {
   state.cloudSave = cloudSave;
   publishGmMeishokuResetCount(gmItemError ? 0 : gmItemCount);
   publishGmGenderChangeCount(gmGenderError ? 0 : gmGenderCount);
+  publishGmDashCount(gmDashError ? 0 : gmDashCount);
   if (state.profile) {
     const lastSeenAt = new Date().toISOString();
     state.profile.last_seen_at = lastSeenAt;
