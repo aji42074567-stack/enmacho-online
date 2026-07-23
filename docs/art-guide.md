@@ -140,6 +140,8 @@ enmacho-online/
  --gender m --out-dir assets --prefix char_kagehoshi`(fも同様)。
 `--prefix` はこの組込で追加した引数(既定は従来どおり`char_rasetsu`)。
 描画サイズは通常主人公と同じ48px(羅刹だけ56px)。
+停止シートの左右は `scripts/repair_kagehoshi_idle.py` で組み直す。男性の上向き停止に
+生成時の離れた破片が残る場合は、同スクリプトへ `--clean-male-up` を付けて除去する。
 
 | ファイル | 内容 | 備考 |
 |---|---|---|

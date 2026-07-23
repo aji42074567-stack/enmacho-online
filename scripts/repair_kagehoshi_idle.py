@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild Kagehoshi side-idle cells without changing front or rear poses."""
+"""Rebuild Kagehoshi idle cells while preserving unaffected poses."""
 
 from __future__ import annotations
 
@@ -13,6 +13,12 @@ from process_rasetsu_sprites import alpha_bbox, load_sprite_source
 
 CELL_SIZE = 128
 PADDING = 4
+MALE_UP_ARTIFACT_RECTS = (
+    # Detached strip above the head.
+    (48, 0, 67, 12),
+    # Detached fragment to the right of the body.
+    (100, 0, 128, 128),
+)
 
 
 def normalize_side_pose(source: Path) -> Image.Image:
@@ -51,7 +57,19 @@ def validate_side_pose(cell: Image.Image, label: str) -> None:
         raise ValueError(f"{label} pose does not plant both feet")
 
 
-def rebuild(base: Image.Image, side_source: Path) -> Image.Image:
+def clear_male_up_artifacts(sheet: Image.Image) -> None:
+    up = sheet.crop((CELL_SIZE, 0, CELL_SIZE * 2, CELL_SIZE))
+    for left, top, right, bottom in MALE_UP_ARTIFACT_RECTS:
+        transparent = Image.new("RGBA", (right - left, bottom - top), (0, 0, 0, 0))
+        up.paste(transparent, (left, top))
+        if up.getchannel("A").crop((left, top, right, bottom)).getbbox() is not None:
+            raise ValueError("male rear-idle artifact cleanup was incomplete")
+    sheet.paste(up, (CELL_SIZE, 0))
+
+
+def rebuild(
+    base: Image.Image, side_source: Path, clean_male_up: bool = False
+) -> Image.Image:
     if base.size != (CELL_SIZE * 4, CELL_SIZE):
         raise ValueError("base idle sheet must be a normalized 4x1 grid")
 
@@ -69,7 +87,11 @@ def rebuild(base: Image.Image, side_source: Path) -> Image.Image:
     sheet.alpha_composite(left, (CELL_SIZE * 2, 0))
     sheet.alpha_composite(right, (CELL_SIZE * 3, 0))
 
-    for column in (0, 1):
+    if clean_male_up:
+        clear_male_up_artifacts(sheet)
+
+    unchanged_columns = (0,) if clean_male_up else (0, 1)
+    for column in unchanged_columns:
         original = base.crop(
             (column * CELL_SIZE, 0, (column + 1) * CELL_SIZE, CELL_SIZE)
         )
@@ -86,10 +108,17 @@ def main() -> None:
     parser.add_argument("--base-idle", type=Path, required=True)
     parser.add_argument("--side-source", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--clean-male-up",
+        action="store_true",
+        help="remove the two detached artifacts from the male rear idle cell",
+    )
     args = parser.parse_args()
 
     with Image.open(args.base_idle) as image:
-        repaired = rebuild(image.convert("RGBA"), args.side_source)
+        repaired = rebuild(
+            image.convert("RGBA"), args.side_source, clean_male_up=args.clean_male_up
+        )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     repaired.save(args.out, optimize=True)
     print(args.out)
