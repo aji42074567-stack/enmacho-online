@@ -8704,13 +8704,21 @@ $('reviveBtn').addEventListener('click',()=>{
 
 /* ================= 起動 ================= */
 FIELD={blocked,tileKind,props,npcs,mobs,ground,size:FIELD_SIZE};
+// 組み立て中の床判定(isB/nearestWalkable)はグローバルのmapSizeを参照する。
+// 起動直後はmapSize=120(賽の森)のままなので、72マスの屋内を組む前に必ず合わせる。
+// 合っていないとspawnMobの置き場所探しが別の場所を読んで失敗し、ボスが生まれない
+// (2026-07-23、ボス3種消失の原因)。
+mapSize=WORLD_SIZE;
 buildCave();
 buildCave2();
 buildCave3();
 buildEnmaHall();
+mapSize=RINNE_SIZE;
 buildRinneContinent();
+mapSize=WORLD_SIZE;
 buildDragonCaves();
 buildBoneCaves();
+mapSize=FIELD_SIZE;
 // 共有ワールド用のID(workerはスポーン順でid付与するため、順序を揃える)
 for(const [zn,w] of [['cave',CAVE],['cave2',CAVE2],['cave3',CAVE3],
   ['dg1',DGW[0]],['dg2',DGW[1]],['dg3',DGW[2]],['dg4',DGW[3]],['dg5',DGW[4]],
