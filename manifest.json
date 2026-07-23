@@ -1,0 +1,14 @@
+{
+  "name": "閻魔庁ONLINE",
+  "short_name": "閻魔庁",
+  "description": "死後に知る。生前こそが地獄だった。和風ダークファンタジーMMORPG",
+  "start_url": "/play.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [
+    { "src": "assets/icon_app_192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon_app_512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

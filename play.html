@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=overlays-content">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="閻魔庁">
+<link rel="apple-touch-icon" href="assets/apple_touch_icon.png">
+<meta name="theme-color" content="#0b0d12">
 <title>閻魔庁ONLINE — 死後に知る。生前こそが地獄だった。</title>
 <style>
   :root{
@@ -1417,6 +1424,8 @@
         </label>
       </div>
       <p class="setting-note">ミュートは音量の設定を保ったまま、すべての音をまとめて消します。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
+      <button class="btn small" id="fullscreenBtn" type="button" hidden>⛶ 全画面で遊ぶ</button>
+      <p class="setting-note" id="fullscreenNote" hidden>iPhone/iPadは共有メニューの「ホーム画面に追加」から起動すると全画面で遊べます。</p>
       <button class="btn small" id="settingsClose">設定を閉じる</button>
     </div>
   </div>
@@ -1507,6 +1516,17 @@ function queueResize(){
 window.addEventListener('resize',queueResize,{passive:true});
 window.visualViewport?.addEventListener('resize',queueResize,{passive:true});
 document.addEventListener('focusout',()=>{if(deferredResize)queueResize();});
+// キャンバスの実寸変化を直接監視(回転・全画面化・アドレスバー出入りを確実に拾う)
+if(window.ResizeObserver)new ResizeObserver(queueResize).observe(canvas);
+// iPhoneは回転直後に古い寸法を返すことがある。回転後しばらく再計測を繰り返し、
+// 「比率が崩れる」「タップ位置がズレる」を防ぐ
+function settleResize(){
+  const until=performance.now()+1500;
+  const remeasure=()=>{resize(true);if(performance.now()<until)setTimeout(remeasure,150);};
+  setTimeout(remeasure,50);
+}
+window.addEventListener('orientationchange',settleResize,{passive:true});
+try{screen.orientation?.addEventListener('change',settleResize);}catch{}
 const worldViewScale=()=>MOBILE_RENDER?MOBILE_VIEW_SCALE:1;
 
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
@@ -8686,6 +8706,25 @@ $('muteSetting').addEventListener('change',ev=>{
   if(!settings.muted)sfx.click();   // 解除時だけ音で知らせる
 });
 $('settingsClose').addEventListener('click',closeSettings);
+// 全画面: 対応ブラウザ(Android/PC)はボタン、iOSは「ホーム画面に追加」の案内を出す
+{
+  const fsBtn=$('fullscreenBtn'),fsNote=$('fullscreenNote');
+  const standalone=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches
+    ||navigator.standalone===true;
+  if(document.documentElement.requestFullscreen&&!standalone){
+    fsBtn.hidden=false;
+    fsBtn.addEventListener('click',()=>{
+      if(document.fullscreenElement)document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(()=>{});
+    });
+    document.addEventListener('fullscreenchange',()=>{
+      fsBtn.textContent=document.fullscreenElement?'⛶ 全画面をやめる':'⛶ 全画面で遊ぶ';
+      settleResize();
+    });
+  }else if(!standalone&&matchMedia('(pointer:coarse)').matches){
+    fsNote.hidden=false;   // iOS系: ホーム画面に追加の案内
+  }
+}
 function openAccount(){
   $('settingsPanel').classList.add('hidden');
   $('accountPanel').classList.remove('hidden');
