@@ -1029,10 +1029,10 @@
         <input id="nameIn" maxlength="8" placeholder="なまえを入力 (8文字まで)" autocomplete="off">
         <div id="nameFixed" class="hidden"><b></b><small>名は台帳に記された（変更不可）</small></div>
         <div class="rule"></div>
-        <div class="say" style="margin-bottom:12px">あなたは死にました。<br>
+        <div class="say" id="introSay" style="margin-bottom:12px">あなたは死にました。<br>
           ここは地獄庁 第七審査区「賽の森」。<br>
           迷える魂を成仏させて徳を積み、転生許可の審査に進みなさい。</div>
-        <ul>
+        <ul id="howtoList">
           <li><b>地面をクリック / タップ</b> … 移動</li>
           <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
           <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
@@ -8717,16 +8717,30 @@ if(hasSaveData){
   $('nameFixed').classList.remove('hidden');
 }
 $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
+// スマホ(タッチ端末)は操作説明をタップ向けに差し替え、キーボードの行は出さない
+if(matchMedia('(pointer:coarse)').matches){
+  $('howtoList').innerHTML=`
+    <li><b>地面をタップ</b> … 移動(左下のパッドでも歩ける)</li>
+    <li><b>迷える魂をタップ</b> … 自動攻撃(成仏)</li>
+    <li><b>川辺の二人をタップ</b> … 会話・買い物</li>
+    <li><b>画面下のボタン</b> … 印・道具・メニュー</li>`;
+}
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');
-  // 姿(性別)もキャラ作成時のまま固定
+  // 再入庁: 男女の選択枠はやめて、現在の冥職の姿ひとつだけを見せる
+  const solo=$('pickM');
+  solo.style.backgroundImage=`url(${playerSpriteAsset(player)})`;
+  solo.classList.add('on');
+  solo.removeAttribute('tabindex');
+  solo.setAttribute('aria-disabled','true');
+  solo.setAttribute('aria-label','現在の姿');
+  $('pickF').classList.add('hidden');
   $('pickRow').classList.add('locked');
-  $('genderHint').textContent='姿は台帳に記された（変更不可）';
-  for(const id of ['pickM','pickF']){
-    $(id).removeAttribute('tabindex');
-    $(id).setAttribute('aria-disabled','true');
-  }
+  $('genderHint').classList.add('hidden');
+  // 導入文と操作説明は初回だけ。再入庁の画面は名と徳位だけで簡潔に
+  $('introSay').classList.add('hidden');
+  $('howtoList').classList.add('hidden');
 }
 // 魂籍ゲートの表示判定:
 //  - TOPページから#soul付きで来た/メール確認・再設定リンクで戻った → 開く
