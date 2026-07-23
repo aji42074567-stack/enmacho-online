@@ -5752,6 +5752,8 @@ loadSprite('map_cave_entrance','assets/map_cave_entrance.png');
 loadSprite('map_dragon_cave_entrance','assets/map_dragon_cave_entrance.png');
 loadSprite('map_muen_entrance','assets/map_muen_entrance.png');
 loadSprite('map_cave_exit','assets/map_cave_exit.png');
+loadSprite('map_stairs_up','assets/map_stairs_up.png');
+loadSprite('map_stairs_down','assets/map_stairs_down.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -6767,10 +6769,26 @@ function drawCaveExit(sx,sy){
   ctx.restore();
 }
 function drawStairs(sx,sy,down){
-  // 下り=奥へ沈む暗い段差、上り=手前へ上がる明るい段差
+  // 全ダンジョン共通。画像が未読/取得失敗なら従来の図形描画へ戻す。
   ctx.save();ctx.translate(sx,sy);
   const p2=0.5+Math.sin(time*2.4)*0.3;
   const col=down?'255,120,80':'150,210,255';
+  const img=SPRITES[down?'map_stairs_down':'map_stairs_up'];
+  if(img){
+    const w=down?108:104;
+    const h=w*img.height/img.width;
+    const glowY=-h*0.36;
+    const g3=ctx.createRadialGradient(0,glowY,2,0,glowY,48);
+    g3.addColorStop(0,`rgba(${col},${0.10+p2*0.08})`);
+    g3.addColorStop(1,`rgba(${col},0)`);
+    ctx.fillStyle=g3;ctx.fillRect(-56,-h,112,h+20);
+    // 透過画像内の石段の最下端をマス中央へ接地させる。
+    ctx.drawImage(img,-w/2,-h*0.78,w,h);
+    ctx.fillStyle=down?'#ffb9a0':'#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
+    ctx.fillText(down?'下り階段':'上り階段',0,20);
+    ctx.restore();
+    return;
+  }
   const g3=ctx.createRadialGradient(0,-8,0,0,-8,42);
   g3.addColorStop(0,`rgba(${col},${0.16+p2*0.12})`);g3.addColorStop(1,`rgba(${col},0)`);
   ctx.fillStyle=g3;ctx.fillRect(-46,-52,92,66);
