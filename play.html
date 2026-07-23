@@ -52,6 +52,9 @@
   #partyFrames{position:absolute;left:12px;top:106px;display:flex;
     flex-direction:column;gap:6px;pointer-events:none;z-index:4}
   #partyFrames[hidden]{display:none}
+  .pframe{cursor:pointer}
+  .pframe.following{border-color:#8fc4ff;box-shadow:0 0 8px rgba(143,196,255,.45)}
+  .pframe.following .nm::after{content:' ▶追従中';color:#8fc4ff;font-size:9px}
   .pframe{min-width:150px;background:var(--panel);border:1px solid #3b598a;
     border-radius:4px;padding:5px 9px 6px}
   .pframe .row1{display:flex;align-items:baseline;gap:6px;font-family:var(--sans)}
@@ -4531,6 +4534,28 @@ function update(dt){
       }
       if(best)player.target=best;
     }
+    // チーム仲間への追従: 数歩後ろ(約2マス)を保って付いて歩く。
+    // 戦闘中・手動移動中・会話中は一時停止し、終わると自動で再開する
+    if(followUserId&&!player.dead){
+      if(!partyHas(followUserId))followUserId='';
+      else{
+        const fr=remotePlayers.get(followUserId);
+        if(fr&&fr.zone===zone&&!fr.dead
+          &&!player.target&&!player.moveHold&&!player.talkTarget
+          &&!player.gateTarget&&player.attackDur<=0&&!vpad.active){
+          const fd=dist(player,fr);
+          if(fd>2.6){
+            player.followRepath=(player.followRepath||0)-dt;
+            if(player.followRepath<=0){
+              player.followRepath=0.45;
+              player.path=findPath(player.x,player.y,fr.x,fr.y);
+            }
+          }else if(fd<1.8&&player.path.length){
+            player.path=[];   // 数歩後ろに到着
+          }
+        }
+      }
+    }
     if(player.target){
       const m=player.target;
       if(m.dead){player.target=null;}
@@ -8341,6 +8366,7 @@ function renderTeamUI(){
   }
 }
 let partyFramesKey='',partyFramesAt=0;
+let followUserId='';   // 追従中のチーム仲間(メンバー枠タップで切替)
 function renderPartyFrames(force){
   const el=$('partyFrames');
   const others=party.id?party.members.filter(m=>!m.self):[];
@@ -8353,6 +8379,7 @@ function renderPartyFrames(force){
     const live=remotePlayers.get(m.userId);
     const sameZone=Boolean(live&&live.zone===zone);
     return{
+      userId:m.userId,following:m.userId===followUserId,
       name:m.displayName,level:m.level,zone:m.zone,away:!sameZone,
       hp:sameZone?live.hp:m.hp,maxHp:sameZone?live.maxHp:m.maxHp,
       mp:sameZone?live.mp:m.mp,maxMp:sameZone?live.maxMp:m.maxMp,
@@ -8366,7 +8393,18 @@ function renderPartyFrames(force){
   el.textContent='';
   for(const r of rows){
     const f=document.createElement('div');
-    f.className='pframe'+(r.away?' away':'');
+    f.className='pframe'+(r.away?' away':'')+(r.following?' following':'');
+    // タップで追従ON/OFF(数歩後ろを付いて歩く)
+    f.addEventListener('click',()=>{
+      if(followUserId===r.userId){
+        followUserId='';
+        log('追従をやめた','sys');
+      }else{
+        followUserId=r.userId;
+        log(`${r.name} に追従開始(枠をもう一度タップで解除)`,'sys');
+      }
+      renderPartyFrames(true);
+    });
     const row1=document.createElement('div');row1.className='row1';
     const nm=document.createElement('span');nm.className='nm';nm.textContent=r.name;
     const lvz=document.createElement('span');
@@ -8385,6 +8423,7 @@ function renderPartyFrames(force){
 }
 function leaveParty(announce){
   if(!party.id)return;
+  followUserId='';
   party.id=null;party.members=[];
   rememberParty();
   chat.teamOnline=false;
