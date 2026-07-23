@@ -52,6 +52,13 @@
   #partyFrames{position:absolute;left:12px;top:106px;display:flex;
     flex-direction:column;gap:6px;pointer-events:none;z-index:4}
   #partyFrames[hidden]{display:none}
+  #autoChoice{position:absolute;left:50%;transform:translateX(-50%);
+    bottom:max(96px,calc(env(safe-area-inset-bottom) + 92px));z-index:8;
+    display:flex;flex-direction:column;gap:7px;background:var(--panel);
+    border:1px solid var(--panel-edge);border-radius:8px;padding:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.55)}
+  #autoChoice[hidden]{display:none}
+  #autoChoice button{white-space:nowrap}
   .pframe{cursor:pointer}
   .pframe.following{border-color:#8fc4ff;box-shadow:0 0 8px rgba(143,196,255,.45)}
   .pframe.following .nm::after{content:' ▶追従中';color:#8fc4ff;font-size:9px}
@@ -8066,17 +8073,25 @@ for(const b of document.querySelectorAll('.chatTab'))
 updateChatInputState();
 
 /* ================= チーム・フレンド・プレイヤーカード ================= */
-const party={id:null,members:[]};
+const party={id:null,members:[],leaderId:''};   // leaderId=チームに誘った人(自動的にリーダー)
 // リロードしてもチームが解散しないよう、このタブの間は覚えておく
 function rememberParty(){
   try{
-    if(party.id)sessionStorage.setItem('enma_party',party.id);
-    else sessionStorage.removeItem('enma_party');
+    if(party.id){
+      sessionStorage.setItem('enma_party',party.id);
+      sessionStorage.setItem('enma_party_leader',party.leaderId||'');
+    }else{
+      sessionStorage.removeItem('enma_party');
+      sessionStorage.removeItem('enma_party_leader');
+    }
   }catch(e){}
 }
 try{
   const savedParty=sessionStorage.getItem('enma_party');
-  if(savedParty&&/^[0-9a-f-]{16,64}$/i.test(savedParty))party.id=savedParty;
+  if(savedParty&&/^[0-9a-f-]{16,64}$/i.test(savedParty)){
+    party.id=savedParty;
+    party.leaderId=sessionStorage.getItem('enma_party_leader')||'';
+  }
 }catch(e){}
 // 画面左のログ(常時見える)とチャットの両方に知らせる
 function notifyNet(text){
@@ -8106,6 +8121,7 @@ function playerTitle(ach,level){
   return '新入り';
 }
 const partyHas=id=>party.members.some(m=>m.userId===id&&!m.self);
+const myUserId=()=>{try{return localStorage.getItem(SAVE_OWNER_KEY)||'';}catch(e){return '';}};
 const isFriend=id=>player.friends.some(f=>f.id===id);
 
 /* ---- プレイヤーカード ---- */
@@ -8168,7 +8184,7 @@ $('pcClose').addEventListener('click',()=>{closePlayerCard();sfx.click();});
 $('pcTeamBtn').addEventListener('click',()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
-  if(!party.id){party.id=genPartyId();rememberParty();renderTeamUI();}
+  if(!party.id){party.id=genPartyId();party.leaderId=myUserId();rememberParty();renderTeamUI();}
   netOutbox.push({type:'invite',kind:'team',targetUserId:playerCard.userId,partyId:party.id});
   notifyNet(`${e.name} をチームに誘った。返事を待とう`);
   closePlayerCard();
@@ -8237,6 +8253,7 @@ $('inviteAccept').addEventListener('click',async()=>{
   $('inviteAccept').disabled=true;$('inviteDecline').disabled=true;
   if(inv.kind==='team'){
     party.id=inv.partyId;party.members=[];
+    party.leaderId=inv.from.userId;   // 誘った人が自動的にリーダー
     rememberParty();
     netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
       targetUserId:inv.from.userId,partyId:inv.partyId});
@@ -8379,7 +8396,8 @@ function renderPartyFrames(force){
     const live=remotePlayers.get(m.userId);
     const sameZone=Boolean(live&&live.zone===zone);
     return{
-      userId:m.userId,following:m.userId===followUserId,
+      userId:m.userId,isLeader:m.userId===party.leaderId,
+      following:followUserId&&m.userId===followUserId,
       name:m.displayName,level:m.level,zone:m.zone,away:!sameZone,
       hp:sameZone?live.hp:m.hp,maxHp:sameZone?live.maxHp:m.maxHp,
       mp:sameZone?live.mp:m.mp,maxMp:sameZone?live.maxMp:m.maxMp,
@@ -8394,19 +8412,9 @@ function renderPartyFrames(force){
   for(const r of rows){
     const f=document.createElement('div');
     f.className='pframe'+(r.away?' away':'')+(r.following?' following':'');
-    // タップで追従ON/OFF(数歩後ろを付いて歩く)
-    f.addEventListener('click',()=>{
-      if(followUserId===r.userId){
-        followUserId='';
-        log('追従をやめた','sys');
-      }else{
-        followUserId=r.userId;
-        log(`${r.name} に追従開始(枠をもう一度タップで解除)`,'sys');
-      }
-      renderPartyFrames(true);
-    });
     const row1=document.createElement('div');row1.className='row1';
-    const nm=document.createElement('span');nm.className='nm';nm.textContent=r.name;
+    const nm=document.createElement('span');nm.className='nm';
+    nm.textContent=(r.isLeader?'★':'')+r.name;
     const lvz=document.createElement('span');
     lvz.className='lvz'+(r.dead?' dead-tag':'');
     lvz.textContent=r.dead?'魂散…':`徳${r.level}${r.away?'・'+zoneLabel(r.zone):''}`;
@@ -8424,7 +8432,7 @@ function renderPartyFrames(force){
 function leaveParty(announce){
   if(!party.id)return;
   followUserId='';
-  party.id=null;party.members=[];
+  party.id=null;party.members=[];party.leaderId='';
   rememberParty();
   chat.teamOnline=false;
   if(announce)notifyNet('チームを抜けた');
@@ -8707,12 +8715,47 @@ window.addEventListener('keydown',ev=>{
   if(k==='m')toggleWorldMap();
   if(k==='t')toggleAuto();
 });
+function setAutoMode(on,follow=false){
+  player.autoMode=on;
+  followUserId=on&&follow?party.leaderId:'';
+  $('btnAuto').classList.toggle('on',on);
+  if(!on)player.target=null;
+  renderPartyFrames(true);
+  log(!on?'AUTOを解除した'
+    :follow?'AUTO: リーダーに追従しながら自動戦闘'
+    :'AUTO: 近くの敵を自動攻撃する','sys');
+  sfx.click();
+}
 function toggleAuto(){
   if(!started||player.dead)return;
-  player.autoMode=!player.autoMode;
-  $('btnAuto').classList.toggle('on',player.autoMode);
-  if(!player.autoMode)player.target=null;
-  log(player.autoMode?'AUTO: 近くの敵を自動攻撃する':'AUTOを解除した','sys');
+  const choice=$('autoChoice');
+  if(choice&&!choice.hidden){choice.hidden=true;sfx.click();return;}
+  if(player.autoMode){setAutoMode(false);return;}
+  // チームのメンバー(リーダー以外)は「リーダー追従AUTO/ふつうのAUTO」を選べる
+  const canFollowLeader=party.id&&party.leaderId
+    &&party.leaderId!==myUserId()&&partyHas(party.leaderId);
+  if(canFollowLeader)showAutoChoice();
+  else setAutoMode(true);
+}
+function showAutoChoice(){
+  let p=$('autoChoice');
+  if(!p){
+    p=document.createElement('div');
+    p.id='autoChoice';
+    p.innerHTML=`<button class="btn small" data-mode="follow">🏃 リーダー追従AUTO</button>
+      <button class="btn small" data-mode="normal">⚔️ ふつうのAUTO</button>
+      <button class="btn small" data-mode="cancel">やめる</button>`;
+    $('stage').appendChild(p);
+    p.addEventListener('click',ev=>{
+      const m=ev.target?.dataset?.mode;
+      if(!m)return;
+      p.hidden=true;
+      if(m==='follow')setAutoMode(true,true);
+      else if(m==='normal')setAutoMode(true);
+      else sfx.click();
+    });
+  }
+  p.hidden=false;
   sfx.click();
 }
 $('btnBolt').addEventListener('click',castBolt);
