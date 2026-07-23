@@ -15,6 +15,9 @@ CELL_SIZE = 128
 PADDING = 4
 VISIBLE_ALPHA = 8
 TOP_ARTIFACT_LIMIT = 20
+MALE_DOWN_LEG_CUT = 104
+MALE_DOWN_LEG_EXTENSION = 4
+GROUND_Y = 124
 
 
 def normalize_side_pose(source: Path) -> Image.Image:
@@ -108,6 +111,33 @@ def clear_rear_top_artifacts(sheet: Image.Image) -> None:
     sheet.paste(up, (CELL_SIZE, 0))
 
 
+def extend_male_down_legs(sheet: Image.Image) -> None:
+    down = sheet.crop((0, 0, CELL_SIZE, CELL_SIZE))
+    if alpha_bbox(down)[1] <= PADDING - 1:
+        return
+    extended = Image.new("RGBA", down.size, (0, 0, 0, 0))
+
+    # Move the torso upward while stretching only the lower robe/legs into the
+    # freed space.  The face and upper-body proportions remain unchanged.
+    upper = down.crop((0, MALE_DOWN_LEG_EXTENSION, CELL_SIZE, MALE_DOWN_LEG_CUT))
+    extended.alpha_composite(upper, (0, 0))
+    lower = down.crop((0, MALE_DOWN_LEG_CUT, CELL_SIZE, GROUND_Y))
+    lower = lower.resize(
+        (
+            CELL_SIZE,
+            GROUND_Y - MALE_DOWN_LEG_CUT + MALE_DOWN_LEG_EXTENSION,
+        ),
+        Image.Resampling.LANCZOS,
+    )
+    extended.alpha_composite(
+        lower,
+        (0, MALE_DOWN_LEG_CUT - MALE_DOWN_LEG_EXTENSION),
+    )
+    if alpha_bbox(extended)[3] != GROUND_Y:
+        raise ValueError("extended male down-idle pose is not grounded")
+    sheet.paste(extended, (0, 0))
+
+
 def validate_side_pose(cell: Image.Image, label: str) -> None:
     left, top, right, bottom = alpha_bbox(cell)
     if min(left, top) < PADDING or max(right, bottom) > CELL_SIZE - PADDING:
@@ -119,7 +149,10 @@ def validate_side_pose(cell: Image.Image, label: str) -> None:
 
 
 def rebuild(
-    base: Image.Image, side_source: Path, clean_rear_top: bool = False
+    base: Image.Image,
+    side_source: Path,
+    clean_rear_top: bool = False,
+    extend_male_down: bool = False,
 ) -> Image.Image:
     if base.size != (CELL_SIZE * 4, CELL_SIZE):
         raise ValueError("base idle sheet must be a normalized 4x1 grid")
@@ -135,9 +168,15 @@ def rebuild(
 
     if clean_rear_top:
         clear_rear_top_artifacts(sheet)
+    if extend_male_down:
+        extend_male_down_legs(sheet)
 
-    unchanged_columns = (0,) if clean_rear_top else (0, 1)
-    for column in unchanged_columns:
+    unchanged_columns = {0, 1}
+    if extend_male_down:
+        unchanged_columns.remove(0)
+    if clean_rear_top:
+        unchanged_columns.remove(1)
+    for column in sorted(unchanged_columns):
         box = (column * CELL_SIZE, 0, (column + 1) * CELL_SIZE, CELL_SIZE)
         if ImageChops.difference(base.crop(box), sheet.crop(box)).getbbox() is not None:
             raise ValueError("front/rear idle frames changed unexpectedly")
@@ -158,6 +197,11 @@ def main() -> None:
         action="store_true",
         help="remove detached fragments above the rear-facing idle pose",
     )
+    parser.add_argument(
+        "--extend-male-down",
+        action="store_true",
+        help="lengthen the male front-idle lower body by four source pixels",
+    )
     args = parser.parse_args()
 
     with Image.open(args.base_idle) as image:
@@ -165,6 +209,7 @@ def main() -> None:
             image.convert("RGBA"),
             args.side_source,
             clean_rear_top=args.clean_rear_top,
+            extend_male_down=args.extend_male_down,
         )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     repaired.save(args.out, optimize=True)
