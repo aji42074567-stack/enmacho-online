@@ -1631,7 +1631,7 @@ const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'';
 const JUGONSHI_SPRITE_VERSION='20260723-jugon4';
 const KAGEHOSHI_SPRITE_VERSION='20260723-idle4';
-const GOHOUSOU_SPRITE_VERSION='20260723-idle5-3fbe371';
+const GOHOUSOU_SPRITE_VERSION='20260723-walk3-attacklr';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
   const src=MEISHOKU_READY.has(e?.meishoku)
@@ -5724,7 +5724,7 @@ loadSprite('player_jugonshi_f_attack','assets/char_jugonshi_f_attack.png');
 loadSprite('player_jugonshi_f_hit','assets/char_jugonshi_f_hit.png');
 loadSprite('player_jugonshi_f_death','assets/char_jugonshi_f_death.png');
 loadSprite('player_gohousou_m',`assets/char_gohousou_m.png?v=${GOHOUSOU_SPRITE_VERSION}`);
-loadSprite('player_gohousou_m_walk','assets/char_gohousou_m_walk.png?v=20260723-walk2');
+loadSprite('player_gohousou_m_walk',`assets/char_gohousou_m_walk.png?v=${GOHOUSOU_SPRITE_VERSION}`);
 loadSprite('player_gohousou_m_attack','assets/char_gohousou_m_attack.png');
 loadSprite('player_gohousou_m_hit','assets/char_gohousou_m_hit.png');
 loadSprite('player_gohousou_m_death','assets/char_gohousou_m_death.png');
@@ -5944,7 +5944,10 @@ function drawPlayer(sx,sy,e){
     const t=e.attackT/e.attackDur;
     const fr=t<0.35?0:(t<0.72?1:2);
     const FA=160,DA=FA*k;
-    ctx.drawImage(atkS,fr*FA,row*FA,FA,FA,-DA/2,(3-4*k)-150*k,DA,DA);
+    // 護法僧男の攻撃原画だけは左右行が逆。進行方向ではなく敵側を叩く行へ読み替える。
+    const attackRow=spriteId==='gohousou_m'&&e.dir==='left'?DIR_FRAME.right
+      :spriteId==='gohousou_m'&&e.dir==='right'?DIR_FRAME.left:row;
+    ctx.drawImage(atkS,fr*FA,attackRow*FA,FA,FA,-DA/2,(3-4*k)-150*k,DA,DA);
     // 大きな円弧ではなく、刀身の進行方向に沿う短い残光だけを出す。
     drawSwordSlashTrail(e,t);
   }else if(e.hitT>0&&hitS){
