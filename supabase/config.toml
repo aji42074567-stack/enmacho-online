@@ -6,3 +6,7 @@ verify_jwt = false
 [functions.admin-newsletter]
 # The function validates the user JWT itself and separately checks admin_users.
 verify_jwt = false
+
+[functions.admin-analytics]
+# The function validates the user JWT itself and separately checks admin_users.
+verify_jwt = false

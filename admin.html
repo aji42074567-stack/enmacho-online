@@ -21,7 +21,8 @@
   .head-user{margin-left:auto;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}.head-user b{color:var(--text)}
   main{width:min(1280px,94vw);margin:0 auto;padding:34px 0 80px}.hidden{display:none!important}
   h1{margin:0;font:clamp(25px,4vw,38px) var(--serif);letter-spacing:.12em}h2{margin:0;font:18px var(--serif);letter-spacing:.1em}h3{margin:0;font:15px var(--serif);color:var(--gold)}
-  .lead{margin:7px 0 26px;color:var(--muted)}.section{margin-top:28px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:12px}.section-head p{margin:0;color:var(--muted);font-size:11px}
+  .lead{margin:7px 0 22px;color:var(--muted)}.section{margin-top:28px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:12px}.section-head p{margin:0;color:var(--muted);font-size:11px}
+  .admin-tabs{display:flex;gap:6px;padding:5px;border:1px solid #30291f;border-radius:7px;background:#0b0c0f;width:max-content;max-width:100%;margin-bottom:24px}.admin-tab{min-width:120px;border:1px solid transparent;border-radius:4px;padding:8px 16px;background:transparent;color:var(--muted)}.admin-tab:hover{color:var(--text);border-color:#453a29}.admin-tab.active{border-color:#765c2d;background:linear-gradient(#342a19,#211a10);color:var(--gold)}
   .panel{border:1px solid var(--line);border-radius:8px;background:linear-gradient(145deg,rgba(23,19,14,.96),rgba(13,13,16,.97));box-shadow:0 18px 50px rgba(0,0,0,.22)}
   .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.metric{padding:18px 16px;min-height:108px}.metric span{display:block;color:var(--muted);font-size:10px;letter-spacing:.08em}.metric b{display:block;margin-top:9px;font:30px var(--serif);color:var(--gold)}.metric.online b{color:var(--cyan)}.metric small{color:#6f6656}
   .grid2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:14px}.pad{padding:20px}
@@ -31,14 +32,21 @@
   .auth h1{text-align:center;font-size:24px}.auth p{text-align:center;color:var(--muted)}
   label{display:block;color:#bdae90;font-size:11px;margin:12px 0 5px}input,textarea{width:100%;border:1px solid #4a402f;border-radius:4px;background:#090a0d;color:var(--text);padding:10px 11px;outline:none}input:focus,textarea:focus{border-color:var(--gold)}textarea{min-height:180px;resize:vertical;line-height:1.8}.form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.check{display:flex;align-items:center;gap:9px}.check input{width:auto}.danger-note{margin-top:9px;color:#ba746b;font-size:10px}
   .online-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}.online-person{padding:10px;border:1px solid #302a20;background:#0d0e10}.online-person b{display:block}.online-person small{color:var(--muted)}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-right:6px}
-  .analytics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.analytics-card{display:flex;flex-direction:column;min-height:190px;padding:18px}.analytics-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.analytics-card h3{font:16px var(--serif);color:var(--text)}.analytics-state{white-space:nowrap;padding:2px 8px;border:1px solid #315942;border-radius:12px;color:var(--green);font-size:9px}.analytics-state.off{border-color:#713a33;color:#e28e83}.analytics-id{margin:14px 0 5px;color:var(--gold);font:14px ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}.analytics-card p{margin:0;color:var(--muted);font-size:11px}.analytics-actions{margin-top:auto;padding-top:16px}.analytics-actions .btn{display:inline-block;text-decoration:none}.analytics-note{margin:9px 2px 0;color:var(--muted);font-size:10px}
+  .analytics-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.range-tabs{display:flex;border:1px solid #453a29;border-radius:5px;overflow:hidden}.range-btn{border:0;border-right:1px solid #453a29;padding:7px 12px;background:#0c0d10;color:var(--muted)}.range-btn:last-child{border-right:0}.range-btn.active{background:#342a19;color:var(--gold)}.analytics-updated{color:var(--muted);font-size:10px;white-space:nowrap}
+  .analytics-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.analytics-kpi{padding:16px;min-height:103px}.analytics-kpi span{display:block;color:var(--muted);font-size:10px;letter-spacing:.05em}.analytics-kpi b{display:block;margin-top:8px;font:27px var(--serif);color:var(--gold)}.analytics-kpi small{color:#756b5a}.analytics-kpi.live-kpi b{color:var(--cyan)}
+  .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.chart-card{padding:18px;min-width:0}.chart-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:12px}.chart-head p{margin:3px 0 0;color:var(--muted);font-size:10px}.chart-legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:9px}.chart-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:var(--gold)}.chart-legend i.alt{background:var(--cyan)}.chart-host{min-height:230px;display:grid;place-items:center}.chart-svg{display:block;width:100%;height:auto;overflow:visible}.chart-gridline{stroke:#30291f;stroke-width:1}.chart-label{fill:#776c59;font:9px var(--sans)}.chart-line{fill:none;stroke:var(--gold);stroke-width:2;vector-effect:non-scaling-stroke}.chart-line.alt{stroke:var(--cyan)}.chart-area{fill:url(#goldArea);opacity:.32}.chart-area.alt{fill:url(#cyanArea)}.chart-point{fill:var(--gold)}.chart-point.alt{fill:var(--cyan)}
+  .bar-list{display:flex;flex-direction:column;gap:11px;width:100%}.bar-row-head{display:flex;justify-content:space-between;gap:14px;margin-bottom:4px;font-size:11px}.bar-row-head span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-row-head b{color:var(--gold)}.bar-track{height:7px;border-radius:8px;background:#242018;overflow:hidden}.bar-fill{height:100%;min-width:2px;border-radius:inherit;background:linear-gradient(90deg,#806323,var(--gold))}
+  .insight-list{align-self:start;margin:2px 0 0;padding-left:20px;color:#d8cdb4}.insight-list li{margin:0 0 11px}.insight-list li::marker{color:var(--gold)}
+  .analytics-table-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.analytics-table-card{padding:0;overflow:hidden}.analytics-table-card.wide{grid-column:1/-1}.analytics-table-title{padding:15px 17px 10px}.analytics-table-title p{margin:2px 0 0;color:var(--muted);font-size:10px}.analytics-table{width:100%;border-collapse:collapse}.analytics-table th,.analytics-table td{padding:9px 12px;border-top:1px solid #2a251c;text-align:right;white-space:nowrap}.analytics-table th{color:var(--muted);font-size:9px}.analytics-table th:first-child,.analytics-table td:first-child{text-align:left;white-space:normal;min-width:180px}.analytics-table td:first-child{max-width:430px;overflow-wrap:anywhere}.analytics-table td{font-size:11px}.analytics-table .primary{color:var(--gold)}
+  .analytics-links{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:12px}.analytics-status{padding:17px}.analytics-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.analytics-pill{padding:4px 9px;border:1px solid #315942;border-radius:14px;color:var(--green);font-size:9px}.analytics-pill.off{border-color:#713a33;color:#e28e83}.clarity-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px}.clarity-card p{margin:3px 0 0;color:var(--muted);font-size:10px}.clarity-card .btn{white-space:nowrap;text-decoration:none}.analytics-note{margin:9px 2px 0;color:var(--muted);font-size:10px}.analytics-loading{min-height:190px;display:grid;place-items:center;color:var(--muted)}
   .system-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.system-card{padding:14px;border:1px solid #302a20;background:#0d0e10}.system-card span{display:block;color:var(--muted);font-size:10px}.system-card b{display:block;margin:5px 0 2px;font:17px var(--serif)}.system-card small{color:#756b5a}.system-card.ok b{color:var(--green)}.system-card.warn b{color:#e0b260}.system-card.down b{color:#e57d72}.system-alert{margin-bottom:12px;padding:11px 13px;border:1px solid #315942;background:#102019;color:#9dd9b2;border-radius:4px}.system-alert.warn{border-color:#72562b;background:#2a2110;color:#e8c780}.system-alert.down{border-color:#7f3b32;background:#271411;color:#efaaa2}.event-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 8px}.event-head span{color:var(--muted);font-size:10px}.event-list{display:flex;flex-direction:column;gap:7px}.event{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 11px;border:1px solid #302a20;background:#0b0c0e}.event-level{min-width:44px;text-align:center;padding:2px 6px;border:1px solid #6b5129;border-radius:10px;color:#e0b260;font-size:9px}.event.error .event-level,.event.critical .event-level{border-color:#713a33;color:#e28e83}.event b{display:block;font-size:12px}.event small{display:block;color:var(--muted)}.event time{white-space:nowrap;color:#756b5a;font-size:9px}
   .toolbar{display:flex;gap:8px}.toolbar input{min-width:240px}.table-wrap{overflow:auto}.users{width:100%;border-collapse:collapse;min-width:900px}.users th,.users td{padding:11px 12px;border-bottom:1px solid #2a251c;text-align:left;white-space:nowrap}.users th{position:sticky;top:0;background:#17130e;color:var(--muted);font-size:10px}.users td.name{color:var(--gold)}.yes{color:var(--green)}.no{color:#6f6656}
   .mail-form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.mail-form .wide{grid-column:1/-1}.campaign-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}.campaign{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px;border:1px solid #332c21;background:#0c0d0f}.campaign b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.campaign small{color:var(--muted)}.status{display:inline-block;padding:2px 7px;border:1px solid #4a402f;border-radius:10px;color:var(--muted);font-size:9px}.status.submitted{color:var(--green);border-color:#315942}.status.failed{color:#e28e83;border-color:#713a33}.status.sending{color:var(--cyan);border-color:#33615e}
   .fb-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}.fb-item{border:1px solid #302a20;background:#0b0c0e;padding:13px 14px}.fb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fb-head b{color:var(--gold)}.fb-head small{color:var(--muted)}.fb-body{margin:9px 0 0;white-space:pre-wrap;line-height:1.75;color:#d8cdb4}.fb-reply{margin-top:11px;border-top:1px dashed #3b3326;padding-top:11px}.fb-reply textarea{min-height:64px}.fb-actions{display:flex;gap:8px;align-items:center;margin-top:8px}
   .empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #3b3326}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  @media(max-width:1050px){.metrics{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
-  @media(max-width:620px){header{gap:10px}.brand{font-size:16px}.brand small{display:none}.head-user span{display:none}main{width:92vw;padding-top:24px}.metrics{grid-template-columns:repeat(2,1fr)}.metric{min-height:92px;padding:14px}.metric b{font-size:25px}.mail-form{grid-template-columns:1fr}.mail-form .wide{grid-column:auto}.toolbar{width:100%}.toolbar input{min-width:0}.online-list,.system-grid,.analytics-grid{grid-template-columns:1fr}.event{grid-template-columns:auto minmax(0,1fr)}.event time{grid-column:2}.pad{padding:16px}}
+  @media(max-width:1050px){.metrics,.analytics-metrics{grid-template-columns:repeat(3,1fr)}.grid2,.analytics-links{grid-template-columns:1fr}}
+  @media(max-width:760px){.chart-grid,.analytics-table-grid{grid-template-columns:1fr}.analytics-table-card.wide{grid-column:auto}}
+  @media(max-width:620px){header{gap:10px}.brand{font-size:16px}.brand small{display:none}.head-user span{display:none}main{width:92vw;padding-top:24px}.admin-tabs{width:100%}.admin-tab{flex:1;min-width:0}.metrics,.analytics-metrics{grid-template-columns:repeat(2,1fr)}.metric,.analytics-kpi{min-height:92px;padding:14px}.metric b,.analytics-kpi b{font-size:25px}.section-head{align-items:start;flex-direction:column}.analytics-toolbar{width:100%}.analytics-updated{width:100%}.mail-form{grid-template-columns:1fr}.mail-form .wide{grid-column:auto}.toolbar{width:100%}.toolbar input{min-width:0}.online-list,.system-grid{grid-template-columns:1fr}.event{grid-template-columns:auto minmax(0,1fr)}.event time{grid-column:2}.pad,.chart-card{padding:16px}.clarity-card{align-items:flex-start;flex-direction:column}}
 </style>
 </head>
 <body>
@@ -69,16 +77,16 @@
   </section>
 
   <div class="hidden" id="adminApp">
-    <h1>運営状況</h1>
-    <p class="lead">魂籍、現世接続、更新情報メールを一つの台帳で確認します。</p>
-    <div class="metrics" id="metrics"></div>
-    <div id="globalFeedback"></div>
+    <h1>運営台帳</h1>
+    <p class="lead">運営状況とアクセス解析を一つの台帳で確認します。</p>
+    <nav class="admin-tabs" aria-label="管理画面の表示切替">
+      <button class="admin-tab active" data-admin-tab="operations" type="button">運営状況</button>
+      <button class="admin-tab" data-admin-tab="analytics" type="button">アクセス解析</button>
+    </nav>
 
-    <section class="section">
-      <div class="section-head"><div><h2>アクセス解析</h2><p>Google検索・ページ閲覧・ヒートマップの計測状態と管理画面</p></div></div>
-      <div class="analytics-grid" id="analyticsTools"></div>
-      <p class="analytics-note">GA4とClarityは利用者が許可した場合だけ読み込みます。この運営台帳自体はアクセス解析の対象外です。</p>
-    </section>
+    <div id="operationsPanel" data-admin-panel="operations">
+      <div class="metrics" id="metrics"></div>
+      <div id="globalFeedback"></div>
 
     <section class="section">
       <div class="section-head"><div><h2>システム監視</h2><p>魂籍DB・共有魔物サーバー・プレイ中の異常を60秒ごとに確認</p></div><button class="btn ghost small" id="refreshSystemBtn">再確認</button></div>
@@ -141,12 +149,78 @@
         <div id="campaignFeedback"></div>
       </div>
     </section>
+    </div>
+
+    <div class="hidden" id="analyticsPanel" data-admin-panel="analytics">
+      <section>
+        <div class="section-head">
+          <div><h2>アクセス解析</h2><p>GA4とGoogle検索の実績を管理画面内で確認</p></div>
+          <div class="analytics-toolbar">
+            <div class="range-tabs" aria-label="集計期間">
+              <button class="range-btn" data-analytics-days="7" type="button">7日</button>
+              <button class="range-btn active" data-analytics-days="28" type="button">28日</button>
+              <button class="range-btn" data-analytics-days="90" type="button">90日</button>
+            </div>
+            <button class="btn ghost small" id="refreshAnalyticsBtn" type="button">再取得</button>
+            <span class="analytics-updated" id="analyticsUpdated">未取得</span>
+          </div>
+        </div>
+        <div id="analyticsFeedback"></div>
+        <div class="analytics-metrics" id="analyticsMetrics"></div>
+      </section>
+
+      <section class="section chart-grid">
+        <article class="chart-card panel">
+          <div class="chart-head"><div><h3>サイト利用の推移</h3><p>GA4の日別ユーザー数と表示回数</p></div><div class="chart-legend"><span><i></i>表示</span><span><i class="alt"></i>利用者</span></div></div>
+          <div class="chart-host" id="gaTrendChart"></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><h3>Google検索の推移</h3><p>日別の表示回数とクリック数</p></div><div class="chart-legend"><span><i></i>表示</span><span><i class="alt"></i>クリック</span></div></div>
+          <div class="chart-host" id="searchTrendChart"></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><h3>流入元</h3><p>GA4のセッション獲得チャネル</p></div></div>
+          <div class="chart-host" id="channelBars"></div>
+        </article>
+        <article class="chart-card panel">
+          <div class="chart-head"><div><h3>数値の見方</h3><p>選択期間のサイト全体の傾向</p></div></div>
+          <div id="analyticsInsight" class="analytics-loading">データ取得後に要点を表示します</div>
+        </article>
+      </section>
+
+      <section class="section analytics-table-grid">
+        <article class="analytics-table-card panel wide">
+          <div class="analytics-table-title"><h3>よく見られたページ</h3><p>GA4・表示回数順</p></div>
+          <div class="table-wrap"><table class="analytics-table"><thead><tr><th>ページ</th><th>表示</th><th>利用者</th><th>平均滞在</th></tr></thead><tbody id="gaPageRows"></tbody></table></div>
+        </article>
+        <article class="analytics-table-card panel">
+          <div class="analytics-table-title"><h3>検索キーワード</h3><p>Search Console・クリック順</p></div>
+          <div class="table-wrap"><table class="analytics-table"><thead><tr><th>検索語</th><th>クリック</th><th>表示</th><th>CTR</th><th>順位</th></tr></thead><tbody id="searchQueryRows"></tbody></table></div>
+        </article>
+        <article class="analytics-table-card panel">
+          <div class="analytics-table-title"><h3>検索で見られたページ</h3><p>Search Console・クリック順</p></div>
+          <div class="table-wrap"><table class="analytics-table"><thead><tr><th>ページ</th><th>クリック</th><th>表示</th><th>CTR</th><th>順位</th></tr></thead><tbody id="searchPageRows"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="section analytics-links">
+        <div class="analytics-status panel">
+          <h3>計測連携</h3>
+          <div class="analytics-status-list" id="analyticsTools"></div>
+          <p class="analytics-note">GA4とClarityは利用者が許可した場合だけ計測します。この運営台帳自体は解析対象外です。</p>
+        </div>
+        <div class="clarity-card panel">
+          <div><h3>ヒートマップ</h3><p>クリック位置と操作録画はClarityで確認</p></div>
+          <a class="btn small" id="clarityLink" href="https://clarity.microsoft.com/" target="_blank" rel="noopener noreferrer">Clarityを開く</a>
+        </div>
+      </section>
+    </div>
   </div>
 </main>
 
 <script src="online/analytics-config.js?v=20260723a"></script>
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/admin.js?v=20260724a"></script>
+<script type="module" src="online/admin.js?v=20260724b"></script>
 </body>
 </html>

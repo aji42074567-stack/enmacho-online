@@ -13,6 +13,11 @@ const state = {
   feedbackRows: [],
   settings: null,
   campaigns: [],
+  analytics: {
+    days: 28,
+    loaded: false,
+    data: null,
+  },
   presence: null,
   online: [],
   system: {
@@ -85,33 +90,222 @@ function renderAnalyticsTools() {
   const clarityId = /^[a-z0-9]+$/i.test(analyticsConfig.clarityProjectId || '')
     ? String(analyticsConfig.clarityProjectId).toLowerCase() : '';
   const tools = [
-    {
-      name: 'Google Analytics 4', active: Boolean(gaId), id: gaId || '測定ID未設定',
-      description: 'ページ閲覧、流入元、端末、登録導線、ゲーム開始を集計',
-      url: 'https://analytics.google.com/analytics/web/#/a112482859p546813112/reports/intelligenthome',
-      action: 'GA4を開く',
-    },
-    {
-      name: 'Microsoft Clarity', active: Boolean(clarityId), id: clarityId || 'プロジェクトID未設定',
-      description: 'トップ・冥職名鑑のヒートマップと匿名化した操作記録',
-      url: clarityId ? `https://clarity.microsoft.com/projects/view/${encodeURIComponent(clarityId)}/dashboard` : '',
-      action: 'Clarityを開く',
-    },
-    {
-      name: 'Google Search Console', active: true, id: 'enmacho.com',
-      description: '検索流入、掲載順位、インデックス状況、サイトマップを確認',
-      url: 'https://search.google.com/search-console?resource_id=sc-domain%3Aenmacho.com',
-      action: 'Search Consoleを開く',
-    },
+    ['GA4', Boolean(gaId)],
+    ['Search Console', true],
+    ['Clarity', Boolean(clarityId)],
   ];
-  $('analyticsTools').innerHTML = tools.map(tool => `<article class="analytics-card panel">
-    <div class="analytics-card-head"><h3>${esc(tool.name)}</h3>
-      <span class="analytics-state ${tool.active ? '' : 'off'}">${tool.active ? '計測有効' : '要設定'}</span></div>
-    <div class="analytics-id">${esc(tool.id)}</div><p>${esc(tool.description)}</p>
-    <div class="analytics-actions">${tool.url
-      ? `<a class="btn small" href="${esc(tool.url)}" target="_blank" rel="noopener noreferrer">${esc(tool.action)}</a>`
-      : '<span class="btn small" aria-disabled="true">設定が必要</span>'}</div>
-  </article>`).join('');
+  $('analyticsTools').innerHTML = tools.map(([name, active]) =>
+    `<span class="analytics-pill ${active ? '' : 'off'}">${esc(name)}・${active ? '計測有効' : '要設定'}</span>`
+  ).join('');
+  if (clarityId) {
+    $('clarityLink').href = `https://clarity.microsoft.com/projects/view/${encodeURIComponent(clarityId)}/dashboard`;
+  }
+}
+
+const numberText = value => Number.isFinite(Number(value))
+  ? new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(Number(value)) : '—';
+
+const percentText = value => Number.isFinite(Number(value))
+  ? `${(Number(value) * 100).toFixed(Number(value) >= 0.1 ? 1 : 2)}%` : '—';
+
+const positionText = value => Number(value) > 0 ? Number(value).toFixed(1) : '—';
+
+const durationText = value => {
+  if (!Number.isFinite(Number(value))) return '—';
+  const seconds = Math.max(0, Math.round(Number(value)));
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+};
+
+const shortDate = value => {
+  const match = String(value || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return match ? `${Number(match[1])}/${Number(match[2])}` : String(value || '');
+};
+
+const channelLabel = value => ({
+  'Direct': '直接・ブックマーク',
+  'Organic Search': '自然検索',
+  'Organic Social': 'SNS（自然流入）',
+  'Paid Search': '検索広告',
+  'Paid Social': 'SNS広告',
+  'Referral': '他サイトから',
+  'Email': 'メール',
+  'Cross-network': '複数広告ネットワーク',
+  'Unassigned': '未分類',
+}[value] || value || '不明');
+
+const displayPath = value => {
+  try {
+    const parsed = new URL(String(value || ''), 'https://enmacho.com');
+    return `${parsed.pathname}${parsed.search}` || '/';
+  } catch {
+    return String(value || '—');
+  }
+};
+
+function emptyTable(columns, message = '該当するデータはまだありません') {
+  return `<tr><td colspan="${columns}"><div class="empty">${esc(message)}</div></td></tr>`;
+}
+
+function lineChart(rows, firstKey, secondKey, label) {
+  if (!Array.isArray(rows) || !rows.length) return '<div class="empty">集計データはまだありません</div>';
+  const width = 640;
+  const height = 250;
+  const margin = { top: 22, right: 42, bottom: 30, left: 42 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const firstMax = Math.max(1, ...rows.map(row => Number(row[firstKey]) || 0));
+  const secondMax = Math.max(1, ...rows.map(row => Number(row[secondKey]) || 0));
+  const point = (row, index, key, max) => {
+    const x = margin.left + (rows.length === 1 ? plotWidth / 2 : index * plotWidth / (rows.length - 1));
+    const y = margin.top + plotHeight - (Number(row[key]) || 0) / max * plotHeight;
+    return [x, y];
+  };
+  const firstPoints = rows.map((row, index) => point(row, index, firstKey, firstMax));
+  const secondPoints = rows.map((row, index) => point(row, index, secondKey, secondMax));
+  const path = points => points.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const grid = [0, .25, .5, .75, 1].map(ratio => {
+    const y = margin.top + plotHeight * ratio;
+    return `<line class="chart-gridline" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"/>`;
+  }).join('');
+  const points = rows.length <= 31 ? firstPoints.map(([x, y]) =>
+    `<circle class="chart-point" cx="${x}" cy="${y}" r="2.2"/>`
+  ).join('') + secondPoints.map(([x, y]) =>
+    `<circle class="chart-point alt" cx="${x}" cy="${y}" r="2.2"/>`
+  ).join('') : '';
+  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(label)}">
+    ${grid}
+    <text class="chart-label" x="${margin.left}" y="12" text-anchor="start">${esc(numberText(firstMax))}</text>
+    <text class="chart-label" x="${width - margin.right}" y="12" text-anchor="end">${esc(numberText(secondMax))}</text>
+    <text class="chart-label" x="${margin.left}" y="${height - 8}" text-anchor="start">${esc(shortDate(rows[0].date))}</text>
+    <text class="chart-label" x="${width - margin.right}" y="${height - 8}" text-anchor="end">${esc(shortDate(rows.at(-1).date))}</text>
+    <path class="chart-line" d="${path(firstPoints)}"/><path class="chart-line alt" d="${path(secondPoints)}"/>${points}
+  </svg>`;
+}
+
+function renderAnalyticsLoading() {
+  $('analyticsMetrics').innerHTML = Array.from({ length: 8 }, () =>
+    '<div class="analytics-kpi panel"><span>読込中</span><b>—</b><small>集計中</small></div>'
+  ).join('');
+  for (const id of ['gaTrendChart', 'searchTrendChart', 'channelBars']) {
+    $(id).innerHTML = '<div class="analytics-loading">解析データを取得しています…</div>';
+  }
+  $('analyticsInsight').className = 'analytics-loading';
+  $('analyticsInsight').textContent = 'データを整理しています…';
+  $('gaPageRows').innerHTML = emptyTable(4, '読み込み中…');
+  $('searchQueryRows').innerHTML = emptyTable(5, '読み込み中…');
+  $('searchPageRows').innerHTML = emptyTable(5, '読み込み中…');
+}
+
+function renderAnalytics() {
+  const data = state.analytics.data || {};
+  const ga = data.ga;
+  const search = data.search;
+  const gaTotals = ga?.totals || {};
+  const searchTotals = search?.totals || {};
+  const metrics = [
+    ['現在の利用者', ga ? numberText(ga.realtimeUsers) : '—', '過去30分', 'live-kpi'],
+    ['利用者', ga ? numberText(gaTotals.activeUsers) : '—', '人'],
+    ['セッション', ga ? numberText(gaTotals.sessions) : '—', '回'],
+    ['ページ表示', ga ? numberText(gaTotals.screenPageViews) : '—', '回'],
+    ['検索クリック', search ? numberText(searchTotals.clicks) : '—', '回'],
+    ['検索で表示', search ? numberText(searchTotals.impressions) : '—', '回'],
+    ['検索CTR', search ? percentText(searchTotals.ctr) : '—', 'クリック率'],
+    ['平均掲載順位', search ? positionText(searchTotals.position) : '—', '位'],
+  ];
+  $('analyticsMetrics').innerHTML = metrics.map(([label, value, unit, className = '']) =>
+    `<div class="analytics-kpi panel ${className}"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(unit)}</small></div>`
+  ).join('');
+  $('gaTrendChart').innerHTML = ga
+    ? lineChart(ga.daily, 'screenPageViews', 'activeUsers', '日別のページ表示回数と利用者数')
+    : '<div class="empty">GA4データを取得できませんでした</div>';
+  $('searchTrendChart').innerHTML = search
+    ? lineChart(search.daily, 'impressions', 'clicks', '日別の検索表示回数とクリック数')
+    : '<div class="empty">Search Consoleデータを取得できませんでした</div>';
+
+  const channels = ga?.channels || [];
+  const maxSessions = Math.max(1, ...channels.map(row => Number(row.sessions) || 0));
+  $('channelBars').innerHTML = channels.length ? `<div class="bar-list">${channels.map(row =>
+    `<div><div class="bar-row-head"><span>${esc(channelLabel(row.sessionDefaultChannelGroup))}</span><b>${esc(numberText(row.sessions))}</b></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, (Number(row.sessions) || 0) / maxSessions * 100).toFixed(1)}%"></div></div></div>`
+  ).join('')}</div>` : '<div class="empty">流入データはまだありません</div>';
+
+  const gaPages = ga?.pages || [];
+  $('gaPageRows').innerHTML = gaPages.length ? gaPages.map(row =>
+    `<tr><td><span class="primary">${esc(row.pageTitle || '無題')}</span><br><small>${esc(row.pagePath || '/')}</small></td>
+      <td>${esc(numberText(row.screenPageViews))}</td><td>${esc(numberText(row.activeUsers))}</td><td>${esc(durationText(row.averageSessionDuration))}</td></tr>`
+  ).join('') : emptyTable(4);
+
+  const searchTableRows = (rows, key) => rows.length ? rows.map(row =>
+    `<tr><td class="primary">${esc(key === 'page' ? displayPath(row[key]) : row[key] || '（検索語なし）')}</td>
+      <td>${esc(numberText(row.clicks))}</td><td>${esc(numberText(row.impressions))}</td>
+      <td>${esc(percentText(row.ctr))}</td><td>${esc(positionText(row.position))}</td></tr>`
+  ).join('') : emptyTable(5);
+  $('searchQueryRows').innerHTML = searchTableRows(search?.queries || [], 'query');
+  $('searchPageRows').innerHTML = searchTableRows(search?.pages || [], 'page');
+
+  const insight = [];
+  if (gaPages[0]) insight.push(`最も見られたページは「${gaPages[0].pageTitle || gaPages[0].pagePath}」で、${numberText(gaPages[0].screenPageViews)}回表示されています。`);
+  if (channels[0]) insight.push(`最大の流入元は「${channelLabel(channels[0].sessionDefaultChannelGroup)}」で、${numberText(channels[0].sessions)}セッションです。`);
+  if (search?.queries?.[0]) insight.push(`最多クリックの検索語は「${search.queries[0].query}」です。`);
+  if (!insight.length) insight.push('計測データがたまると、注目すべきページと流入元をここに表示します。');
+  $('analyticsInsight').className = '';
+  $('analyticsInsight').innerHTML = `<ul class="insight-list">${insight.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
+
+  const generated = data.generatedAt ? dateText(data.generatedAt) : '—';
+  const range = data.range || {};
+  $('analyticsUpdated').textContent = `取得 ${generated}・集計 ${shortDate(range.startDate)}〜${shortDate(range.endDate)}`;
+  const errors = Object.values(data.errors || {}).filter(Boolean);
+  feedback('analyticsFeedback', errors.join(' / '), errors.length > 0);
+}
+
+async function invokeAnalytics(days) {
+  const { data, error } = await state.client.functions.invoke('admin-analytics', { body: { days } });
+  if (error) {
+    let detail = '';
+    try { detail = (await error.context?.json?.())?.error || ''; } catch {}
+    throw new Error(detail || error.message || '解析データを取得できませんでした');
+  }
+  if (data?.error) throw new Error(data.error);
+  return data || {};
+}
+
+async function loadAnalytics() {
+  renderAnalyticsLoading();
+  feedback('analyticsFeedback');
+  try {
+    const data = await invokeAnalytics(state.analytics.days);
+    state.analytics.data = data;
+    state.analytics.loaded = true;
+    renderAnalytics();
+  } catch (error) {
+    state.analytics.loaded = false;
+    $('analyticsMetrics').innerHTML = '<div class="empty" style="grid-column:1/-1">解析データを表示できませんでした。接続設定を確認して再取得してください。</div>';
+    for (const id of ['gaTrendChart', 'searchTrendChart', 'channelBars']) {
+      $(id).innerHTML = '<div class="empty">データを取得できませんでした</div>';
+    }
+    $('analyticsInsight').className = 'analytics-loading';
+    $('analyticsInsight').textContent = '接続を確認してください';
+    $('gaPageRows').innerHTML = emptyTable(4, 'データを取得できませんでした');
+    $('searchQueryRows').innerHTML = emptyTable(5, 'データを取得できませんでした');
+    $('searchPageRows').innerHTML = emptyTable(5, 'データを取得できませんでした');
+    throw error;
+  }
+}
+
+function setAdminTab(name) {
+  const selected = name === 'analytics' ? 'analytics' : 'operations';
+  for (const button of document.querySelectorAll('[data-admin-tab]')) {
+    const active = button.dataset.adminTab === selected;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+  for (const panel of document.querySelectorAll('[data-admin-panel]')) {
+    panel.classList.toggle('hidden', panel.dataset.adminPanel !== selected);
+  }
+  if (selected === 'analytics' && !state.analytics.loaded && !state.busy) {
+    void runBusy(loadAnalytics, 'analyticsFeedback');
+  }
 }
 
 function readPresence() {
@@ -486,6 +680,24 @@ $('loginForm').addEventListener('submit', event => {
     await openAdmin(data.session);
   }, 'authFeedback');
 });
+
+for (const button of document.querySelectorAll('[data-admin-tab]')) {
+  button.addEventListener('click', () => setAdminTab(button.dataset.adminTab));
+}
+
+for (const button of document.querySelectorAll('[data-analytics-days]')) {
+  button.addEventListener('click', () => {
+    const days = Number(button.dataset.analyticsDays);
+    if (![7, 28, 90].includes(days) || days === state.analytics.days) return;
+    state.analytics.days = days;
+    for (const rangeButton of document.querySelectorAll('[data-analytics-days]')) {
+      rangeButton.classList.toggle('active', Number(rangeButton.dataset.analyticsDays) === days);
+    }
+    void runBusy(loadAnalytics, 'analyticsFeedback');
+  });
+}
+
+$('refreshAnalyticsBtn').addEventListener('click', () => void runBusy(loadAnalytics, 'analyticsFeedback'));
 
 $('logoutBtn').addEventListener('click', () => void runBusy(async () => {
   if (state.presence) await state.client.removeChannel(state.presence);
