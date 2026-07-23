@@ -499,8 +499,9 @@ export class WorldRoom {
     this.state.acceptWebSocket(server);
     if (this.simReady()) {
       this.send(server, this.snapshot(Date.now(), true));
-      if (this.zone === 'field' && !this.fieldWalls)
-        this.send(server, { type: 'need_init', zone: this.zone });
+      // 入室ごとに最新の地図を求める。sigが同じなら何もせず、地図が更新されていたら
+      // 部屋を作り直す(古いキャッシュのクライアントが作った古い地形が残り続けるのを防ぐ)。
+      this.send(server, { type: 'need_init', zone: this.zone });
       if (this.dispatchDragonRespawnNotice([server])) void this.persist(Date.now(), true);
       this.startTicking();
     } else {
