@@ -5936,7 +5936,12 @@ function drawPlayer(sx,sy,e){
   }else if(e.moving&&walkS){
     // 歩行: 実際に進んだ距離(walkT)に同期してコマ送り(足滑り防止)
     const fr=Math.floor((e.walkT||0)*2.6)%4;
-    ctx.drawImage(walkS,fr*F,row*F,F,F,-D/2,-D+3,D,D);
+    // 護法僧男の歩行素材は長い錫杖を128pxセルへ収めたぶん人物本体が小さい。
+    // 足元を固定したまま方向別に補正し、停止姿勢と体格・顔の大きさを揃える。
+    const walkD=spriteId==='gohousou_m'
+      ?(e.dir==='down'?64:(e.dir==='left'||e.dir==='right'?60:D))
+      :D;
+    ctx.drawImage(walkS,fr*F,row*F,F,F,-walkD/2,-walkD+3,walkD,walkD);
     if(!bundledWeapon)drawHeldWeapon(e,fr);
   }else{
     const swingMax=e.swingMax||0.25;
