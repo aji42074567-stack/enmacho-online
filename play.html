@@ -1623,6 +1623,7 @@ const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'';
 const JUGONSHI_SPRITE_VERSION='20260723-jugon4';
 const KAGEHOSHI_SPRITE_VERSION='20260723-idle4';
+const GOHOUSOU_SPRITE_VERSION='20260723-idle2';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
   const src=MEISHOKU_READY.has(e?.meishoku)
@@ -1630,6 +1631,7 @@ const playerSpriteAsset=e=>{
     :`assets/char_player_${gender}.png`;
   if(e?.meishoku==='jugonshi')return`${src}?v=${JUGONSHI_SPRITE_VERSION}`;
   if(e?.meishoku==='kagehoshi')return`${src}?v=${KAGEHOSHI_SPRITE_VERSION}`;
+  if(e?.meishoku==='gohousou')return`${src}?v=${GOHOUSOU_SPRITE_VERSION}`;
   return src;
 };
 const sealCdMul=()=>meishokuDef(player)?.sealCd||1;   // 呪禁師など印のクールタイム補正
@@ -5729,12 +5731,12 @@ loadSprite('player_jugonshi_f_walk',`assets/char_jugonshi_f_walk.png?v=${JUGONSH
 loadSprite('player_jugonshi_f_attack','assets/char_jugonshi_f_attack.png');
 loadSprite('player_jugonshi_f_hit','assets/char_jugonshi_f_hit.png');
 loadSprite('player_jugonshi_f_death','assets/char_jugonshi_f_death.png');
-loadSprite('player_gohousou_m','assets/char_gohousou_m.png');
+loadSprite('player_gohousou_m',`assets/char_gohousou_m.png?v=${GOHOUSOU_SPRITE_VERSION}`);
 loadSprite('player_gohousou_m_walk','assets/char_gohousou_m_walk.png?v=20260723-walk2');
 loadSprite('player_gohousou_m_attack','assets/char_gohousou_m_attack.png');
 loadSprite('player_gohousou_m_hit','assets/char_gohousou_m_hit.png');
 loadSprite('player_gohousou_m_death','assets/char_gohousou_m_death.png');
-loadSprite('player_gohousou_f','assets/char_gohousou_f.png');
+loadSprite('player_gohousou_f',`assets/char_gohousou_f.png?v=${GOHOUSOU_SPRITE_VERSION}`);
 loadSprite('player_gohousou_f_walk','assets/char_gohousou_f_walk.png?v=20260723-walk2');
 loadSprite('player_gohousou_f_attack','assets/char_gohousou_f_attack.png');
 loadSprite('player_gohousou_f_hit','assets/char_gohousou_f_hit.png');

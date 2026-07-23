@@ -201,6 +201,9 @@ enmacho-online/
 各シートは正本を参照画像にCodex `image_gen` で量産。緑背景 #00FF00 クロマキー素材。
 配信用は `assets/char_gohousou_{m,f}*.png` として組込済み(冥職ID `gohousou`)。
 再生成コマンドは呪禁師と同じ(`--prefix char_gohousou`)。描画は武器焼き込み(bundledWeapon)56px。
+左右の停止絵は専用の左向き静止素材 `goho_{m,f}_idle_side_v2.png` から
+`scripts/repair_gohousou_idle.py` で組み直す。右向きは左向きの全身反転とし、
+頭・錫杖をセル内へ収め、人物と錫杖の接地を y=124 に統一する。
 
 | ファイル | 内容 | 備考 |
 |---|---|---|
