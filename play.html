@@ -2287,6 +2287,9 @@ function save(){
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
       hastePots:player.hastePots,critPots:player.critPots,
+      buffs:{haste:Math.max(0,Math.round(player.hasteT)),crit:Math.max(0,Math.round(player.critT)),
+        gmDash:Math.max(0,Math.round(player.gmDashT)),foodAtk:Math.max(0,Math.round(player.foodAtkT)),
+        foodDef:Math.max(0,Math.round(player.foodDefT)),foodRegen:Math.max(0,Math.round(player.foodRegenT))},
       quests:player.quests,qb:player.qb,plus:player.plus,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
@@ -2392,6 +2395,14 @@ function load(){
     player.smithIntro=!!d.smithIntro;
     // v7以前は2時間の出現枠を記録していたため、更新時は討伐待ちを解除する。
     player.drakeKilledAt=d.v>=8?Math.max(0,Number(d.drakeKilledAt)||0):0;
+    // バフの残り時間を復元(保存からの経過実時間を差し引く。リロードで時間は稼げない)
+    if(d.buffs&&typeof d.buffs==='object'){
+      const elapsed=Math.max(0,(Date.now()-(Number(d.savedAt)||Date.now()))/1000);
+      const rest=v=>Math.max(0,(Number(v)||0)-elapsed);
+      player.hasteT=rest(d.buffs.haste);player.critT=rest(d.buffs.crit);
+      player.gmDashT=rest(d.buffs.gmDash);player.foodAtkT=rest(d.buffs.foodAtk);
+      player.foodDefT=rest(d.buffs.foodDef);player.foodRegenT=rest(d.buffs.foodRegen);
+    }
     const cfg=d.settings&&typeof d.settings==='object'?d.settings:{};
     settings.bgm=clamp(Number.isFinite(+cfg.bgm)?+cfg.bgm:55,0,100);
     settings.sfx=clamp(Number.isFinite(+cfg.sfx)?+cfg.sfx:100,0,100);
