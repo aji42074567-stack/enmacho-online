@@ -1486,11 +1486,13 @@ const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
 const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   // 冥装(スプライト)が揃い選択できる職
 const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'亡者';
+const JUGONSHI_SPRITE_VERSION='20260723-jugon3';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
-  return MEISHOKU_READY.has(e?.meishoku)
+  const src=MEISHOKU_READY.has(e?.meishoku)
     ?`assets/char_${e.meishoku}_${gender}.png`
     :`assets/char_player_${gender}.png`;
+  return e?.meishoku==='jugonshi'?`${src}?v=${JUGONSHI_SPRITE_VERSION}`:src;
 };
 const sealCdMul=()=>meishokuDef(player)?.sealCd||1;   // 呪禁師など印のクールタイム補正
 
@@ -5537,13 +5539,13 @@ loadSprite('player_kagehoshi_f_walk','assets/char_kagehoshi_f_walk.png?v=2026072
 loadSprite('player_kagehoshi_f_attack','assets/char_kagehoshi_f_attack.png');
 loadSprite('player_kagehoshi_f_hit','assets/char_kagehoshi_f_hit.png');
 loadSprite('player_kagehoshi_f_death','assets/char_kagehoshi_f_death.png');
-loadSprite('player_jugonshi_m','assets/char_jugonshi_m.png');
-loadSprite('player_jugonshi_m_walk','assets/char_jugonshi_m_walk.png?v=20260723-walk2');
+loadSprite('player_jugonshi_m',`assets/char_jugonshi_m.png?v=${JUGONSHI_SPRITE_VERSION}`);
+loadSprite('player_jugonshi_m_walk',`assets/char_jugonshi_m_walk.png?v=${JUGONSHI_SPRITE_VERSION}`);
 loadSprite('player_jugonshi_m_attack','assets/char_jugonshi_m_attack.png');
 loadSprite('player_jugonshi_m_hit','assets/char_jugonshi_m_hit.png');
 loadSprite('player_jugonshi_m_death','assets/char_jugonshi_m_death.png');
-loadSprite('player_jugonshi_f','assets/char_jugonshi_f.png');
-loadSprite('player_jugonshi_f_walk','assets/char_jugonshi_f_walk.png?v=20260723-walk2');
+loadSprite('player_jugonshi_f',`assets/char_jugonshi_f.png?v=${JUGONSHI_SPRITE_VERSION}`);
+loadSprite('player_jugonshi_f_walk',`assets/char_jugonshi_f_walk.png?v=${JUGONSHI_SPRITE_VERSION}`);
 loadSprite('player_jugonshi_f_attack','assets/char_jugonshi_f_attack.png');
 loadSprite('player_jugonshi_f_hit','assets/char_jugonshi_f_hit.png');
 loadSprite('player_jugonshi_f_death','assets/char_jugonshi_f_death.png');
