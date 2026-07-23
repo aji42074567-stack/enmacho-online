@@ -113,6 +113,9 @@
     box-shadow:0 5px 18px rgba(0,0,0,.52),inset 0 0 0 1px rgba(224,193,119,.05);
     text-align:left;touch-action:manipulation}
   #miniMapHud[hidden]{display:none}
+  /* 着任研修の表示中は、チェックリストと重ならないよう地図を下げる */
+  body.tutorial-on #miniMapHud{top:210px}
+  body.tutorial-on #miniMapMinBtn{top:202px}
   #miniMapHud:hover{border-color:#9a7d42}
   #miniMapHud:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   #miniMapMinBtn{position:absolute;top:90px;right:56px;z-index:6;width:24px;height:24px;
@@ -7715,6 +7718,7 @@ function renderTutorialList(){
   const active=started&&tutorialStep<TUTORIAL_STEPS.length;
   listEl.hidden=!active;
   el.goal.style.display=active?'none':'';
+  document.body.classList.toggle('tutorial-on',active);
   if(!active)return;
   const key=String(tutorialStep);
   if(tutorialRendered===key)return;
