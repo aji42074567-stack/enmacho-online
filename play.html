@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=overlays-content">
 <title>閻魔庁ONLINE — 死後に知る。生前こそが地獄だった。</title>
 <style>
   :root{
@@ -310,7 +310,14 @@
   /* スマホはフォーカス時の自動ズームを防ぐため16px必須。
      pointer判定がfineになる端末・ブラウザもあるため、ゲーム本体と同じ幅判定を併用する。 */
   /* 16pxはズーム防止に必須だが、余白を絞って入力欄(とカーソル)の背を低く保つ */
-  @media (pointer:coarse),(max-width:700px){#chatIn{font-size:16px;padding:3px 8px}}
+  @media (pointer:coarse),(max-width:700px){
+    #chatIn{font-size:16px;padding:1px 8px}
+    #chatInputRow{padding:4px 6px}
+    #chatSend{padding:0 10px}
+    /* チームタブのメンバー名一覧は縦幅を食うだけなので出さない(PTフレームで見える) */
+    #teamMembers{display:none}
+    #teamBar{padding:3px 6px}
+  }
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
     letter-spacing:.1em;padding:0 13px;cursor:pointer;touch-action:manipulation}
@@ -6035,13 +6042,14 @@ function drawRemotePlayerLabel(sx,sy,e){
   }
 }
 const CHAT_BUBBLE_COLOR={general:'#c9a24a',friend:'#75c36c',team:'#6ea8e8',guild:'#b48ce8'};
-function drawChatBubbleFx(sx,sy,fx){
+function drawChatBubbleFx(sx,sy,fx,screenSpace=false){
   const remain=fx.until-performance.now();
   if(remain<=0)return false;
   ctx.save();
   ctx.globalAlpha=Math.min(1,remain/400);  // 消える直前だけすっと薄くなる
   // 吹き出しチャットが主役なので、スマホの世界縮小に負けない画面上一定サイズで描く
-  const k=1/worldViewScale();
+  // (screenSpace=trueは等倍の画面座標で呼ばれた場合。三角インジケーター上の吹き出し等)
+  const k=screenSpace?1:1/worldViewScale();
   ctx.font=`${12*k}px sans-serif`;ctx.textAlign='center';
   const maxW=140*k,lines=[];
   let line='',truncated=false;
@@ -6168,23 +6176,23 @@ function drawPartyOffscreenArrows(viewScale,SX,SY){
     ctx.fill();ctx.stroke();
     ctx.restore();
     const nm=(e.name||'ナナシ').slice(0,6);
-    const nx=clamp(ex-Math.cos(ang)*22,30,W-30),ny=clamp(ey-Math.sin(ang)*22,mTop-14,H-mBottom+16);
+    const nx=clamp(ex-Math.cos(ang)*22,34,W-34),ny=clamp(ey-Math.sin(ang)*22,26,H-26);
     ctx.font='bold 10px sans-serif';ctx.textAlign='center';
     ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=3;
     ctx.strokeText(nm,nx,ny+3);
     ctx.fillStyle='#8fc4ff';ctx.fillText(nm,nx,ny+3);
+    // 画面外の仲間の発言は三角の上に吹き出しで出す(チームチャットが届く)
+    if(e.chatFx&&!drawChatBubbleFx(nx,ny+52,e.chatFx,true))e.chatFx=null;
   }
 }
 function drawPlayerMobileHud(sx,sy){
   if(!started||player.dead)return;
-  const mobile=W<=640;
-  const fighting=mobile&&player.combatT>0;   // 戦闘メーターはスマホのみ。名前は全端末で常時表示
-  const nameY=fighting?sy-70:sy-52;
+  // 名前とHP/MPバーは全端末で常時表示(自分の状態を頭上で把握できるように)
+  const nameY=sy-70;
   ctx.font='bold 11px sans-serif';ctx.textAlign='center';
   ctx.strokeStyle='rgba(0,0,0,.9)';ctx.lineWidth=3;
   ctx.strokeText(player.name||'ナナシ',sx,nameY);
   ctx.fillStyle='#f2e4c7';ctx.fillText(player.name||'ナナシ',sx,nameY);
-  if(!fighting)return;
   const bw=62;
   const meter=(y,ratio,color)=>{
     ctx.fillStyle='rgba(0,0,0,.78)';ctx.fillRect(sx-bw/2,y,bw,5);
@@ -9388,6 +9396,19 @@ if(matchMedia('(pointer:coarse)').matches){
     <li><b>迷える魂をタップ</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をタップ</b> … 会話・買い物</li>
     <li><b>画面下のボタン</b> … 印・道具・メニュー　／　右上の<b>地図</b> … 全体地図</li>`;
+}
+// スマホのキーボード表示で画面全体が上へずれるのを防ぐ:
+// ゲーム画面は固定のまま、縮んだ分だけチャット窓を持ち上げる(狩りの状況を見ながら打てる)
+if(window.visualViewport){
+  const vv=window.visualViewport;
+  const adjustForKeyboard=()=>{
+    const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+    const wrap=document.getElementById('chatWrap');
+    if(wrap)wrap.style.transform=kb>40?`translateY(-${kb}px)`:'';
+    if(kb>40)window.scrollTo(0,0);
+  };
+  vv.addEventListener('resize',adjustForKeyboard);
+  vv.addEventListener('scroll',adjustForKeyboard);
 }
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
