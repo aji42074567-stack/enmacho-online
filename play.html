@@ -4619,6 +4619,8 @@ const terrainTexture=new Image();
 const groundTiles={};
 let terrainAssetsStarted=false,groundRenderQueued=false;
 const GROUND_TILE_SOURCES=[
+  ['path','assets/map_tile_path.png'],
+  ['stone','assets/map_tile_stone.png'],
   ['sand','assets/map_tile_sand.png'],
   ['sea','assets/map_tile_sea.png'],
   ['cavefloor','assets/map_cave_floor.png'],
@@ -4742,6 +4744,36 @@ function renderGround(){
   paintLayer(groundTiles.sand||null,'#6d5c40',layerMask(2.2,15),'rgba(30,24,12,0.18)');
   paintLayer(terrainTexture.complete&&terrainTexture.naturalWidth?terrainTexture:null,
              '#2c4630',layerMask(0,15),'rgba(18,30,22,0.22)');
+  // 道と町床は生成画像を面として敷き、半透明の外縁と不規則な中心マスクで森へ馴染ませる。
+  // 1マスごとの画像配置には戻さないため、地形の輪郭は連続したまま素材の描き込みだけを使える。
+  const paintKindLayer=(kind,img,fallback,tint,outerRx,outerRy,innerRx,innerRy)=>{
+    const mc=document.createElement('canvas');
+    mc.width=Math.ceil(gW*renderScale);mc.height=Math.ceil(gH*renderScale);
+    const mg=mc.getContext('2d');
+    mg.setTransform(renderScale,0,0,renderScale,0,0);
+    for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
+      if(tkF[y*FIELD_SIZE+x]!==kind)continue;
+      const jx=(hash2(x*3+kind,y*5+kind)-.5)*10;
+      const jy=(hash2(x*7+kind,y*11+kind)-.5)*5;
+      const cx=GX(x,y)+jx,cy=GY(x,y)+jy;
+      const rot=(hash2(x*13+kind,y*17+kind)-.5)*.18;
+      mg.fillStyle='rgba(255,255,255,0.30)';
+      mg.beginPath();mg.ellipse(cx,cy,outerRx,outerRy,rot,0,6.29);mg.fill();
+      mg.fillStyle='#fff';
+      mg.beginPath();mg.ellipse(cx,cy,innerRx,innerRy,rot,0,6.29);mg.fill();
+    }
+    const lc=document.createElement('canvas');
+    lc.width=Math.ceil(gW*renderScale);lc.height=Math.ceil(gH*renderScale);
+    const lg=lc.getContext('2d');
+    lg.setTransform(renderScale,0,0,renderScale,0,0);
+    lg.fillStyle=img?lg.createPattern(img,'repeat'):fallback;
+    lg.fillRect(0,0,gW,gH);
+    if(tint){lg.fillStyle=tint;lg.fillRect(0,0,gW,gH);}
+    lg.globalCompositeOperation='destination-in';
+    lg.drawImage(mc,0,0,gW,gH);
+    g.drawImage(lc,0,0,gW,gH);
+    mc.width=1;mc.height=1;lc.width=1;lc.height=1;
+  };
   // 波打ち際: 輪郭の接線に沿った細い筋(丸は使わない)
   const shoreTan=(x,y)=>{
     const e=0.4;
@@ -4790,37 +4822,12 @@ function renderGround(){
       g.beginPath();g.moveTo(cx-18,cy+5);g.quadraticCurveTo(cx,cy-5,cx+18,cy-3);g.stroke();
     }
   }
-  // 2) 土の道: テクスチャタイルを並べず、柔らかい土の斑を重ねて連続させる。
-  for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
-    if(tkF[y*FIELD_SIZE+x]!==1)continue;
-    const n=vnoise(x/4+3,y/4+9);
-    const cx=GX(x,y)+(hash2(x,y)-0.5)*12, cy=GY(x,y)+(hash2(y,x)-0.5)*6;
-    g.fillStyle=`rgba(${lerp(68,94,n)|0},${lerp(52,72,n)|0},${lerp(34,48,n)|0},0.78)`;
-    g.beginPath();g.ellipse(cx,cy,TW*.73,TH*.84,(hash2(x*7,y*5)-.5)*.22,0,6.29);g.fill();
-    if(hash2(x*13,y*11)>.54){
-      g.fillStyle='rgba(135,116,82,0.22)';
-      g.beginPath();g.ellipse(cx+(hash2(x,y*3)-.5)*25,cy+(hash2(y,x*3)-.5)*10,5,2.2,0,0,6.29);g.fill();
-    }
-  }
-  // 3) 村の石畳: ひし形画像を並べず、連続した下地の上へ丸石を散らす。
-  for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
-    if(tkF[y*FIELD_SIZE+x]!==2)continue;
-    const cx=GX(x,y)+(hash2(x*3,y*5)-.5)*5,cy=GY(x,y)+(hash2(x*7,y*11)-.5)*3;
-    const n=vnoise(x/5+13,y/5+4);
-    g.fillStyle=`rgba(${lerp(48,64,n)|0},${lerp(47,62,n)|0},${lerp(46,60,n)|0},0.90)`;
-    g.beginPath();g.ellipse(cx,cy,TW*.71,TH*.82,(hash2(x*13,y*17)-.5)*.16,0,6.29);g.fill();
-  }
-  for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
-    if(tkF[y*FIELD_SIZE+x]!==2)continue;
-    const cx=GX(x,y),cy=GY(x,y);
-    for(let i=0;i<4;i++){
-      const h1=hash2(x*3+i,y*7),h2=hash2(x*7,y*3+i),h3=hash2(x+i*13,y+i*5);
-      const sxp=cx+(h1-0.5)*TW*0.8, syp=cy+(h2-0.5)*TH*0.8;
-      const rw=4+h3*6;
-      g.fillStyle=`rgba(${76+h3*28|0},${74+h3*27|0},${73+h3*25|0},0.78)`;
-      g.beginPath();g.ellipse(sxp,syp,rw,rw*0.55,(h1-0.5)*0.6,0,6.29);g.fill();
-    }
-  }
+  // 2) 土の街道: 暗い踏み固め土を連続面として敷く。茶色い単色帯にはしない。
+  paintKindLayer(1,groundTiles.path||null,'#3d3024','rgba(72,49,31,0.13)',
+                 TW*.76,TH*.91,TW*.67,TH*.77);
+  // 3) 宿場町: 青灰色の丸石ではなく、煤けた不揃いな板石を連続面として敷く。
+  paintKindLayer(2,groundTiles.stone||null,'#343230','rgba(13,10,8,0.09)',
+                 TW*.75,TH*.89,TW*.68,TH*.80);
   // 4) まだら模様: 複数マスをまたぐ影と光で自然な地面に
   for(let i=0;i<420;i++){
     const x=rnd(0,FIELD_SIZE-0.01),y=rnd(0,FIELD_SIZE-0.01);
