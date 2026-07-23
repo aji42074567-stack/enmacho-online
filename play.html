@@ -8090,6 +8090,8 @@ updateChatInputState();
 
 /* ================= チーム・フレンド・プレイヤーカード ================= */
 const party={id:null,members:[],leaderId:''};   // leaderId=チームに誘った人(自動的にリーダー)
+const PARTY_MAX_MEMBERS=4;   // チーム上限人数(自分を含む)。バランス・UI都合で4人まで
+const partyIsFull=()=>Boolean(party.id)&&party.members.length>=PARTY_MAX_MEMBERS;
 // リロードしてもチームが解散しないよう、このタブの間は覚えておく
 function rememberParty(){
   try{
@@ -8153,9 +8155,10 @@ function updatePlayerCardButtons(){
   const inParty=partyHas(id),friend=isFriend(id);
   const incoming=socialState.incoming.some(f=>f.id===id);
   const outgoing=socialState.outgoing.some(f=>f.id===id);
-  teamBtn.textContent=inParty?'チーム同行中':'チームに誘う';
+  const partyFull=partyIsFull();
+  teamBtn.textContent=inParty?'チーム同行中':partyFull?`チーム満員(${PARTY_MAX_MEMBERS}/${PARTY_MAX_MEMBERS})`:'チームに誘う';
   friendBtn.textContent=friend?'フレンド ✓':incoming?'申請を承認':outgoing?'申請済み':'フレンド申請';
-  teamBtn.disabled=inParty||!chat.online;
+  teamBtn.disabled=inParty||!chat.online||partyFull;
   friendBtn.disabled=friend||outgoing||!socialState.online;
   hint.hidden=chat.online&&socialState.online;
   if(!chat.online||!socialState.online)hint.textContent='誘い・申請には魂籍ログインが必要';
@@ -8200,6 +8203,10 @@ $('pcClose').addEventListener('click',()=>{closePlayerCard();sfx.click();});
 $('pcTeamBtn').addEventListener('click',()=>{
   const e=remotePlayers.get(playerCard.userId);
   if(!e){closePlayerCard();return;}
+  if(partyIsFull()){
+    notifyNet(`チームは${PARTY_MAX_MEMBERS}人が上限です`);
+    closePlayerCard();return;
+  }
   if(!party.id){party.id=genPartyId();party.leaderId=myUserId();rememberParty();renderTeamUI();}
   netOutbox.push({type:'invite',kind:'team',targetUserId:playerCard.userId,partyId:party.id});
   notifyNet(`${e.name} をチームに誘った。返事を待とう`);
