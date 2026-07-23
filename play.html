@@ -1314,6 +1314,7 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
+const SAVE_VERSION=12;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -2075,7 +2076,8 @@ const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
 const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5','muen1','muen2','muen3']);
 const worldByZone=z=>({field:FIELD,rinne:RINNE,
   // 旧版クライアントの地域名は、同じ連続大陸として受ける。
-  rinne_coast:RINNE,rinne_wilds:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3}[z]
+  rinne_coast:RINNE,rinne_wilds:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3,
+  enma1:ENMA1,enma2:ENMA2,enma3:ENMA3}[z]
   ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]
   :z&&z.startsWith('muen')?MUENW[+z.slice(4)-1]:null));
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
@@ -2116,7 +2118,7 @@ function save(){
   try{
     const savedAt=Date.now();
     const serialized=JSON.stringify({
-      v:11,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
+      v:SAVE_VERSION,savedAt,lv:player.lv,xp:player.xp,gold:player.gold,potions:player.potions,
       potionsM:player.potionsM,potionsL:player.potionsL,potionTier:player.potionTier,
       quickItems:player.quickItems,quickPage:player.quickPage,
       dragonBlood:player.dragonBlood,
@@ -2129,6 +2131,8 @@ function save(){
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
       meishoku:player.meishoku,meishokuLv:player.meishokuLv,
+      location:{zone,x:Math.round(player.x*1000)/1000,y:Math.round(player.y*1000)/1000,
+        dir:player.dir},
       friends:player.friends,giftsUsed:player.giftsUsed,settings
     });
     localStorage.setItem(SAVE_KEY,serialized);
@@ -2140,7 +2144,7 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY));
-    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>11)return false;
+    if(!d||!Number.isInteger(d.v)||d.v<1||d.v>SAVE_VERSION)return false;
     player.lv=d.lv;player.xp=d.xp;player.gold=d.gold;
     player.potions=Math.max(0,d.potions|0);
     player.potionsM=Math.max(0,d.potionsM|0);player.potionsL=Math.max(0,d.potionsL|0);
@@ -2237,6 +2241,7 @@ function load(){
     settings.muted=cfg.muted===true;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
+    if(d.v>=12)restoreSavedLocation(d.location);
     return true;
   }catch(e){return false;}
 }
@@ -5374,16 +5379,13 @@ function showBossCutinForZone(zoneName){
 $('bossCutin').addEventListener('click',dismissBossCutin);
 function switchZone(z,px,py){
   if(z==='rinne_coast'||z==='rinne_wilds')z='rinne';
+  const W2=worldByZone(z);
+  if(!W2)return false;
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
   const previousGround=ground;
   zone=z;
   mapSize=z==='field'?FIELD_SIZE:z==='rinne'?RINNE_SIZE:WORLD_SIZE;
-  const W2={
-    field:FIELD,rinne:RINNE,
-    cave:CAVE,cave2:CAVE2,cave3:CAVE3,
-    enma1:ENMA1,enma2:ENMA2,enma3:ENMA3,
-  }[z]||(z.startsWith('muen')?MUENW[+z.slice(4)-1]:DGW[+z.slice(2)-1]);
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
   // 120マスの巨大マップは二枚同時に保持せず、船移動のときだけ再生成する。
@@ -5435,6 +5437,27 @@ function switchZone(z,px,py){
     log(ZMSG[z],'sys');
     showBossCutinForZone(z);
   }
+  return true;
+}
+function restoreSavedLocation(saved){
+  if(!saved||typeof saved!=='object')return false;
+  const savedZone=saved.zone==='rinne_coast'||saved.zone==='rinne_wilds'
+    ?'rinne':String(saved.zone||'');
+  if(!worldByZone(savedZone)||typeof saved.x!=='number'||typeof saved.y!=='number'
+    ||!Number.isFinite(saved.x)||!Number.isFinite(saved.y))return false;
+  const size=savedZone==='field'?FIELD_SIZE:savedZone==='rinne'?RINNE_SIZE:WORLD_SIZE;
+  const x=clamp(saved.x,0,size-1),y=clamp(saved.y,0,size-1);
+  if(!switchZone(savedZone,x,y))return false;
+  if(isB(Math.round(x),Math.round(y))){
+    const safe=nearestWalkable(Math.round(x),Math.round(y));
+    if(!safe){switchZone('field',SPAWN.x,SPAWN.y);return false;}
+    player.x=safe.x;player.y=safe.y;
+  }
+  player.dir=['up','down','left','right'].includes(saved.dir)?saved.dir:'down';
+  if(player.dir==='left')player.face=-1;
+  else if(player.dir==='right')player.face=1;
+  player.actionTargetX=player.x;player.actionTargetY=player.y;
+  return true;
 }
 /* ================= 画像スプライト ================= */
 // 読み込みに失敗したら従来のコード描画にフォールバックする
@@ -8267,7 +8290,7 @@ window.EnmaGameBridge={
   },
   importSave(payload,options={}){
     if(!payload||typeof payload!=='object'||!Number.isInteger(payload.v)||
-      payload.v<1||payload.v>11)throw new Error('対応していない記録です');
+      payload.v<1||payload.v>SAVE_VERSION)throw new Error('対応していない記録です');
     const serialized=JSON.stringify(payload);
     resetting=true;  // 再読込時のbeforeunloadで、現在の端末記録を上書きさせない
     try{
