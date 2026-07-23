@@ -6134,7 +6134,9 @@ function drawPlayerCorpse(sx,sy,e){
 // 画面外にいるチーム仲間の方角を、画面端の青い三角+名前で示す(スマホ/PC共通)
 function drawPartyOffscreenArrows(viewScale,SX,SY){
   if(!started||!party.id)return;
-  const margin=20;
+  // UIパネル(上部プレート/クエスト・下部HPバー等)はキャンバスより手前に載るため、
+  // 三角はそれらと被らない帯に出す
+  const mX=24,mTop=96,mBottom=130;
   for(const e of remotePlayers.values()){
     if(e.zone!==zone||e.dead||!partyHas(e.userId))continue;
     const wx=SX(e.x,e.y),wy=SY(e.x,e.y)-(zone==='field'?ELEV_PX*elevF(e.x,e.y):0);
@@ -6142,9 +6144,9 @@ function drawPartyOffscreenArrows(viewScale,SX,SY){
     if(px>=0&&px<=W&&py>=-30&&py<=H)continue;   // 画面内なら不要
     const cx=W/2,cy=H/2,dx=px-cx,dy=py-cy;
     if(!dx&&!dy)continue;
-    // 画面の縁(margin内側)との交点へクランプし、仲間の方向へ向けた三角を描く
-    const tx=dx?(dx>0?(W-margin-cx)/dx:(margin-cx)/dx):Infinity;
-    const ty=dy?(dy>0?(H-margin-cy)/dy:(margin-cy)/dy):Infinity;
+    // UIを避けた矩形の縁との交点へクランプし、仲間の方向へ向けた三角を描く
+    const tx=dx?(dx>0?(W-mX-cx)/dx:(mX-cx)/dx):Infinity;
+    const ty=dy?(dy>0?(H-mBottom-cy)/dy:(mTop-cy)/dy):Infinity;
     const t=Math.max(0.0001,Math.min(tx,ty));
     const ex=cx+dx*t,ey=cy+dy*t,ang=Math.atan2(dy,dx);
     ctx.save();
@@ -6154,7 +6156,7 @@ function drawPartyOffscreenArrows(viewScale,SX,SY){
     ctx.fill();ctx.stroke();
     ctx.restore();
     const nm=(e.name||'ナナシ').slice(0,6);
-    const nx=clamp(ex-Math.cos(ang)*22,26,W-26),ny=clamp(ey-Math.sin(ang)*22,14,H-8);
+    const nx=clamp(ex-Math.cos(ang)*22,30,W-30),ny=clamp(ey-Math.sin(ang)*22,mTop-14,H-mBottom+16);
     ctx.font='bold 10px sans-serif';ctx.textAlign='center';
     ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=3;
     ctx.strokeText(nm,nx,ny+3);
