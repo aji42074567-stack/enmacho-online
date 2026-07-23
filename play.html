@@ -6129,6 +6129,36 @@ function drawPlayerCorpse(sx,sy,e){
   const D=spriteId.startsWith('rasetsu_')?56:48;
   if(img)ctx.drawImage(img,0,0,128,128,sx-D/2,sy-D+3,D,D);
 }
+// 画面外にいるチーム仲間の方角を、画面端の青い三角+名前で示す(スマホ/PC共通)
+function drawPartyOffscreenArrows(viewScale){
+  if(!started||!party.id)return;
+  const margin=20;
+  for(const e of remotePlayers.values()){
+    if(e.zone!==zone||e.dead||!partyHas(e.userId))continue;
+    const wx=SX(e.x,e.y),wy=SY(e.x,e.y)-(zone==='field'?ELEV_PX*elevF(e.x,e.y):0);
+    const px=W/2+(wx-W/2)*viewScale,py=H/2+(wy-H/2)*viewScale;
+    if(px>=0&&px<=W&&py>=-30&&py<=H)continue;   // 画面内なら不要
+    const cx=W/2,cy=H/2,dx=px-cx,dy=py-cy;
+    if(!dx&&!dy)continue;
+    // 画面の縁(margin内側)との交点へクランプし、仲間の方向へ向けた三角を描く
+    const tx=dx?(dx>0?(W-margin-cx)/dx:(margin-cx)/dx):Infinity;
+    const ty=dy?(dy>0?(H-margin-cy)/dy:(margin-cy)/dy):Infinity;
+    const t=Math.max(0.0001,Math.min(tx,ty));
+    const ex=cx+dx*t,ey=cy+dy*t,ang=Math.atan2(dy,dx);
+    ctx.save();
+    ctx.translate(ex,ey);ctx.rotate(ang);
+    ctx.fillStyle='#8fc4ff';ctx.strokeStyle='rgba(0,0,0,0.85)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-7,-7);ctx.lineTo(-7,7);ctx.closePath();
+    ctx.fill();ctx.stroke();
+    ctx.restore();
+    const nm=(e.name||'ナナシ').slice(0,6);
+    const nx=clamp(ex-Math.cos(ang)*22,26,W-26),ny=clamp(ey-Math.sin(ang)*22,14,H-8);
+    ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+    ctx.strokeStyle='rgba(0,0,0,0.9)';ctx.lineWidth=3;
+    ctx.strokeText(nm,nx,ny+3);
+    ctx.fillStyle='#8fc4ff';ctx.fillText(nm,nx,ny+3);
+  }
+}
 function drawPlayerMobileHud(sx,sy){
   if(!started||player.dead)return;
   const mobile=W<=640;
@@ -7419,6 +7449,7 @@ function render(){
     cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${Math.min(0.78,0.35+CAVE_DEPTH[zone]*0.09)})`);
     ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
   }
+  drawPartyOffscreenArrows(viewScale);
   drawPlayerMobileHud(playerHudX,playerHudY);
 }
 
