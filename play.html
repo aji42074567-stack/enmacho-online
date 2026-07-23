@@ -8895,6 +8895,7 @@ window.EnmaGameBridge={
     };
   },
   setSharedWorldConnection(status){
+    const wasConnected=sharedWorld.connected;
     const prevZone=sharedWorld.zone;
     sharedWorld.connected=Boolean(status?.connected);
     sharedWorld.zone=sharedWorld.connected&&SHARED_ZONES.has(status?.zone)?status.zone:'';
