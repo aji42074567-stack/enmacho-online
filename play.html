@@ -2264,7 +2264,8 @@ const player={
   story:{kazuStage:0,oniKingCleared:false,dragonCaveReached:false,
     dragonCleared:false,chapter1Seen:false,gashaoCleared:false,muenSeen:false,
     oniIntroSeen:false,gashaoIntroSeen:false,dragonIntroSeen:false,
-    oniVideoIntroSeen:false,gashaoVideoIntroSeen:false,dragonVideoIntroSeen:false},
+    oniVideoIntroSeen:false,gashaoVideoIntroSeen:false,dragonVideoIntroSeen:false,
+    firstKillDone:false,statAllocated:false},
   ferrymanCoin:false,                       // 第一章を越える者へ渡される、消費しない通行証
   meishoku:'',meishokuLv:0,                 // 第二章で魂に刻む役目
   friends:[],                               // フレンド {id,name,lv,at}(相互承諾で登録)
@@ -2430,6 +2431,8 @@ function load(){
       oniVideoIntroSeen:!!st.oniVideoIntroSeen,
       gashaoVideoIntroSeen:!!st.gashaoVideoIntroSeen,
       dragonVideoIntroSeen:!!st.dragonVideoIntroSeen,
+      firstKillDone:!!st.firstKillDone,
+      statAllocated:!!st.statAllocated,
     };
     // 旧版で1回会話のクエストを終えた記録は、第一話を聞いた状態へ移行する。
     if(oldKazuDone){
@@ -2847,6 +2850,7 @@ function completeQuest(q){
   banner={txt:`頼み事「${q.name}」達成！`,age:0};
   log(`クエスト「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
   sfx.coin();
+  window.enmachoAnalytics?.track('quest_complete',{quest_id:q.id});
 }
 function questProgress(type,tag){
   let changed=false,floatOffset=0;
@@ -2895,6 +2899,10 @@ function markMobDead(m,respawn=m.type==='drake'?DRAKE_RESPAWN_SECONDS:
 }
 function grantMobReward(m,firstAttackerId){
   kills++;
+  if(!player.story.firstKillDone){
+    player.story.firstKillDone=true;
+    window.enmachoAnalytics?.track('first_kill',{mob:m.type});
+  }
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
   // FA(最初に攻撃した人)以外は徳(経験値)半分。firstAttackerId不明(ソロ討伐等)は従来通り全額
@@ -3023,6 +3031,7 @@ function gainXp(n){
     addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
     log(`徳が高まり、徳位${player.lv}になった`,'gain');
+    window.enmachoAnalytics?.track('level_up',{level:player.lv});
     if(player.lv===3)log('印「ヒール」を授かった！','gain');
     if(player.lv===6)log('印「業火」を授かった！','gain');
     if(Math.random()<0.15)log('[系統] 人格学習スコア: 良好','glitch');
@@ -3257,6 +3266,7 @@ function applySharedDamage(result,m){
     player.autoMode=false;$('btnAuto').classList.remove('on');
     player.attackDur=0;player.pendingHit=null;
     log('魂がほどけて散った…','sys');
+    window.enmachoAnalytics?.track('player_death',{zone,level:player.lv});
     document.getElementById('judgeText').textContent=JUDGE_COMMENTS[rndi(0,JUDGE_COMMENTS.length-1)];
     // 倒れる姿を見せてからオーバーレイ表示
     setTimeout(()=>{if(player.dead)document.getElementById('death').classList.remove('hidden');},1500);
@@ -3432,6 +3442,7 @@ function acceptQuest(id){
   const q=questById(id);
   if(!q||player.qb.done[id]||questIsActive(id))return null;
   player.qb.active[id]=id==='q_tokkuri'?player.story.kazuStage:0;
+  window.enmachoAnalytics?.track('quest_accept',{quest_id:id});
   return q;
 }
 function renderKessha(){
@@ -3842,6 +3853,10 @@ function renderStatTab(){
     b.addEventListener('click',()=>{
       if(player.statPts<=0)return;
       player.stats[b.getAttribute('data-st')]++;player.statPts--;
+      if(!player.story.statAllocated){
+        player.story.statAllocated=true;
+        window.enmachoAnalytics?.track('stat_allocate');
+      }
       recalcMax();sfx.click();save();renderStatTab();
     });
   }
@@ -5717,6 +5732,8 @@ function switchZone(z,px,py){
   // エリア境界だけは追跡不能なので、元のエリアの敵を帰還させる。
   for(const m of mobs)if(!m.dead&&m.state==='chase'){m.state='return';m.path=[];}
   const previousGround=ground;
+  // ゲーム開始後の移動のみ計測(起動時の初期配置は含めない)
+  if(started&&zone!==z)window.enmachoAnalytics?.track('zone_enter',{zone:z});
   zone=z;
   mapSize=z==='field'?FIELD_SIZE:z==='rinne'?RINNE_SIZE:WORLD_SIZE;
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
@@ -9703,6 +9720,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260723j"></script>
+<script type="module" src="online/account.js?v=20260724a"></script>
 </body>
 </html>

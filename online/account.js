@@ -52,6 +52,7 @@ let cloudSaveTimer = 0;
 let cloudSaveInFlight = false;
 let cloudSaveQueued = false;
 let cloudSaveUserId = '';
+let cloudSaveTracked = false;  // GA4のcloud_saveは1ページ表示につき初回成功のみ送る
 let cloudReloadTimer = 0;
 const reportedSystemEvents = new Map();
 
@@ -701,6 +702,7 @@ async function signUp(event) {
     }
     state.session = data.session;
     state.sessionSource = 'signup';
+    window.enmachoAnalytics?.track('account_register');
     if (data.session) window.EnmaGameBridge?.claimSave?.(data.session.user.id);
     setFeedback(data.session
       ? '魂籍を登録しました'
@@ -926,6 +928,10 @@ async function flushCloudSave() {
       return;
     }
     state.cloudSave = result.data;
+    if (!cloudSaveTracked) {
+      cloudSaveTracked = true;
+      window.enmachoAnalytics?.track('cloud_save');
+    }
     setAutoSyncState('synced', 'クラウドへ自動保存済み');
   } catch (error) {
     setAutoSyncState('retrying', '通信が戻り次第、自動保存を再試行します');
