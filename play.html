@@ -70,13 +70,35 @@
     font-variant-numeric:tabular-nums}
   #worldClock .phase{color:#f0d383}
   #worldClock.night .phase{color:#a9c8ff}
-  #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
+  #sndBtn,#accountBtn,#mapBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:var(--parchment);cursor:pointer;padding:0;line-height:1}
   #sndBtn{top:82px;font-size:19px}
   #accountBtn{top:126px;width:46px;font-family:var(--serif);font-size:11px;
     letter-spacing:.05em}
-  #sndBtn:hover,#accountBtn:hover{border-color:#6b5730}
+  #mapBtn{top:176px;width:46px;font-family:var(--serif);font-size:12px;
+    letter-spacing:.08em;color:#ead397}
+  #sndBtn:hover,#accountBtn:hover,#mapBtn:hover{border-color:#8a6f3d;color:#fff}
+  #miniMapHud{position:absolute;top:98px;right:64px;z-index:5;width:220px;
+    box-sizing:border-box;padding:6px;background:rgba(15,18,16,.92);
+    border:1px solid #66532f;border-radius:5px;color:var(--parchment);cursor:pointer;
+    box-shadow:0 5px 18px rgba(0,0,0,.52),inset 0 0 0 1px rgba(224,193,119,.05);
+    text-align:left;touch-action:manipulation}
+  #miniMapHud[hidden]{display:none}
+  #miniMapHud:hover{border-color:#9a7d42}
+  #miniMapHud:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .mini-map-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    height:20px;padding:0 2px;font-family:var(--serif)}
+  #miniMapZone{font-size:11px;letter-spacing:.1em;color:#eadfc8;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .mini-map-expand{font:8px/1 var(--sans);letter-spacing:.08em;color:#b9a778;white-space:nowrap}
+  #miniMapCanvas{display:block;width:100%;height:auto;aspect-ratio:1/1;
+    background:#17303b;border:1px solid rgba(209,184,124,.32);box-sizing:border-box}
+  .mini-map-location{display:flex;align-items:center;gap:6px;min-width:0;height:23px;
+    padding:0 2px;font:9.5px/1 var(--sans);letter-spacing:.05em;color:#d9cdaF}
+  .mini-map-location::before{content:"";width:7px;height:7px;flex:none;border-radius:50%;
+    background:#f0c75c;border:1px solid #fff1bd;box-shadow:0 0 7px rgba(240,199,92,.75)}
+  #miniMapLocation{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #accountBtn .status-dot{display:inline-block;width:6px;height:6px;margin-right:3px;
     border-radius:50%;background:#645b4b;box-shadow:0 0 0 1px #1a150f}
   #accountBtn.online{border-color:#6f9b65;color:#d6efcf}
@@ -328,6 +350,44 @@
   /* ---- overlays / panels ---- */
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(5,6,9,.82);z-index:10}
+  /* ---- 全体地図 ---- */
+  .world-map-sheet{position:relative;width:min(920px,calc(100vw - 36px));
+    max-height:calc(100dvh - 36px);box-sizing:border-box;padding:22px 24px 18px;
+    overflow:auto;color:var(--parchment);text-align:center;
+    background:
+      radial-gradient(circle at 16% 10%,rgba(217,190,121,.08),transparent 34%),
+      linear-gradient(160deg,rgba(28,23,15,.98),rgba(10,12,15,.98));
+    border:1px solid #705b32;border-radius:8px;
+    box-shadow:0 22px 72px rgba(0,0,0,.76),inset 0 0 0 1px rgba(230,197,119,.06)}
+  .world-map-sheet::before{content:"";position:absolute;inset:7px;border:1px solid rgba(181,147,78,.18);
+    border-radius:4px;pointer-events:none}
+  .world-map-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;
+    margin:0 2px 12px;text-align:left}
+  .world-map-kicker{font:9px/1 var(--sans);letter-spacing:.34em;color:var(--gold)}
+  .world-map-head h2{margin:6px 0 0;font:600 22px/1.2 var(--serif);
+    letter-spacing:.18em;color:#f0e6d2}
+  #worldMapRegion{font:11px/1.5 var(--sans);letter-spacing:.1em;color:#bcae91;
+    white-space:nowrap}
+  .world-map-frame{position:relative;overflow:hidden;border:1px solid #65512d;
+    display:flex;justify-content:center;border-radius:5px;background:#11242c;
+    box-shadow:inset 0 0 28px rgba(0,0,0,.55)}
+  #worldMapCanvas{display:block;width:auto;max-width:100%;height:min(60dvh,580px);
+    aspect-ratio:3/2}
+  .world-map-compass{position:absolute;right:12px;top:10px;width:30px;height:42px;
+    font:700 10px/1 var(--serif);color:#efe0b7;text-shadow:0 1px 3px #000;
+    pointer-events:none}
+  .world-map-compass::after{content:"";position:absolute;left:12px;top:14px;
+    border-left:4px solid transparent;border-right:4px solid transparent;
+    border-bottom:18px solid #d2ad55;filter:drop-shadow(0 2px 2px #000)}
+  .world-map-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    margin:12px 2px 0}
+  .world-map-legend{display:flex;align-items:center;gap:13px;flex-wrap:wrap;
+    font:10px/1.4 var(--sans);color:#bfb49d;text-align:left}
+  .world-map-legend span{display:inline-flex;align-items:center;gap:5px}
+  .world-map-legend i{width:9px;height:9px;border-radius:2px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+  .world-map-note{margin:8px 2px 0;color:#8f856f;font:10px/1.6 var(--sans);text-align:left}
+  #worldMapClose{flex:none;margin:0;padding:8px 20px}
   /* ---- ボス階・映画風カットイン ---- */
   .boss-cutin{--boss-accent:#d8643f;--boss-glow:rgba(216,100,63,.22);
     position:absolute;inset:0;z-index:20;overflow:hidden;
@@ -818,6 +878,21 @@
     .skill .icon{font-size:15px}
     #dock{bottom:max(8px,env(safe-area-inset-bottom));gap:0;padding:8px;
       max-width:calc(100vw - 12px)}
+    #miniMapHud{top:98px;right:64px;width:140px;padding:4px}
+    .mini-map-head{height:18px}
+    #miniMapZone{font-size:9px}
+    .mini-map-expand{font-size:7px}
+    .mini-map-location{height:20px;font-size:8px}
+    .world-map-sheet{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);
+      padding:16px 12px 12px}
+    .world-map-head{align-items:flex-start;margin-bottom:9px}
+    .world-map-head h2{font-size:17px;letter-spacing:.12em}
+    #worldMapRegion{font-size:9px;white-space:normal;text-align:right}
+    #worldMapCanvas{width:100%;height:auto;max-height:min(58dvh,calc(100vw - 42px));
+      aspect-ratio:1/1}
+    .world-map-foot{align-items:flex-end;gap:8px}
+    .world-map-legend{gap:7px;font-size:8.5px}
+    #worldMapClose{padding:8px 14px;font-size:11px}
     .scroll{padding:22px 20px}
     .scroll h1{font-size:24px}
     .reset-paper{padding:26px 18px}
@@ -871,6 +946,11 @@
       filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
     .boss-cutin-skip{bottom:max(calc(10vh + 8px),env(safe-area-inset-bottom));font-size:9px}
   }
+  @media (max-height:520px){
+    #miniMapHud{top:98px;width:108px}
+    .mini-map-location{height:17px;font-size:7px}
+    .mini-map-head{height:16px}
+  }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
   }
@@ -900,6 +980,14 @@
   <button id="accountBtn" title="魂籍を開く" aria-label="魂籍を開く">
     <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
     <span id="onlineCount" hidden aria-hidden="true">1</span>
+  </button>
+  <button id="mapBtn" title="全体地図 (M)" aria-label="全体地図を開く">地図</button>
+
+  <button id="miniMapHud" type="button" hidden
+    title="現在地を拡大して見る" aria-label="全体地図。押すと拡大表示">
+    <span class="mini-map-head"><b id="miniMapZone">賽の森</b><span class="mini-map-expand">拡大 ↗</span></span>
+    <canvas id="miniMapCanvas" width="280" height="280" aria-hidden="true"></canvas>
+    <span class="mini-map-location"><span id="miniMapLocation">現在地を照合中</span></span>
   </button>
 
   <div id="log" aria-live="polite"></div>
@@ -1038,7 +1126,7 @@
           <li><b>地面をクリック / タップ</b> … 移動</li>
           <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
           <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-          <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー</li>
+          <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
         </ul>
         <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
         <button class="btn" id="startBtn">入庁する</button>
@@ -1231,6 +1319,34 @@
       <div id="tabSocial" class="hidden"><div id="socialList"></div></div>
       <button class="btn small" id="equipClose">閉じる (I)</button>
     </div>
+  </div>
+
+  <div class="overlay hidden" id="worldMapPanel" role="dialog" aria-modal="true"
+    aria-labelledby="worldMapTitle">
+    <section class="world-map-sheet">
+      <header class="world-map-head">
+        <div>
+          <div class="world-map-kicker">SURVEY MAP / ENMA BUREAU</div>
+          <h2 id="worldMapTitle">全体地図</h2>
+        </div>
+        <div id="worldMapRegion">現在地を照合中</div>
+      </header>
+      <div class="world-map-frame">
+        <canvas id="worldMapCanvas" width="960" height="640"
+          aria-label="現在いる区域の全体地図"></canvas>
+        <div class="world-map-compass" aria-hidden="true">北</div>
+      </div>
+      <div class="world-map-foot">
+        <div class="world-map-legend" aria-label="地図の凡例">
+          <span><i style="background:#78844e"></i>陸地</span>
+          <span><i style="background:#b89358"></i>街道</span>
+          <span><i style="background:#315d70"></i>水域</span>
+          <span><i style="background:#d8bd63;border-radius:50%"></i>現在地</span>
+        </div>
+        <button class="btn small" id="worldMapClose">閉じる (M)</button>
+      </div>
+      <p class="world-map-note" id="worldMapNote">地図を開いた時点の現在地を示しています。</p>
+    </section>
   </div>
 
   <div class="overlay hidden" id="settingsPanel" role="dialog" aria-modal="true"
@@ -5121,45 +5237,47 @@ function rinneRegionAt(x,y){
   return city?'city':v<78?'northcoast':v>246?'coast':'wilds';
 }
 const rinneEllipse=(u,v,cu,cv,ru,rv)=>((u-cu)/ru)**2+((v-cv)/rv)**2<1;
+const RINNE_MAINLAND_OUTLINE=[
+  [-150,155],[-132,140],[-112,120],[-90,96],[-68,73],[-54,60],[-48,50],
+  [-46,39],[-34,29],[-24,33],[-21,48],[-10,59],[2,66],[13,58],[27,55],
+  [43,61],[61,72],[82,91],[104,112],[128,136],[155,160],[142,172],
+  [122,179],[101,190],[82,202],[70,214],[58,222],[44,216],[35,205],
+  [34,197],[43,190],[52,180],[52,169],[45,164],[38,172],[35,188],
+  [31,206],[27,230],[21,253],[15,274],[5,300],[-7,291],[-19,268],
+  [-29,242],[-39,218],[-45,207],[-42,198],[-34,188],[-29,179],
+  [-31,171],[-40,168],[-48,176],[-52,188],[-59,199],[-72,193],
+  [-88,185],[-107,178],[-129,170],[-150,165],
+];
+const RINNE_SHIKOKU_OUTLINE=[
+  [-105,216],[-94,207],[-79,203],[-64,204],[-51,210],[-43,219],[-47,229],
+  [-58,237],[-68,247],[-83,252],[-97,247],[-107,239],[-112,228],
+];
+const RINNE_AWAJI_OUTLINE=[
+  [-61,196],[-55,199],[-49,211],[-48,225],[-53,232],[-59,225],[-64,211],[-64,201],
+];
+function rinnePolygonContains(u,v,points){
+  let inside=false;
+  for(let i=0,j=points.length-1;i<points.length;j=i++){
+    const [xi,yi]=points[i],[xj,yj]=points[j];
+    if((yi>v)!==(yj>v)&&u<(xj-xi)*(v-yi)/(yj-yi)+xi)inside=!inside;
+  }
+  return inside;
+}
 function rinneWaterKindAt(u,v){
-  // 北は日本海。若狭湾を南へ切り込み、丹後半島を北へ張り出させる。
-  const northShore=48+Math.sin((u+14)*.12)*3.8+Math.sin(u*.31)*1.8;
-  const japanSea=v<northShore;
-  const wakasaBay=rinneEllipse(u,v,0,55,27,19)&&v<74;
-  const tangoPeninsula=rinneEllipse(u,v,-27,43,17,25)
-    ||(u>-37&&u<-18&&v>47&&v<72);
+  // 海を後から丸く切り抜くのではなく、実際の接続関係に沿う陸地輪郭を先に定義する。
+  // これにより本州・四国・淡路島が地続きに見える問題を防ぐ。
+  const mainland=rinnePolygonContains(u,v,RINNE_MAINLAND_OUTLINE);
+  const shikoku=rinnePolygonContains(u,v,RINNE_SHIKOKU_OUTLINE);
+  const awaji=rinnePolygonContains(u,v,RINNE_AWAJI_OUTLINE);
+  const setoIsland=rinneEllipse(u,v,-80,197,7,3.2)
+    ||rinneEllipse(u,v,-96,191,5.5,2.6);
+  const land=mainland||shikoku||awaji||setoIsland;
 
-  // 南は熊野灘・太平洋。紀伊半島だけを南へ長く残す。
-  const southShore=232+Math.sin((u+9)*.075)*4+Math.sin(u*.19)*1.8;
-  const pacific=v>southShore;
-  const kiiT=clamp((v-180)/118,0,1);
-  const kiiHalf=62*Math.pow(1-kiiT,.66)+4;
-  const kiiAxis=2+Math.sin((v-198)*.042)*2.4;
-  const kiiPeninsula=v>=178&&v<=298&&Math.abs(u-kiiAxis)<kiiHalf;
-
-  // 瀬戸内海から大阪湾、東側の伊勢湾をそれぞれ海として本州へ切り込ませる。
-  const setoInland=rinneEllipse(u,v,-75,203,43,27)&&u<-42&&v>170;
-  const osakaBay=rinneEllipse(u,v,-38,204,28,28)&&v>172;
-  const iseBay=rinneEllipse(u,v,47,204,24,31)&&v>170;
-
-  // 大阪湾口の淡路島、瀬戸内海南岸の四国、伊勢湾口の志摩半島を陸として戻す。
-  const awaji=rinneEllipse(u+(v-216)*.15,v,-49,216,9,27);
-  const shikoku=rinneEllipse(u,v,-79,240,40,18)
-    ||rinneEllipse(u,v,-51,237,23,14);
-  const shimaNeck=rinneEllipse(u,v,35,220,19,14);
-  const shimaCape=rinneEllipse(u,v,59,223,31,13);
-  const shimaPeninsula=shimaNeck||shimaCape;
-
-  let sea=japanSea||pacific;
-  if(tangoPeninsula||kiiPeninsula||shikoku)sea=false;
-  if(wakasaBay||setoInland||osakaBay||iseBay)sea=true;
-  if(tangoPeninsula||awaji||shikoku||shimaPeninsula)sea=false;
-
-  // 琵琶湖は若狭湾・伊勢湾のどちらとも接続しない、南北に長い内陸湖にする。
-  const biwa=rinneEllipse(u,v,29,101,9,19)
-    ||rinneEllipse(u,v,27,122,12,26)
-    ||rinneEllipse(u,v,24,143,8,10);
-  return biwa?8:sea?4:0;
+  // 琵琶湖は若狭湾・伊勢湾のどちらにも接しない、南北に長い内陸湖。
+  const biwa=rinneEllipse(u,v,24,108,8,18)
+    ||rinneEllipse(u,v,26,130,11,25)
+    ||rinneEllipse(u,v,23,151,7,10);
+  return land?(biwa?8:0):4;
 }
 function buildRinneContinent(){
   // 近畿・中国東部・東海西部を1枚の320×320マップに置く。地域境界でswitchZoneしない。
@@ -7210,6 +7328,7 @@ const el={
 };
 function hud(){
   refreshPlayerIdentityUi();
+  renderMiniMap();
   if(performance.now()-partyFramesAt>300){
     partyFramesAt=performance.now();
     renderPartyFrames();
@@ -8024,10 +8143,240 @@ function leaveParty(announce){
 }
 $('teamLeave').addEventListener('click',()=>{leaveParty(true);sfx.click();});
 
+/* ================= 全体地図 ================= */
+const WORLD_MAP_COLORS={
+  grass:[112,128,74],forest:[67,84,57],path:[185,145,86],stone:[202,194,165],
+  sand:[213,194,137],sea:[37,78,96],lake:[45,94,116],floor:[88,78,64],
+  wall:[28,29,29],
+};
+const WORLD_MAP_RASTER_CACHE=new WeakMap();
+function worldMapCellColor(kind,isBlocked,outdoor){
+  if(kind===1||kind===7)return WORLD_MAP_COLORS.path;
+  if(kind===2)return WORLD_MAP_COLORS.stone;
+  if(kind===3)return WORLD_MAP_COLORS.sand;
+  if(kind===4)return WORLD_MAP_COLORS.sea;
+  if(kind===8)return WORLD_MAP_COLORS.lake;
+  if(kind===5||kind===6)return isBlocked?WORLD_MAP_COLORS.wall:WORLD_MAP_COLORS.floor;
+  if(isBlocked&&outdoor)return WORLD_MAP_COLORS.forest;
+  return WORLD_MAP_COLORS.grass;
+}
+function makeWorldMapRaster(world,size,outdoor){
+  const raster=document.createElement('canvas');
+  raster.width=size;raster.height=size;
+  const rc=raster.getContext('2d'),image=rc.createImageData(size,size),data=image.data;
+  for(let row=0;row<size;row++)for(let col=0;col<size;col++){
+    let gx,gy,valid;
+    if(outdoor){
+      const u=col-size/2,v=row;
+      gx=Math.floor(v+u);gy=Math.floor(v-u);
+      valid=gx>=0&&gy>=0&&gx<size&&gy<size;
+    }else{
+      gx=col;gy=row;valid=true;
+    }
+    let rgb=WORLD_MAP_COLORS.sea;
+    if(valid){
+      const index=gy*size+gx;
+      rgb=worldMapCellColor(world.tileKind[index],!!world.blocked[index],outdoor);
+    }
+    const p=(row*size+col)*4;
+    data[p]=rgb[0];data[p+1]=rgb[1];data[p+2]=rgb[2];data[p+3]=255;
+  }
+  rc.putImageData(image,0,0);
+  return raster;
+}
+function cachedWorldMapRaster(world,size,outdoor){
+  const cached=WORLD_MAP_RASTER_CACHE.get(world);
+  if(cached&&cached.size===size&&cached.outdoor===outdoor)return cached.raster;
+  const raster=makeWorldMapRaster(world,size,outdoor);
+  WORLD_MAP_RASTER_CACHE.set(world,{size,outdoor,raster});
+  return raster;
+}
+function worldMapPoint(x,y,size,outdoor,left,top,side){
+  if(outdoor){
+    const u=(x-y)/2,v=(x+y)/2;
+    return{x:left+(u+size/2)/size*side,y:top+v/size*side};
+  }
+  return{x:left+x/size*side,y:top+y/size*side};
+}
+function drawWorldMapText(g,text,x,y,color='#e9ddc5',align='center'){
+  g.save();
+  g.font=`600 ${MOBILE_RENDER?19:15}px ${getComputedStyle(document.documentElement).getPropertyValue('--serif')}`;
+  g.textAlign=align;g.textBaseline='middle';
+  g.lineWidth=MOBILE_RENDER?5:4;g.strokeStyle='rgba(5,9,11,.82)';g.strokeText(text,x,y);
+  g.fillStyle=color;g.fillText(text,x,y);g.restore();
+}
+function drawWorldMapLandmark(g,point,label,color='#e5d6b3'){
+  g.save();
+  g.fillStyle='#d2ad55';g.strokeStyle='#fff1bf';g.lineWidth=1.5;
+  g.beginPath();g.rect(point.x-4.5,point.y-4.5,9,9);g.fill();g.stroke();
+  drawWorldMapText(g,label,point.x+9,point.y-8,color,'left');
+  g.restore();
+}
+function drawWorldMapPlayer(g,point){
+  g.save();
+  g.shadowColor='rgba(237,197,86,.8)';g.shadowBlur=12;
+  g.fillStyle='#f1c95e';g.strokeStyle='#fff5cc';g.lineWidth=2.5;
+  g.beginPath();g.arc(point.x,point.y,7,0,Math.PI*2);g.fill();g.stroke();
+  g.shadowBlur=0;
+  drawWorldMapText(g,'現在地',point.x+12,point.y+1,'#fff1b5','left');
+  g.restore();
+}
+function renderWorldMap(){
+  const panel=$('worldMapPanel');
+  if(panel.classList.contains('hidden'))return;
+  const mapCanvas=$('worldMapCanvas');
+  const mobile=MOBILE_RENDER||mapCanvas.clientWidth<620;
+  const width=mobile?720:960,height=mobile?720:640;
+  mapCanvas.width=width;mapCanvas.height=height;
+  const g=mapCanvas.getContext('2d'),world=worldByZone(zone);
+  if(!world)return;
+  g.fillStyle='#11242c';g.fillRect(0,0,width,height);
+  const haze=g.createRadialGradient(width*.5,height*.45,20,width*.5,height*.45,width*.56);
+  haze.addColorStop(0,'rgba(211,189,127,.075)');haze.addColorStop(1,'rgba(0,0,0,.24)');
+  g.fillStyle=haze;g.fillRect(0,0,width,height);
+
+  const outdoor=zone==='field'||zone==='rinne';
+  const size=world.size||(zone==='field'?FIELD_SIZE:zone==='rinne'?RINNE_SIZE:WORLD_SIZE);
+  const side=Math.min(width-(mobile?54:150),height-(mobile?56:58));
+  const left=(width-side)/2,top=(height-side)/2;
+  const raster=cachedWorldMapRaster(world,size,outdoor);
+  g.imageSmoothingEnabled=true;g.drawImage(raster,left,top,side,side);
+  g.strokeStyle='rgba(232,211,159,.36)';g.lineWidth=1;
+  g.strokeRect(left-.5,top-.5,side+1,side+1);
+  const point=(x,y)=>worldMapPoint(x,y,size,outdoor,left,top,side);
+
+  if(zone==='rinne'){
+    drawWorldMapText(g,'日本海',left+side*.50,top+side*.105,'#a9c8d5');
+    drawWorldMapText(g,'琵琶湖',left+side*.59,top+side*.405,'#c1dbe5');
+    drawWorldMapText(g,'瀬戸内海',left+side*.27,top+side*.625,'#a9c8d5');
+    drawWorldMapText(g,'大阪湾',left+side*.355,top+side*.69,'#a9c8d5');
+    drawWorldMapText(g,'伊勢湾',left+side*.65,top+side*.615,'#a9c8d5');
+    drawWorldMapText(g,'四国',left+side*.245,top+side*.73,'#d8cfad');
+    drawWorldMapText(g,'淡路島',left+side*.325,top+side*.665,'#d8cfad');
+    drawWorldMapText(g,'紀伊半島',left+side*.515,top+side*.785,'#d8cfad');
+    drawWorldMapLandmark(g,point(RINNE_ENTRY.x,RINNE_ENTRY.y),'輪廻の都');
+    drawWorldMapLandmark(g,point(RINNE_COAST_ENTRY.x,RINNE_COAST_ENTRY.y),'南岸船着場');
+    const region=rinneRegionAt(player.x,player.y);
+    const regionLabel=region==='city'?'輪廻の都・京都盆地'
+      :region==='northcoast'?'日本海・若狭方面'
+      :region==='coast'?'紀伊半島・南岸':'近畿内陸';
+    $('worldMapRegion').textContent=`輪廻大陸　／　${regionLabel}`;
+    $('worldMapNote').textContent='北を上に表示。本州・四国・淡路島を分け、琵琶湖と両湾、主要街道を記しています。';
+  }else if(zone==='field'){
+    drawWorldMapText(g,'瀬戸内海',left+side*.64,top+side*.16,'#a9c8d5');
+    drawWorldMapText(g,'太平洋',left+side*.44,top+side*.88,'#a9c8d5');
+    drawWorldMapLandmark(g,point(SPAWN.x,SPAWN.y),'宿場町');
+    drawWorldMapLandmark(g,point(CAVE_DOOR.x,CAVE_DOOR.y),'試練の洞窟');
+    drawWorldMapLandmark(g,point(MUEN_DOOR.x,MUEN_DOOR.y),'無縁塚');
+    drawWorldMapLandmark(g,point(DCAVE_DOOR.x,DCAVE_DOOR.y),'竜の洞窟');
+    if(PIER)drawWorldMapLandmark(g,point(PIER.x,PIER.y),'船着場');
+    $('worldMapRegion').textContent='賽の森　／　四国全域';
+    $('worldMapNote').textContent='北を上に表示。徳島側の宿場町から四国山地、各洞窟、船着場までを記しています。';
+  }else{
+    const links=ZONE_LINKS.filter(link=>link.from===zone);
+    for(const link of links)drawWorldMapLandmark(g,point(link.at.x,link.at.y),link.label||'階段');
+    $('worldMapRegion').textContent=zoneLabel(zone);
+    $('worldMapNote').textContent='現在いる階層の通路と出入口を表示しています。';
+  }
+  drawWorldMapPlayer(g,point(player.x,player.y));
+  $('worldMapTitle').textContent=`${zoneLabel(zone)}　全体地図`;
+}
+function miniMapLocationLabel(){
+  if(zone==='rinne'){
+    const region=rinneRegionAt(player.x,player.y);
+    return region==='city'?'輪廻の都・京都盆地'
+      :region==='northcoast'?'日本海・若狭方面'
+      :region==='coast'?'紀伊半島・南岸船着場':'近畿内陸・大陸街道';
+  }
+  if(zone==='field'){
+    const sites=[
+      [SPAWN,'宿場町',11],[CAVE_DOOR,'試練の洞窟付近',8],
+      [MUEN_DOOR,'無縁塚付近',8],[DCAVE_DOOR,'竜の洞窟付近',8],
+      ...(PIER?[[PIER,'東岸の船着場',9]]:[]),
+    ];
+    for(const [site,label,radius] of sites)if(Math.hypot(player.x-site.x,player.y-site.y)<radius)return label;
+    const u=(player.x-player.y)/2,v=(player.x+player.y)/2;
+    return v<32?'四国北部':v>61?'四国南部':u>-9?'四国東部':u<-34?'四国西部':'四国山地';
+  }
+  return zoneLabel(zone);
+}
+let miniMapNextDraw=0,miniMapLastZone='';
+function renderMiniMap(force=false){
+  const hudMap=$('miniMapHud');
+  hudMap.hidden=!started;
+  if(!started)return;
+  const now=performance.now();
+  if(!force&&zone===miniMapLastZone&&now<miniMapNextDraw)return;
+  miniMapNextDraw=now+120;miniMapLastZone=zone;
+  const world=worldByZone(zone);
+  if(!world)return;
+  const outdoor=zone==='field'||zone==='rinne';
+  const size=world.size||(zone==='field'?FIELD_SIZE:zone==='rinne'?RINNE_SIZE:WORLD_SIZE);
+  const mapCanvas=$('miniMapCanvas'),g=mapCanvas.getContext('2d');
+  const width=mapCanvas.width,height=mapCanvas.height,pad=7,side=width-pad*2;
+  g.clearRect(0,0,width,height);
+  g.fillStyle='#17303b';g.fillRect(0,0,width,height);
+  g.imageSmoothingEnabled=true;
+  g.drawImage(cachedWorldMapRaster(world,size,outdoor),pad,pad,side,side);
+  const point=(x,y)=>worldMapPoint(x,y,size,outdoor,pad,pad,side);
+  const landmarks=zone==='rinne'?[RINNE_ENTRY,RINNE_COAST_ENTRY]
+    :zone==='field'?[SPAWN,CAVE_DOOR,MUEN_DOOR,DCAVE_DOOR,...(PIER?[PIER]:[])]
+    :ZONE_LINKS.filter(link=>link.from===zone).map(link=>link.at);
+  g.fillStyle='#e4c66e';g.strokeStyle='rgba(30,22,9,.85)';g.lineWidth=2;
+  for(const landmark of landmarks){
+    const p=point(landmark.x,landmark.y);
+    g.beginPath();g.rect(p.x-3,p.y-3,6,6);g.fill();g.stroke();
+  }
+  const current=point(player.x,player.y),pulse=1.5+Math.sin(time*5)*.8;
+  g.shadowColor='rgba(255,215,92,.95)';g.shadowBlur=10;
+  g.fillStyle='#f6cc55';g.strokeStyle='#fff7d1';g.lineWidth=3;
+  g.beginPath();g.arc(current.x,current.y,7+pulse,0,Math.PI*2);g.fill();g.stroke();
+  g.shadowBlur=0;g.strokeStyle='rgba(255,245,202,.85)';g.lineWidth=1;
+  g.beginPath();g.moveTo(current.x-14,current.y);g.lineTo(current.x+14,current.y);
+  g.moveTo(current.x,current.y-14);g.lineTo(current.x,current.y+14);g.stroke();
+  const label=miniMapLocationLabel();
+  $('miniMapZone').textContent=zoneLabel(zone);
+  $('miniMapLocation').textContent=label;
+  hudMap.setAttribute('aria-label',`${zoneLabel(zone)}の全体地図。現在地は${label}。押すと拡大表示`);
+}
+function openWorldMap(){
+  if(!started)return;
+  player.path=[];player.moveHold=false;vpadReset();
+  if(chat.open)closeChat();
+  $('equip').classList.add('hidden');
+  $('worldMapPanel').classList.remove('hidden');
+  renderWorldMap();
+  $('worldMapClose').focus({preventScroll:true});
+  sfx.click();
+}
+function closeWorldMap(){
+  if($('worldMapPanel').classList.contains('hidden'))return;
+  $('worldMapPanel').classList.add('hidden');
+  sfx.click();
+}
+function toggleWorldMap(){
+  if($('worldMapPanel').classList.contains('hidden'))openWorldMap();
+  else closeWorldMap();
+}
+$('mapBtn').addEventListener('click',openWorldMap);
+$('miniMapHud').addEventListener('click',openWorldMap);
+$('worldMapClose').addEventListener('click',closeWorldMap);
+$('worldMapPanel').addEventListener('pointerdown',ev=>{
+  if(ev.target===$('worldMapPanel'))closeWorldMap();
+});
+window.addEventListener('resize',()=>{
+  if(!$('worldMapPanel').classList.contains('hidden'))requestAnimationFrame(renderWorldMap);
+},{passive:true});
+
 window.addEventListener('keydown',ev=>{
   if(bossCutinActive){
     if(ev.key==='Escape'||ev.key==='Enter'||ev.key===' ')dismissBossCutin();
     ev.preventDefault();return;
+  }
+  if(ev.key==='Escape'&&!$('worldMapPanel').classList.contains('hidden')){
+    ev.preventDefault();
+    closeWorldMap();
+    return;
   }
   if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
     ev.preventDefault();
@@ -8069,6 +8418,7 @@ window.addEventListener('keydown',ev=>{
   if(k==='w')drinkHaste();
   if(k==='c')drinkCrit();
   if(k==='i')toggleEquip();
+  if(k==='m')toggleWorldMap();
   if(k==='t')toggleAuto();
 });
 function toggleAuto(){
@@ -8807,7 +9157,7 @@ if(matchMedia('(pointer:coarse)').matches){
     <li><b>地面をタップ</b> … 移動(左下のパッドでも歩ける)</li>
     <li><b>迷える魂をタップ</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をタップ</b> … 会話・買い物</li>
-    <li><b>画面下のボタン</b> … 印・道具・メニュー</li>`;
+    <li><b>画面下のボタン</b> … 印・道具・メニュー　／　右上の<b>地図</b> … 全体地図</li>`;
 }
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
