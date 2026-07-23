@@ -5120,6 +5120,18 @@ function renderGroundRinne(world){
   tgt._renderScale=groundRenderScale();tgt._groundChunks=new Map();tgt._chunked=true;
   tgt._groundReady=true;
 }
+function placeDungeonTorch(x,y){
+  props.push({x,y,kind:'torch'});
+  // 床タイルは残したまま、経路探索・直接移動・同期中の敵移動では障害物として扱う。
+  const tx=Math.round(x),ty=Math.round(y);
+  if(tx>=0&&ty>=0&&tx<WORLD_SIZE&&ty<WORLD_SIZE)blocked[ty*WORLD_SIZE+tx]=1;
+}
+function placeRoomTorch(room){
+  const [x0,y0,x1,y1]=room;
+  // 幅または奥行きが狭い矩形は通路。松明を置かず、広い部屋の壁際に1本だけ置く。
+  if(x1-x0<6||y1-y0<6)return;
+  placeDungeonTorch(x0+1,y0+1);
+}
 function buildCave(){
   blocked=new Uint8Array(WORLD_SIZE*WORLD_SIZE);blocked.fill(1);
   tileKind=new Uint8Array(WORLD_SIZE*WORLD_SIZE);
@@ -5130,9 +5142,7 @@ function buildCave(){
   carve(27,25,35,35);   // 中の間
   carve(35,28,41,32);   // 通路
   carve(41,23,53,37);   // 主の間
-  for(const [tx,ty] of [[11,27],[11,33],[17,29],[27,25],[27,35],[35,28],[35,32],[41,23],[41,37],[47,23],[47,37],[53,23],[53,37]]){
-    props.push({x:tx,y:ty,kind:'torch'});
-  }
+  for(const room of [[11,27,17,33],[27,25,35,35],[41,23,53,37]])placeRoomTorch(room);
   props.push({x:CAVE_EXIT.x-0.6,y:CAVE_EXIT.y,kind:'cavexit'});
   props.push({x:CAVE_LINKS[0].at.x,y:CAVE_LINKS[0].at.y,kind:'stairdown'});
   spawnMob('skeleton',30,27);spawnMob('skeleton',33,33);spawnMob('skeleton',28,31);
@@ -5152,9 +5162,7 @@ function buildCave2(){
   carve(35,29,41,31);   // 東通路
   carve(41,25,49,35);   // 東の間
   carve(45,17,53,25);   // 北東の間(下り階段)
-  for(const [tx,ty] of [[11,27],[11,33],[17,29],[25,24],[25,36],[35,29],[41,25],[41,35],[45,17],[53,17],[53,25],[49,35]]){
-    props.push({x:tx,y:ty,kind:'torch'});
-  }
+  for(const room of [[11,27,17,33],[25,24,35,36],[41,25,49,35],[45,17,53,25]])placeRoomTorch(room);
   props.push({x:CAVE_LINKS[1].at.x,y:CAVE_LINKS[1].at.y,kind:'stairup'});
   props.push({x:CAVE_LINKS[2].at.x,y:CAVE_LINKS[2].at.y,kind:'stairdown'});
   spawnMob('dark_dog',28,27);spawnMob('dark_dog',33,33);spawnMob('dark_dog',44,33);
@@ -5172,9 +5180,7 @@ function buildCave3(){
   carve(27,24,39,38);   // 罪火の広間
   carve(39,28,43,32);   // 王の間への通路
   carve(43,22,55,38);   // 王の間
-  for(const [tx,ty] of [[11,28],[11,34],[17,30],[27,24],[27,38],[39,28],[39,32],[43,22],[43,38],[49,22],[49,38],[55,22],[55,38]]){
-    props.push({x:tx,y:ty,kind:'torch'});
-  }
+  for(const room of [[11,28,17,34],[27,24,39,38],[43,22,55,38]])placeRoomTorch(room);
   props.push({x:CAVE_LINKS[3].at.x,y:CAVE_LINKS[3].at.y,kind:'stairup'});
   spawnMob('gozu',30,27);spawnMob('gozu',33,31);spawnMob('gozu',45,25);
   spawnMob('oni_bone',37,26);
@@ -5349,11 +5355,8 @@ function buildDragonCaves(){
     tileKind=new Uint8Array(WORLD_SIZE*WORLD_SIZE);
     props=[];npcs=[];mobs=[];
     const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*WORLD_SIZE+x]=0;tileKind[y*WORLD_SIZE+x]=5;}};
-    for(const r of def.rooms){
-      carve(...r);
-      props.push({x:r[0],y:r[1],kind:'torch'});
-      props.push({x:r[2],y:r[3],kind:'torch'});
-    }
+    for(const r of def.rooms)carve(...r);
+    for(const r of def.rooms)placeRoomTorch(r);
     for(const L of CAVE_LINKS)if(L.from===zn&&L.kind)props.push({x:L.at.x,y:L.at.y,kind:L.kind});
     for(const m of def.mobs)spawnMob(...m);
     if(f===4){
@@ -5384,11 +5387,8 @@ function buildBoneCaves(){
     tileKind=new Uint8Array(WORLD_SIZE*WORLD_SIZE);
     props=[];npcs=[];mobs=[];
     const carve=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){blocked[y*WORLD_SIZE+x]=0;tileKind[y*WORLD_SIZE+x]=5;}};
-    for(const r of def.rooms){
-      carve(...r);
-      props.push({x:r[0],y:r[1],kind:'torch'});
-      props.push({x:r[2],y:r[3],kind:'torch'});
-    }
+    for(const r of def.rooms)carve(...r);
+    for(const r of def.rooms)placeRoomTorch(r);
     for(const L of CAVE_LINKS)if(L.from===zn&&L.kind)props.push({x:L.at.x,y:L.at.y,kind:L.kind});
     for(const m of def.mobs)spawnMob(...m);
     if(f===2)spawnMob('gashao',51,30);   // 最深部の主・骨の王
