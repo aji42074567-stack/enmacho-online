@@ -1686,12 +1686,17 @@ const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,m
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
-// アイソメ画面上で西→東が横長に見える四国輪郭。
-// u=(x-y)/2 が東西、v=(x+y)/2 が南北。徳島側の既存街と船着場は動かさない。
+// 添付資料の赤い四国を北が上になるよう写した外周。
+// u=(x-y)/2 が東西、v=(x+y)/2 が南北。佐田岬・室戸岬・足摺岬と
+// 瀬戸内側の入り組みを一筆書きし、既存の120×120枠で陸地面積を約2倍へ広げる。
 const SHIKOKU_OUTLINE=[
-  [2,7],[9,13],[17,26],[15,39],[12,52],[4,66],[-9,72],[-25,75],
-  [-37,68],[-43,60],[-52,56],[-47,51],[-36,48],[-33,39],[-28,29],
-  [-20,22],[-9,14],
+  [-3,7],[2,7],[9,11],[14,17],[22,24],[31,31],[39,39],[47,48],
+  [43,54],[45,60],[40,65],[37,73],[33,81],[28,88],[22,93],
+  [13,91],[5,86],[-4,84],[-12,86],[-18,91],[-21,98],
+  [-27,91],[-34,83],[-43,79],[-50,74],[-54,69],
+  [-55,63],[-52,58],[-44,59],[-38,55],[-33,51],[-31,45],
+  [-25,41],[-23,33],[-17,28],[-12,30],[-8,23],[-2,19],
+  [-1,14],
 ];
 function segmentDistance(px,py,ax,ay,bx,by){
   const dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
@@ -1975,8 +1980,8 @@ const MOUNTAIN_SITES=[
   {x:30,y:70,v:3,s:.32,name:'剣山系',meters:1955},
   {x:38,y:76,v:1,s:.28,name:'三嶺山系',meters:1894},
   {x:18,y:98,v:2,s:.30,name:'西南山地',meters:1456},
-  {x:14,y:78,v:1,s:.26,name:'西部山地',meters:1210},
-  {x:7,y:58,v:0,s:.24,name:'北部丘陵',meters:884},
+  {x:17,y:76,v:1,s:.26,name:'西部山地',meters:1210},
+  {x:10,y:56,v:0,s:.24,name:'北部丘陵',meters:884},
   {x:49,y:88,v:0,s:.25,name:'高知東部山地',meters:1120},
 ];
 (function genProps(){
@@ -2052,7 +2057,7 @@ const FOAM_PTS=[];
 
 // ヤシの木・浜の小物・桟橋
 let PIER=null;
-const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0;
+const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0,PIER_SHORE_Y=20;
 (function beachDecor(){
   const h=(x,y)=>{const n=Math.sin(x*53.1+y*97.7)*24634.6345;return n-Math.floor(n);};
   for(let y=2;y<FIELD_SIZE-2;y++)for(let x=2;x<FIELD_SIZE-2;x++){
@@ -2069,10 +2074,10 @@ const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0;
       props.push({x:x+h(x,y)*0.6,y:y+h(y,x)*0.6,kind:'sundry',v:1+Math.floor(h(x*5,y*7)*3.99),s:0.8+h(x,y)*0.5});
     }
   }
-  // 桟橋: 東の浜、岸がf≈1になる場所へ
-  for(let x=40;x<FIELD_SIZE-4;x++){
-    if(islandF(x,44)>1.0){
-      PIER={x:x-0.5,y:44};
+  // 桟橋: 徳島東岸に当たる浜で、岸がf≈1になる場所へ。
+  for(let x=40;x<FIELD_SIZE-PIER_DECK_LENGTH-2;x++){
+    if(islandF(x,PIER_SHORE_Y)>1.0){
+      PIER={x:x-0.5,y:PIER_SHORE_Y};
       break;
     }
   }
@@ -8204,15 +8209,18 @@ function renderWorldMap(){
     $('worldMapRegion').textContent=`輪廻大陸　／　近畿地方・${regionLabel}`;
     $('worldMapNote').textContent='北を上に表示。近畿7府県の外周、淡路島、海岸線と琵琶湖の位置を優先して制作しています。';
   }else if(zone==='field'){
-    drawWorldMapText(g,'瀬戸内海',left+side*.64,top+side*.16,'#a9c8d5');
-    drawWorldMapText(g,'太平洋',left+side*.44,top+side*.88,'#a9c8d5');
+    drawWorldMapText(g,'瀬戸内海',left+side*.50,top+side*.13,'#a9c8d5');
+    drawWorldMapText(g,'太平洋',left+side*.50,top+side*.91,'#a9c8d5');
+    drawWorldMapText(g,'佐田岬',left+side*.12,top+side*.55,'#d8cfad');
+    drawWorldMapText(g,'室戸岬',left+side*.72,top+side*.79,'#d8cfad');
+    drawWorldMapText(g,'足摺岬',left+side*.31,top+side*.84,'#d8cfad');
     drawWorldMapLandmark(g,point(SPAWN.x,SPAWN.y),'宿場町');
     drawWorldMapLandmark(g,point(CAVE_DOOR.x,CAVE_DOOR.y),'試練の洞窟');
     drawWorldMapLandmark(g,point(MUEN_DOOR.x,MUEN_DOOR.y),'無縁塚');
     drawWorldMapLandmark(g,point(DCAVE_DOOR.x,DCAVE_DOOR.y),'竜の洞窟');
     if(PIER)drawWorldMapLandmark(g,point(PIER.x,PIER.y),'船着場');
     $('worldMapRegion').textContent='賽の森　／　四国全域';
-    $('worldMapNote').textContent='北を上に表示。徳島側の宿場町から四国山地、各洞窟、船着場までを記しています。';
+    $('worldMapNote').textContent='北を上に表示。四国本島の外周、三つの岬、四国山地と主要施設を記しています。';
   }else{
     const links=ZONE_LINKS.filter(link=>link.from===zone);
     for(const link of links)drawWorldMapLandmark(g,point(link.at.x,link.at.y),link.label||'階段');
@@ -8237,7 +8245,11 @@ function miniMapLocationLabel(){
     ];
     for(const [site,label,radius] of sites)if(Math.hypot(player.x-site.x,player.y-site.y)<radius)return label;
     const u=(player.x-player.y)/2,v=(player.x+player.y)/2;
-    return v<32?'四国北部':v>61?'四国南部':u>-9?'四国東部':u<-34?'四国西部':'四国山地';
+    return v<32?'香川・瀬戸内海岸'
+      :v>78&&u>0?'室戸岬・高知東部'
+      :v>78&&u<-10?'足摺岬・高知西部'
+      :u>10?'徳島東部':u<-34?'愛媛・佐田岬'
+      :v>60?'高知・太平洋岸':'四国山地';
   }
   return zoneLabel(zone);
 }
