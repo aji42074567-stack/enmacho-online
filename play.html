@@ -1305,10 +1305,17 @@
 'use strict';
 /* ================= 基本設定 ================= */
 const TW=64, TH=32, WORLD_SIZE=72, FIELD_SIZE=120;
-const RINNE_BASE_SIZE=120,RINNE_SIZE=208,RINNE_SCALE=RINNE_SIZE/RINNE_BASE_SIZE;
+const RINNE_BASE_SIZE=120,RINNE_PREVIOUS_SIZE=208,RINNE_AUTHORED_SIZE=160,RINNE_SIZE=320;
+const RINNE_SCALE=RINNE_SIZE/RINNE_AUTHORED_SIZE;
 const rinneCoord=value=>value*RINNE_SCALE;
 const rinnePoint=point=>[rinneCoord(point[0]),rinneCoord(point[1]),...point.slice(2)];
-let mapSize=FIELD_SIZE;   // 賽の森は120マス、輪廻大陸は208マス、屋内・洞窟は72マス。
+const rinnePointFromUV=point=>rinnePoint([(point[1]+point[0])/2,(point[1]-point[0])/2]);
+const rinneLocationFromUV=(u,v)=>{
+  const [x,y]=rinnePointFromUV([u,v]);
+  return{x,y};
+};
+const rinneUVFromGrid=(x,y)=>({u:(x-y)/RINNE_SCALE,v:(x+y)/RINNE_SCALE});
+let mapSize=FIELD_SIZE;   // 賽の森は120マス、輪廻大陸は320マス、屋内・洞窟は72マス。
 const RANGE=1.4;
 const AUTO_RANGE=8;
 const COMBAT_HOLD_SECONDS=4;
@@ -1319,7 +1326,7 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
-const SAVE_VERSION=13;
+const SAVE_VERSION=14;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -1553,14 +1560,14 @@ const ENMA_LINKS=[
   {from:'enma2',at:{x:23,y:20},   to:'enma3',entry:{x:39,y:41},label:'三階へ',tone:'up'},
   {from:'enma3',at:{x:40,y:43},   to:'enma2',entry:{x:22,y:21},label:'二階へ',tone:'down'},
 ];
-const RINNE_COAST_ENTRY={x:rinneCoord(96),y:rinneCoord(94)};
-const RINNE_COAST_FERRY={x:rinneCoord(104),y:rinneCoord(104)};
-const RINNE_ENTRY={x:rinneCoord(51),y:rinneCoord(51)};
+const RINNE_COAST_ENTRY=rinneLocationFromUV(5,288);
+const RINNE_COAST_FERRY=rinneLocationFromUV(8,307);
+const RINNE_ENTRY=rinneLocationFromUV(-6,142);
 const MEISHOKU_SEALS=[
-  {x:rinneCoord(37),y:rinneCoord(45),job:'rasetsu', label:'羅刹'},
-  {x:rinneCoord(45),y:rinneCoord(37),job:'kagehoshi',label:'影法師'},
-  {x:rinneCoord(43),y:rinneCoord(49),job:'jugonshi', label:'呪禁師'},
-  {x:rinneCoord(49),y:rinneCoord(43),job:'gohousou', label:'護法僧'},
+  {...rinneLocationFromUV(-18,148),job:'rasetsu', label:'羅刹'},
+  {...rinneLocationFromUV(6,136),job:'kagehoshi',label:'影法師'},
+  {...rinneLocationFromUV(-4,154),job:'jugonshi', label:'呪禁師'},
+  {...rinneLocationFromUV(8,146),job:'gohousou', label:'護法僧'},
 ];
 const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
@@ -4880,7 +4887,8 @@ function paintRinneGroundChunk(W2,clip,canvas){
     const px=GX(x,y),py=GY(x,y);
     if(px+r<clip.x||px-r>clip.x+clip.w||py+r*.5<clip.y||py-r*.5>clip.y+clip.h)continue;
     if(kind===0){
-      g.fillStyle=rinneRegionAt(x,y)==='coast'?'rgba(65,94,48,.032)':'rgba(171,126,35,.038)';
+      g.fillStyle=['coast','northcoast'].includes(rinneRegionAt(x,y))
+        ?'rgba(65,94,48,.032)':'rgba(171,126,35,.038)';
       g.beginPath();g.ellipse(px,py,r,r*.42,rinneHash(i,9,24)*.35,0,6.29);g.fill();
     }else if(kind!==4&&kind!==8&&rinneHash(i,7,25)>.58){
       g.fillStyle=kind===2?'rgba(73,102,108,.14)':'rgba(97,72,35,.12)';
@@ -5045,7 +5053,8 @@ function carveRinneTrail(world,points,radius,kind=7){
     for(let i=1;i<points.length;i++){
       if(rinneTrailDistance(x,y,points[i-1],points[i])<=radius){near=true;break;}
     }
-    if(near){world.blocked[y*size+x]=0;world.tileKind[y*size+x]=kind;}
+    const index=y*size+x,tile=world.tileKind[index];
+    if(near&&tile!==4&&tile!==8){world.blocked[index]=0;world.tileKind[index]=kind;}
   }
 }
 function newRinneWorld(){
@@ -5065,109 +5074,131 @@ const rinneHash=(x,y,s=0)=>{
   return n-Math.floor(n);
 };
 function rinneRegionAt(x,y){
-  const depth=(x+y)/RINNE_SCALE;
-  return depth<112?'city':depth>184?'coast':'wilds';
+  const {u,v}=rinneUVFromGrid(x,y);
+  const city=((u+6)/34)**2+((v-142)/29)**2<1;
+  return city?'city':v<78?'northcoast':v>246?'coast':'wilds';
 }
-function rinneSetBlocked(world,x,y,value=1){
-  const size=world.size||RINNE_SIZE;
-  const gx=Math.round(x),gy=Math.round(y);
-  if(gx>0&&gy>0&&gx<size-1&&gy<size-1)world.blocked[gy*size+gx]=value;
+const rinneEllipse=(u,v,cu,cv,ru,rv)=>((u-cu)/ru)**2+((v-cv)/rv)**2<1;
+function rinneWaterKindAt(u,v){
+  // 北は日本海。若狭湾を南へ切り込み、丹後半島を北へ張り出させる。
+  const northShore=48+Math.sin((u+14)*.12)*3.8+Math.sin(u*.31)*1.8;
+  const japanSea=v<northShore;
+  const wakasaBay=rinneEllipse(u,v,0,55,27,19)&&v<74;
+  const tangoPeninsula=rinneEllipse(u,v,-27,43,17,25)
+    ||(u>-37&&u<-18&&v>47&&v<72);
+
+  // 南は熊野灘・太平洋。紀伊半島だけを南へ長く残す。
+  const southShore=232+Math.sin((u+9)*.075)*4+Math.sin(u*.19)*1.8;
+  const pacific=v>southShore;
+  const kiiT=clamp((v-180)/118,0,1);
+  const kiiHalf=62*Math.pow(1-kiiT,.66)+4;
+  const kiiAxis=2+Math.sin((v-198)*.042)*2.4;
+  const kiiPeninsula=v>=178&&v<=298&&Math.abs(u-kiiAxis)<kiiHalf;
+
+  // 瀬戸内海から大阪湾、東側の伊勢湾をそれぞれ海として本州へ切り込ませる。
+  const setoInland=rinneEllipse(u,v,-75,203,43,27)&&u<-42&&v>170;
+  const osakaBay=rinneEllipse(u,v,-38,204,28,28)&&v>172;
+  const iseBay=rinneEllipse(u,v,47,204,24,31)&&v>170;
+
+  // 大阪湾口の淡路島、瀬戸内海南岸の四国、伊勢湾口の志摩半島を陸として戻す。
+  const awaji=rinneEllipse(u+(v-216)*.15,v,-49,216,9,27);
+  const shikoku=rinneEllipse(u,v,-79,240,40,18)
+    ||rinneEllipse(u,v,-51,237,23,14);
+  const shimaNeck=rinneEllipse(u,v,35,220,19,14);
+  const shimaCape=rinneEllipse(u,v,59,223,31,13);
+  const shimaPeninsula=shimaNeck||shimaCape;
+
+  let sea=japanSea||pacific;
+  if(tangoPeninsula||kiiPeninsula||shikoku)sea=false;
+  if(wakasaBay||setoInland||osakaBay||iseBay)sea=true;
+  if(tangoPeninsula||awaji||shikoku||shimaPeninsula)sea=false;
+
+  // 琵琶湖は若狭湾・伊勢湾のどちらとも接続しない、南北に長い内陸湖にする。
+  const biwa=rinneEllipse(u,v,29,101,9,19)
+    ||rinneEllipse(u,v,27,122,12,26)
+    ||rinneEllipse(u,v,24,143,8,10);
+  return biwa?8:sea?4:0;
 }
 function buildRinneContinent(){
-  // 関西地方を1枚の208×208マップに置く。地域境界でswitchZoneしない。
-  // 形状は120マス版の設計座標で定義し、距離だけをRINNE_SCALEで拡張する。
-  // u=x-yが東西、v=x+yが南北。北に都、北東に琵琶湖、南に紀伊半島と渡船場を置く。
+  // 近畿・中国東部・東海西部を1枚の320×320マップに置く。地域境界でswitchZoneしない。
+  // u=x-yが東西、v=x+yが南北。国土地理院の近畿図を下敷きに、水域の接続関係を優先する。
   const city=newRinneWorld(),size=RINNE_SIZE;
-  const mainTrail=[[51,51],[58,52],[66,57],[75,68],[83,74],[89,83],[96,94]].map(rinnePoint);
-  const okayamaTrail=[[51,51],[45,58],[36,67],[27,75],[23,75]].map(rinnePoint);
-  const gifuTrail=[[51,51],[61,51],[72,44],[80,34],[83,31]].map(rinnePoint);
+  const mainTrail=[[-6,142],[-3,160],[2,184],[7,210],[10,238],[8,266],[5,288]].map(rinnePointFromUV);
+  const okayamaTrail=[[-6,142],[-27,149],[-50,154],[-73,158],[-94,161]].map(rinnePointFromUV);
+  const gifuTrail=[[-6,142],[1,126],[7,105],[12,84],[33,73],[56,81],[73,97]].map(rinnePointFromUV);
 
-  // 琵琶湖・大阪湾・伊勢湾と紀伊半島。判定はマス、表示は連続マスクでつなぐ。
+  // 先に日本海・太平洋・瀬戸内海・両湾・琵琶湖を確定する。
   for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,index=y*size+x;
-    const lakeNorth=((u-30)/9)**2+((v-69)/27)**2;
-    const lakeSouth=((u-25)/7.5)**2+((v-93)/17)**2;
-    const lake=lakeNorth<1||lakeSouth<1;
-    const peninsulaCenter=2+Math.sin((v-118)*.035)*3.2;
-    const peninsulaHalf=Math.max(3.5,68-(v-120)*.78+Math.sin(v*.13)*2.4);
-    const peninsulaEdge=Math.abs(u-peninsulaCenter)-peninsulaHalf;
-    const osakaBay=((u+34)/23)**2+((v-146)/31)**2;
-    const iseBay=((u-38)/22)**2+((v-146)/31)**2;
-    const southShore=201+Math.sin(u*.17)*2.6+Math.sin(v*.11+1.2)*1.4;
-    const sea=v>southShore||(v>122&&peninsulaEdge>0)
-      ||(v>122&&osakaBay<1)||(v>122&&iseBay<1);
-    const shellBeach=!sea&&(v>122&&peninsulaEdge>-7
-      ||v>190+Math.sin(u*.15)*2.2
-      ||(v>122&&osakaBay<1.28)||(v>122&&iseBay<1.28));
-    if(sea){city.tileKind[index]=4;city.blocked[index]=1;}
-    else if(lake){city.tileKind[index]=8;city.blocked[index]=1;}
-    else if(shellBeach)city.tileKind[index]=3;
+    const {u,v}=rinneUVFromGrid(x,y),index=y*size+x;
+    const water=rinneWaterKindAt(u,v);
+    if(water){city.tileKind[index]=water;city.blocked[index]=1;}
   }
+  // 海と接する陸だけを貝砂にする。琵琶湖畔は草地・岩場のまま残す。
+  const beachRadius=Math.max(2,Math.round(rinneCoord(2.2)));
+  const beachCells=[];
+  for(let y=beachRadius;y<size-beachRadius;y++)for(let x=beachRadius;x<size-beachRadius;x++){
+    const index=y*size+x;
+    if(city.tileKind[index]!==0)continue;
+    let nearSea=false;
+    for(let oy=-beachRadius;oy<=beachRadius&&!nearSea;oy++)for(let ox=-beachRadius;ox<=beachRadius;ox++){
+      if(ox*ox+oy*oy>beachRadius*beachRadius)continue;
+      if(city.tileKind[(y+oy)*size+x+ox]===4){nearSea=true;break;}
+    }
+    if(nearSea)beachCells.push(index);
+  }
+  for(const index of beachCells)city.tileKind[index]=3;
 
   carveRinneTrail(city,mainTrail,rinneCoord(3.15),1);
   carveRinneTrail(city,okayamaTrail,rinneCoord(2.35),1);
   carveRinneTrail(city,gifuTrail,rinneCoord(2.35),1);
 
-  // 輪廻の都。水路と無作為な橋は置かず、広い石畳で街道につなぐ。
+  // 輪廻の都は琵琶湖の南西、京都盆地に相当する内陸へ置く。
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-    const depth=(x+y)/RINNE_SCALE,side=Math.abs(x-y)/RINNE_SCALE;
-    const mainApproach=depth>=44&&depth<=108&&side<=5;
-    const upperCourt=depth>=56&&depth<72&&side<=9;
-    const grandCourt=depth>=68&&depth<=100&&side<=15;
-    if(mainApproach||upperCourt||grandCourt){
-      city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;
-    }
+    const {u,v}=rinneUVFromGrid(x,y),du=u+6,dv=v-142,index=y*size+x;
+    const mainApproach=Math.abs(du)<=5&&dv>=10&&dv<=38;
+    const upperCourt=Math.abs(du)<=10&&dv>=-22&&dv<-8;
+    const grandCourt=Math.abs(du)<=18&&dv>=-10&&dv<=20;
+    if((mainApproach||upperCourt||grandCourt)&&city.tileKind[index]!==4&&city.tileKind[index]!==8)
+      {city.blocked[index]=0;city.tileKind[index]=2;}
   }
-  for(const depth0 of [66,84,96])for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    const depth=(x+y)/RINNE_SCALE,side=Math.abs(x-y)/RINNE_SCALE;
-    if(Math.abs(depth-depth0)<=1&&side<=18){city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;}
-  }
-
-  // 岡山方面と岐阜方面は陸の続きを見せつつ、山並みの向こうを現章では通行不可にする。
-  for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,index=y*size+x;
-    if(v<128&&(u<-49||u>52)&&city.tileKind[index]!==4&&city.tileKind[index]!==8)
-      city.blocked[index]=1;
-  }
-  for(const [u,side] of [[-50,'west'],[52,'east']])for(let v=76;v<=124;v+=8){
-    const x=rinneCoord((v+u)/2),y=rinneCoord((v-u)/2);
-    if(x<=2||y<=2||x>=size-2||y>=size-2)continue;
-    rinneSetBlocked(city,x,y);
-    city.props.push({x,y,kind:'rinne_rock',coastal:false,s:.82+rinneHash(x,y,62)*.28});
-    city.props.push({x:x+rinneCoord(side==='west'?1:-1),y:y+rinneCoord(side==='west'?-1:1),
-      kind:'rinne_clutter',v:'talisman'});
+  for(const streetV of [132,142,154])for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
+    const {u,v}=rinneUVFromGrid(x,y),index=y*size+x;
+    if(Math.abs(v-streetV)<=1.2&&Math.abs(u+6)<=22&&city.tileKind[index]!==4&&city.tileKind[index]!==8)
+      {city.blocked[index]=0;city.tileKind[index]=2;}
   }
 
   // 個別素材は大陸拡張後に配置する。ここでは中央広場と四職印の導線を先に確定する。
   for(const seal of MEISHOKU_SEALS)city.props.push({...seal,kind:'jobseal'});
-  for(const [x,y] of [[48,48],[44,44],[40,40],[36,36],[32,32],[28,28]])
-    city.props.push({x:rinneCoord(x+.8),y:rinneCoord(y-.8),kind:'rinne_lantern'});
+  for(const [u,v] of [[-5,153],[-4,161],[-2,169],[0,177],[-8,135],[-8,147]])
+    city.props.push({...rinneLocationFromUV(u,v),kind:'rinne_lantern'});
 
   // 植生の個別素材は新しい大陸上の距離感を見てから配置する。現段階はススキだけで密度を確認する。
   for(let y=4;y<size-4;y+=3)for(let x=4;x<size-4;x+=3){
     const index=y*size+x,kind=city.tileKind[index],region=rinneRegionAt(x,y);
     if(kind!==0||region==='city')continue;
-    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,restricted=v<128&&(u<-49||u>52);
-    if(city.blocked[index]&&!restricted)continue;
+    if(city.blocked[index])continue;
     const d=Math.min(...mainTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,mainTrail[i],p)));
     const h=rinneHash(x,y,41);
-    if(d>rinneCoord(3.2)&&h>.5){
+    if(d>rinneCoord(4)&&h>.9){
       city.props.push({x:x+.3,y:y+.2,kind:'rinne_pampas',s:.65+rinneHash(x,y,45)*.48});
     }
   }
-  // 琵琶湖の湖岸は建物を置かず、石と薄だけで縁取る。
-  for(const [x,y] of [[46,18],[52,22],[58,28],[56,35],[49,36],[43,29]]){
-    const rx=rinneCoord(x),ry=rinneCoord(y);
-    city.props.push({x:rx,y:ry,kind:'rinne_rock',coastal:false,s:.64+rinneHash(rx,ry,71)*.18});
-    city.props.push({x:rx-.6,y:ry+.5,kind:'rinne_pampas',s:.62+rinneHash(rx,ry,72)*.22});
+  // 琵琶湖岸・若狭湾・志摩半島の要所を岩で縁取り、地形の読みやすさを補う。
+  for(const [u,v,coastal] of [
+    [18,100,false],[16,122,false],[18,145,false],[36,143,false],[40,120,false],[38,94,false],
+    [-18,67,true],[13,70,true],[43,220,true],[69,223,true],
+  ]){
+    const pos=rinneLocationFromUV(u,v);
+    city.props.push({...pos,kind:'rinne_rock',coastal,s:.64+rinneHash(pos.x,pos.y,71)*.22});
+    if(!coastal)city.props.push({x:pos.x-.6,y:pos.y+.5,kind:'rinne_pampas',s:.62+rinneHash(pos.x,pos.y,72)*.22});
   }
 
-  city.props.push({x:rinneCoord(101),y:rinneCoord(101),kind:'rinne_pier'});
-  city.npcs.push({x:rinneCoord(97),y:rinneCoord(93),kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
-  city.props.push({x:rinneCoord(92),y:rinneCoord(89),kind:'rinne_lantern'},
-    {x:rinneCoord(69),y:rinneCoord(61),kind:'rinne_lantern'});
-  for(const [x,y] of [[109,96],[105,101],[99,104],[92,103],[111,91]])
-    city.props.push({x:rinneCoord(x),y:rinneCoord(y),kind:'rinne_rock',s:.72+rinneHash(x,y)*.34});
+  city.props.push({...rinneLocationFromUV(4,298),kind:'rinne_pier'});
+  city.npcs.push({...rinneLocationFromUV(5,285),kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
+  city.props.push({...rinneLocationFromUV(2,280),kind:'rinne_lantern'},
+    {...rinneLocationFromUV(2,196),kind:'rinne_lantern'});
+  for(const [u,v] of [[-3,299],[3,301],[9,298],[-7,291],[12,289]])
+    city.props.push({...rinneLocationFromUV(u,v),kind:'rinne_rock',s:.72+rinneHash(u,v)*.34});
   RINNE=city;
 }
 /* ---- 竜の洞窟(地下5階) ---- */
@@ -5446,10 +5477,10 @@ function restoreSavedLocation(saved,saveVersion=SAVE_VERSION){
   if(!worldByZone(savedZone)||typeof saved.x!=='number'||typeof saved.y!=='number'
     ||!Number.isFinite(saved.x)||!Number.isFinite(saved.y))return false;
   const size=savedZone==='field'?FIELD_SIZE:savedZone==='rinne'?RINNE_SIZE:WORLD_SIZE;
-  // v12の輪廻大陸は120マス。旧座標を同じ地域の208マス座標へ移す。
+  // v12は120マス、v13は208マス。旧座標を同じ地域の320マス座標へ移す。
   const savedMapSize=savedZone==='rinne'
     ?(Number.isFinite(+saved.mapSize)&&+saved.mapSize>0?+saved.mapSize:
-      saveVersion<=12?RINNE_BASE_SIZE:RINNE_SIZE)
+      saveVersion<=12?RINNE_BASE_SIZE:saveVersion===13?RINNE_PREVIOUS_SIZE:RINNE_SIZE)
     :size;
   const locationScale=savedZone==='rinne'?RINNE_SIZE/savedMapSize:1;
   const x=clamp(saved.x*locationScale,0,size-1),y=clamp(saved.y*locationScale,0,size-1);
@@ -5609,7 +5640,7 @@ loadSprite('map_enmacho_3f',MOBILE_RENDER?'assets/map_enmacho_3f_mobile.jpg':'as
 loadSprite('rinne_terrain_atlas','assets/map_rinne_terrain_atlas.png');
 loadSprite('rinne_vegetation_atlas','assets/map_rinne_vegetation_atlas.png');
 loadSprite('rinne_props_atlas','assets/map_rinne_props_atlas.png');
-// 検品済みの個別素材は、208マス大陸の導線確定後に読み込む。
+// 検品済みの個別素材は、320マス大陸の導線確定後に読み込む。
 loadSprite('npc_enma','assets/npc_enma.png');
 loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
 loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
@@ -7175,6 +7206,7 @@ function hud(){
   }else{
     const rinneRegion=zone==='rinne'?rinneRegionAt(player.x,player.y):'';
     el.goal.textContent=rinneRegion==='coast'?'南岸から一続きの大陸街道へ'
+      :rinneRegion==='northcoast'?'日本海岸をたどり、若狭から輪廻の都へ'
       :rinneRegion==='wilds'?'大陸街道を進み、輪廻の都へ'
       :zone==='rinne'
         ?player.meishoku?`冥職「${MEISHOKU[player.meishoku]?.name||'—'}」として第二審査へ`:'広場の四つの印から冥職を選ぼう'
