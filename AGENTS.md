@@ -103,6 +103,42 @@ Cloudflare Pages のダッシュボードから古いデプロイを手動リト
 
 秘密鍵やResend APIキーはリポジトリへ保存しない。`.env` がないことは、連携が未実装という意味ではない。秘密情報はSupabaseおよびCloudflare側のSecretsで管理する。
 
+## ハマりどころ集(これを知らないと遠回りする)
+
+### 調査の入り方
+- 「直したのに反映されない」と思ったら、コードを疑う前にまず `bash scripts/check_release.sh`。
+  どの段(ローカル/GitHub/本番/Worker)でずれているかが即分かる
+- 敵やボスの不具合は、推測せず **`https://enmacho.com/play.html?debugmob`** で開く。
+  現在ゾーンの敵名簿(ID・種類・座標・生死・サーバー座標)がログタブに5秒ごとに出る
+- サーバー側の敵の実態は `curl 'https://enmacho-world.aji42074567.workers.dev/health?zone=cave3'`(全戦闘ゾーン可)
+- `curl https://enmacho.com/play.html` は308で `/play` へ転送される。素のcurlだと空が返るので `-L` を付ける
+
+### クライアント(play.html)の罠
+- **mapSizeの罠(ボス3種消失の原因だった)**: 床判定 `isB` はグローバル`mapSize`を参照する
+  (賽の森120/輪廻大陸320/屋内72)。起動時の一括組み立てや新ゾーン追加時は、
+  builderを呼ぶ前に `mapSize=対象サイズ` を設定すること。忘れるとspawnMobが静かに失敗し敵が生まれない
+- **クライアントは「自分の世界データにない敵」を表示しない**: サーバーがボスを送ってきても、
+  ローカルのw.mobsに同種の敵がいなければ黙って捨てられる。「サーバーにはいるのに見えない」は大抵これ
+- 共有ゾーンの敵IDは `${zone}-${i}`(スポーン順)。クライアントとworkerでスポーン順を揃えること
+- renderGround系はゾーン切替後も自分のtileKindを参照させる(グローバル参照だと真っ暗になる)
+- テクスチャのonloadではrenderGroundとrenderGroundCaveの両方を再描画する
+- localStorageのセーブを消してテストする時: play.htmlは**ページ離脱時にも自動save()する**ので、
+  復元→リロードの手順だと離脱セーブに上書きされて消える。タブごと閉じてから操作する
+
+### サーバー(worker)の罠
+- 部屋(Durable Object)の状態は永続する。コードを直しても既存の部屋は直らないことがある。
+  部屋を強制的に作り直したい時はWORLD_VERSIONを上げる(入室ごとのsig比較でも地図更新は自動反映される)
+- `/health?zone=` の `initialized:false, boss:null` は異常ではなく「誰も入室していない」だけ
+- `/health` の `build` フィールド=動いているコミットSHA。`unknown`なら正規手順(scripts/deploy_worker.sh)を踏んでいない
+- ゾーンを追加したら4箇所+デプロイ: worker `VALID_ZONE` / play.html+online/world.js `SHARED_ZONES` /
+  online/presence.js `VALID_ZONE`と`ZONE_LABELS` / `bash scripts/deploy_worker.sh`
+- workerデプロイのたびに接続中プレイヤーは切断1006で一瞬切れる(自動再接続)。
+  運営台帳の異常記録にこの警告が残るのは正常。デプロイと無関係な時間帯の連発だけが本物の異常
+
+### その他
+- Supabaseのmigrationは自動適用されない。**ユーザーにSQL Editorでの適用を依頼**し、依頼したことを報告に含める
+- 監視・運営系のURL、Worker URL、Supabase URLは `online/config.js` が正本
+
 ## 画像素材の原本
 
 - `_wip_src/` はgitignore対象の素材置き場(このMacのローカルにのみ存在)。
