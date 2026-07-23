@@ -1631,7 +1631,7 @@ const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'';
 const JUGONSHI_SPRITE_VERSION='20260723-jugon4';
 const KAGEHOSHI_SPRITE_VERSION='20260723-idle4';
-const GOHOUSOU_SPRITE_VERSION='20260723-walk3-attacklr';
+const GOHOUSOU_SPRITE_VERSION='20260723-walk4-8f';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
   const src=MEISHOKU_READY.has(e?.meishoku)
@@ -5970,11 +5970,13 @@ function drawPlayer(sx,sy,e){
     ctx.globalCompositeOperation='source-over';
   }else if(e.moving&&walkS){
     // 歩行: 実際に進んだ距離(walkT)に同期してコマ送り(足滑り防止)
-    const fr=Math.floor((e.walkT||0)*2.6)%4;
     // 護法僧男の歩行素材は長い錫杖を128pxセルへ収めたぶん人物本体が小さい。
     // 足元を固定したまま方向別に補正し、停止姿勢と体格・顔の大きさを揃える。
     const gohoMale=spriteId==='gohousou_m';
     const sideWalk=gohoMale&&(e.dir==='left'||e.dir==='right');
+    // 左右だけは手前脚4コマ+奥脚4コマ。1周期の移動距離は従来の4コマと同じ。
+    const frameCount=sideWalk?8:4;
+    const fr=Math.floor((e.walkT||0)*2.6*frameCount/4)%frameCount;
     const walkW=gohoMale&&e.dir==='down'?68:(sideWalk?60:D);
     const walkH=gohoMale&&e.dir==='down'?59:(sideWalk?60:D);
     ctx.drawImage(walkS,fr*F,row*F,F,F,-walkW/2,-walkH+3,walkW,walkH);

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Assemble grounded four-direction walk sheets from direction strips.
 
-The generated source strips contain four poses in one horizontal row.  Front
-and rear views are especially prone to repeating the same leg.  With
+Direction strips normally contain four poses; side strips may contain eight.
+Front and rear views are especially prone to repeating the same leg.  With
 ``--mirror-opposite-legs`` the first contact/passing pair remains untouched and
 the opposite pair is built by mirroring only the lower body.  The asymmetric
 upper costume and weapon therefore stay on their established side.
@@ -76,16 +76,17 @@ def normalized_row(
     *,
     cell_size: int,
     padding: int,
+    frame_count: int = 4,
 ) -> list[Image.Image]:
-    """Split a four-frame strip and ground every frame on one baseline."""
+    """Split a direction strip and ground every frame on one baseline."""
     image = load_sprite_source(source)
     try:
         # Generated strips rarely place their gutters on exact quarter points.
         # Projection-based splitting prevents a sword tip from leaking into the
         # neighboring frame.
-        frames = split_irregular_grid(image, columns=4, rows=1)
+        frames = split_irregular_grid(image, columns=frame_count, rows=1)
     except ValueError:
-        frames = split_grid(image, columns=4, rows=1)
+        frames = split_grid(image, columns=frame_count, rows=1)
     frames = [keep_largest_alpha_component(frame) for frame in frames]
     boxes = [alpha_bbox(frame) for frame in frames]
     max_width = max(right - left for left, _top, right, _bottom in boxes)
@@ -184,7 +185,10 @@ def mirrored_direction(frames: list[Image.Image]) -> list[Image.Image]:
 
 
 def assemble_rows(rows: list[list[Image.Image]], cell_size: int) -> Image.Image:
-    sheet = Image.new("RGBA", (cell_size * 4, cell_size * 4), (0, 0, 0, 0))
+    columns = max(len(frames) for frames in rows)
+    sheet = Image.new(
+        "RGBA", (cell_size * columns, cell_size * len(rows)), (0, 0, 0, 0)
+    )
     for row_index, frames in enumerate(rows):
         for column_index, frame in enumerate(frames):
             sheet.alpha_composite(
@@ -194,10 +198,15 @@ def assemble_rows(rows: list[list[Image.Image]], cell_size: int) -> Image.Image:
     return sheet
 
 
-def validate_grounding(sheet: Image.Image, cell_size: int, padding: int) -> None:
+def validate_grounding(
+    sheet: Image.Image,
+    cell_size: int,
+    padding: int,
+    frame_counts: list[int],
+) -> None:
     expected_bottom = cell_size - padding
-    for row in range(4):
-        for column in range(4):
+    for row, frame_count in enumerate(frame_counts):
+        for column in range(frame_count):
             frame = sheet.crop(
                 (
                     column * cell_size,
@@ -219,6 +228,13 @@ def main() -> None:
     parser.add_argument("--up", type=Path, required=True)
     parser.add_argument("--left", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--side-frames",
+        type=int,
+        choices=(4, 8),
+        default=4,
+        help="number of frames in the left/right rows",
+    )
     parser.add_argument("--cell-size", type=int, default=128)
     parser.add_argument("--padding", type=int, default=4)
     # Start above the upper thigh.  A lower cut can mirror only the feet while
@@ -248,9 +264,18 @@ def main() -> None:
     ):
         parser.error("--leg-mask-half-width must fit inside the cell")
 
-    down = normalized_row(args.down, cell_size=args.cell_size, padding=args.padding)
-    up = normalized_row(args.up, cell_size=args.cell_size, padding=args.padding)
-    left = normalized_row(args.left, cell_size=args.cell_size, padding=args.padding)
+    down = normalized_row(
+        args.down, frame_count=4, cell_size=args.cell_size, padding=args.padding
+    )
+    up = normalized_row(
+        args.up, frame_count=4, cell_size=args.cell_size, padding=args.padding
+    )
+    left = normalized_row(
+        args.left,
+        frame_count=args.side_frames,
+        cell_size=args.cell_size,
+        padding=args.padding,
+    )
     if args.mirror_opposite_legs:
         down = opposite_leg_cycle(
             down,
@@ -265,8 +290,11 @@ def main() -> None:
             mask_half_width=args.leg_mask_half_width,
         )
     right = mirrored_direction(left)
-    sheet = assemble_rows([down, up, left, right], args.cell_size)
-    validate_grounding(sheet, args.cell_size, args.padding)
+    rows = [down, up, left, right]
+    sheet = assemble_rows(rows, args.cell_size)
+    validate_grounding(
+        sheet, args.cell_size, args.padding, [len(frames) for frames in rows]
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(args.out, optimize=True)
     print(args.out)
