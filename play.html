@@ -8860,13 +8860,16 @@ window.EnmaGameBridge={
   },
   getZoneInit(zoneName){
     const w=worldByZone(zoneName);
-    if(!w||!SHARED_ZONES.has(zoneName)||zoneName==='field')return null;
+    if(!w||!SHARED_ZONES.has(zoneName))return null;
+    const size=zoneName==='field'?FIELD_SIZE:WORLD_SIZE;
     const rows=[];
-    for(let y=0;y<WORLD_SIZE;y++){
+    for(let y=0;y<size;y++){
       let row='';
-      for(let x=0;x<WORLD_SIZE;x++)row+=w.blocked[y*WORLD_SIZE+x]?'1':'0';
+      for(let x=0;x<size;x++)row+=w.blocked[y*size+x]?'1':'0';
       rows.push(row);
     }
+    // フィールドの敵定義はWorker内蔵。町の柵・建物・岩など壁情報だけ同期する。
+    if(zoneName==='field')return{zone:zoneName,walls:rows};
     const types={};
     const spawns=w.mobs.map(m=>{
       types[m.type]=true;

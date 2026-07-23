@@ -108,6 +108,26 @@ function onIsland(x, y) {
     && islandDistance(x, y) <= -4.5;
 }
 
+const FIELD_TOWN = { x0: 29, y0: 47, x1: 56, y1: 68 };
+function insideFieldTown(x, y) {
+  const tx = Math.round(x);
+  const ty = Math.round(y);
+  return tx >= FIELD_TOWN.x0 && tx <= FIELD_TOWN.x1
+    && ty >= FIELD_TOWN.y0 && ty <= FIELD_TOWN.y1;
+}
+
+function validateFieldWalls(data) {
+  if (!data || cleanText(data.zone, 16) !== 'field') return null;
+  const walls = data.walls;
+  if (!Array.isArray(walls) || walls.length !== FIELD_SIZE) return null;
+  for (const row of walls) {
+    if (typeof row !== 'string' || row.length !== FIELD_SIZE || /[^01]/.test(row)) return null;
+  }
+  const fieldData = { walls };
+  fieldData.sig = zoneSignature({ walls, defs: {}, spawns: [] });
+  return fieldData;
+}
+
 // クライアントの敵配置が更新されたら部屋データを差し替えるための署名
 function zoneSignature(data) {
   const text = JSON.stringify([data.spawns, data.defs, data.walls]);
@@ -260,11 +280,15 @@ export class WorldRoom {
     this.hitWindows = new Map();
     this.lastBroadcastState = new Map();
     this.pendingDragonRespawnNoticeAt = 0;
+    this.fieldWalls = null;
+    this.fieldWallsSig = '';
     this.ready = state.blockConcurrencyWhile(async () => {
       const saved = await state.storage.get('world');
       if (saved?.version === WORLD_VERSION) {
         this.zone = saved.zone || '';
         this.zoneData = saved.zoneData || null;
+        this.fieldWalls = Array.isArray(saved.fieldWalls) ? saved.fieldWalls : null;
+        this.fieldWallsSig = cleanText(saved.fieldWallsSig, 64);
         if (Array.isArray(saved.mobs)) this.mobs = saved.mobs;
         this.pendingDragonRespawnNoticeAt = Math.max(
           0, finite(saved.pendingDragonRespawnNoticeAt, 0),
@@ -291,8 +315,16 @@ export class WorldRoom {
     return this.zoneData?.spawns || [];
   }
 
-  walkable(x, y) {
-    if (this.zone === 'field') return onIsland(x, y);
+  walkable(x, y, forMonster = false) {
+    if (this.zone === 'field') {
+      if (!onIsland(x, y)) return false;
+      if (!forMonster) return true;   // プレイヤーはクライアント側の門開閉と壁判定に従う
+      if (insideFieldTown(x, y)) return false;
+      if (!this.fieldWalls) return true;
+      const tx = Math.round(x);
+      const ty = Math.round(y);
+      return this.fieldWalls[ty]?.[tx] === '0';
+    }
     const walls = this.zoneData?.walls;
     if (!walls) return false;
     const tx = Math.round(x);
@@ -369,6 +401,8 @@ export class WorldRoom {
     this.state.acceptWebSocket(server);
     if (this.simReady()) {
       this.send(server, this.snapshot(Date.now(), true));
+      if (this.zone === 'field' && !this.fieldWalls)
+        this.send(server, { type: 'need_init', zone: this.zone });
       if (this.dispatchDragonRespawnNotice([server])) void this.persist(Date.now(), true);
       this.startTicking();
     } else {
@@ -396,7 +430,14 @@ export class WorldRoom {
   }
 
   applyZoneInit(data) {
-    if (this.zone === 'field') return;
+    if (this.zone === 'field') {
+      const fieldData = validateFieldWalls(data);
+      if (!fieldData || this.fieldWallsSig === fieldData.sig) return;
+      this.fieldWalls = fieldData.walls;
+      this.fieldWallsSig = fieldData.sig;
+      void this.persist();
+      return;
+    }
     const zoneData = validateZoneInit(this.zone, data);
     if (!zoneData) return;
     // 既に同じ内容ならそのまま。ゲーム更新で配置が変わった時だけ部屋を作り直す
@@ -542,9 +583,17 @@ export class WorldRoom {
         if (this.reconcileMonsterRespawn(monster, now, players)) respawnChanged = true;
         continue;
       }
+      // 旧シミュレーションですでに壁内や町へ入った敵は、元の出現地点へ戻す。
+      if (this.zone === 'field' && !this.walkable(monster.x, monster.y, true)) {
+        monster.x = monster.homeX;
+        monster.y = monster.homeY;
+        monster.targetId = '';
+        monster.state = 'idle';
+      }
       const definition = this.definitions()[monster.type];
       if (!definition) continue;
       let target = players.get(monster.targetId);
+      if (target && this.zone === 'field' && insideFieldTown(target.x, target.y)) target = null;
       if (!target || target.dead) {
         monster.targetId = '';
         target = null;
@@ -555,7 +604,7 @@ export class WorldRoom {
         let closest = null;
         let closestDistance = definition.aggro;
         for (const player of players.values()) {
-          if (player.dead) continue;
+          if (player.dead || (this.zone === 'field' && insideFieldTown(player.x, player.y))) continue;
           const candidateDistance = distance(monster, player);
           if (candidateDistance < closestDistance) {
             closest = player;
@@ -642,12 +691,12 @@ export class WorldRoom {
     const step = Math.min(length, speed * dt);
     const nextX = monster.x + dx / length * step;
     const nextY = monster.y + dy / length * step;
-    if (this.walkable(nextX, nextY)) {
+    if (this.walkable(nextX, nextY, true)) {
       monster.x = nextX;
       monster.y = nextY;
-    } else if (this.walkable(nextX, monster.y)) {
+    } else if (this.walkable(nextX, monster.y, true)) {
       monster.x = nextX;
-    } else if (this.walkable(monster.x, nextY)) {
+    } else if (this.walkable(monster.x, nextY, true)) {
       monster.y = nextY;
     }
     monster.face = dx >= 0 ? 1 : -1;
@@ -817,6 +866,8 @@ export class WorldRoom {
       version: WORLD_VERSION,
       zone: this.zone,
       zoneData: this.zoneData,
+      fieldWalls: this.fieldWalls,
+      fieldWallsSig: this.fieldWallsSig,
       mobs: this.mobs,
       pendingDragonRespawnNoticeAt: this.pendingDragonRespawnNoticeAt,
       savedAt: now,
