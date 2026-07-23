@@ -229,6 +229,8 @@
     color:var(--parchment);background:linear-gradient(180deg,transparent,rgba(4,5,8,.9))}
   .gcard.wide{grid-column:span 2;aspect-ratio:auto}
   .gcard.wide img{image-rendering:auto;width:100%;height:100%;object-fit:cover;filter:none}
+  .gcard.art img{image-rendering:auto;width:64%;height:84%}
+  .gal-grid>a{display:block}
   /* 4方向スプライトシートから正面1コマだけ切り出して表示 */
   .gcard .cell{width:60%;aspect-ratio:1;margin-bottom:10%;
     background-repeat:no-repeat;background-size:400% 100%;background-position:0 0;
@@ -296,6 +298,7 @@
   <div class="nav-links">
     <a href="#world">世界観<small>WORLD</small></a>
     <a href="#system">システム<small>SYSTEM</small></a>
+    <a href="meishoku.html">冥職<small>MEISHOKU</small></a>
     <a href="#gallery">ギャラリー<small>GALLERY</small></a>
     <a href="#devlog">開発記録<small>DEVLOG</small></a>
   </div>
@@ -406,12 +409,18 @@
       <figcaption>第二章の拠点　輪廻の都</figcaption></figure>
     <figure class="gcard wide fade"><img src="assets/title_enmacho_pc.jpg" alt="閻魔庁の全景">
       <figcaption>地獄庁 中央合同庁舎</figcaption></figure>
-    <figure class="gcard fade" id="rasetsu-gallery"><i class="cell" role="img" aria-label="冥職 羅刹 男"
-        style="background-image:url(assets/char_rasetsu_m.png)"></i>
-      <figcaption>冥職　羅刹（男）</figcaption></figure>
-    <figure class="gcard fade"><i class="cell" role="img" aria-label="冥職 羅刹 女"
-        style="background-image:url(assets/char_rasetsu_f.png)"></i>
-      <figcaption>冥職　羅刹（女）</figcaption></figure>
+    <a href="meishoku.html#rasetsu"><figure class="gcard art fade" id="rasetsu-gallery">
+      <img src="assets/meishoku/rasetsu_m.webp" alt="冥職 羅刹" loading="lazy">
+      <figcaption>冥職　羅刹</figcaption></figure></a>
+    <a href="meishoku.html#kagehoshi"><figure class="gcard art fade">
+      <img src="assets/meishoku/kagehoshi_m.webp" alt="冥職 影法師" loading="lazy">
+      <figcaption>冥職　影法師</figcaption></figure></a>
+    <a href="meishoku.html#jugonshi"><figure class="gcard art fade">
+      <img src="assets/meishoku/jugonshi_f.webp" alt="冥職 呪禁師" loading="lazy">
+      <figcaption>冥職　呪禁師</figcaption></figure></a>
+    <a href="meishoku.html#gohousou"><figure class="gcard art fade">
+      <img src="assets/meishoku/gohousou_m.webp" alt="冥職 護法僧" loading="lazy">
+      <figcaption>冥職　護法僧</figcaption></figure></a>
     <figure class="gcard fade"><i class="cell" role="img" aria-label="新入りの魂（男）"
         style="background-image:url(assets/char_player_m.png)"></i>
       <figcaption>新入りの魂</figcaption></figure>
@@ -441,7 +450,12 @@
   </div>
   <div class="devlog-list">
     <div class="dev fade">
-      <time>2026.07.22</time><span class="tag">NEW</span>
+      <time>2026.07.23</time><span class="tag">NEW</span>
+      <h3>四つの冥職、出揃う</h3>
+      <p>呪禁師と護法僧を実装し、羅刹・影法師と合わせて四職が完成。立ち絵で見る<a href="meishoku.html" style="color:var(--gold-bright);text-decoration:underline">冥職名鑑</a>を公開。</p>
+    </div>
+    <div class="dev fade">
+      <time>2026.07.22</time>
       <h3>第二章「冥職編」開幕</h3>
       <p>渡し船の先に輪廻の都を追加。男女の冥職「羅刹」と、現実時間に同期する昼夜を実装。</p>
     </div>

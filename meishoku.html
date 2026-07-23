@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>冥職名鑑 — 閻魔庁ONLINE 公式サイト</title>
+<meta name="description" content="閻魔庁ONLINE 第二章「冥職編」。第六審査区で魂に刻む四つの冥職 — 羅刹・影法師・呪禁師・護法僧の名鑑。">
+<meta property="og:title" content="冥職名鑑 — 閻魔庁ONLINE">
+<meta property="og:description" content="第六審査区で魂に刻む四つの冥職 — 羅刹・影法師・呪禁師・護法僧。">
+<meta property="og:image" content="https://enmacho.com/assets/title_enmacho_pc.jpg">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://enmacho.com/meishoku.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#07080c;
+    --panel:rgba(22,18,12,.92);
+    --panel-edge:#4a3b22;
+    --parchment:#e8dcc4;
+    --dim:#9a8c6f;
+    --gold:#c9a24a;
+    --gold-bright:#e8c76a;
+    --vermilion:#c43a2b;
+    --serif:'Hiragino Mincho ProN','YuMincho','Yu Mincho','Noto Serif JP',serif;
+    --sans:'Hiragino Kaku Gothic ProN','Yu Gothic','Noto Sans JP',sans-serif;
+    --brush:'Yuji Syuku','Hiragino Mincho ProN',serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--ink);color:var(--parchment);font-family:var(--sans);
+    overflow-x:hidden;line-height:1.8}
+  img{max-width:100%}
+  a{color:inherit;text-decoration:none}
+
+  /* ---------------- nav ---------------- */
+  #nav{position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;gap:26px;padding:14px 28px;
+    background:linear-gradient(180deg,rgba(4,5,8,.92),rgba(4,5,8,.72) 70%,transparent);
+    transition:background .3s}
+  #nav.solid{background:rgba(4,5,8,.96);box-shadow:0 1px 0 #241c11,0 6px 24px rgba(0,0,0,.5)}
+  .nav-logo{font-family:var(--brush);font-size:21px;color:var(--gold);
+    letter-spacing:.1em;white-space:nowrap}
+  .nav-logo small{font-family:var(--sans);font-size:9px;color:var(--parchment);
+    letter-spacing:.5em;margin-left:8px;vertical-align:2px}
+  .nav-links{display:flex;gap:26px;margin:0 auto}
+  .nav-links a{text-align:center;font-family:var(--serif);font-size:13.5px;
+    letter-spacing:.2em;opacity:.85}
+  .nav-links a small{display:block;font-family:var(--sans);font-size:8.5px;
+    letter-spacing:.3em;color:var(--dim)}
+  .nav-links a:hover{opacity:1;color:var(--gold-bright)}
+  .seal-btn{display:inline-block;padding:10px 22px;border:1px solid var(--gold);
+    border-radius:3px;font-family:var(--serif);font-size:13px;letter-spacing:.24em;
+    color:var(--gold-bright);background:rgba(201,162,74,.08);white-space:nowrap;
+    transition:background .3s,color .3s}
+  .seal-btn:hover{background:var(--gold);color:#14100a}
+
+  /* ---------------- hero ---------------- */
+  #hero{position:relative;padding:132px 24px 56px;text-align:center;
+    background:
+      radial-gradient(ellipse at 50% -10%,rgba(196,58,43,.16),transparent 55%),
+      radial-gradient(ellipse at 50% 115%,rgba(201,162,74,.10),transparent 60%)}
+  #hero .kicker{font-family:var(--serif);font-size:12px;letter-spacing:.5em;
+    color:var(--vermilion);margin-bottom:14px}
+  #hero h1{font-family:var(--brush);font-size:clamp(40px,8vw,64px);
+    letter-spacing:.14em;color:var(--gold-bright);font-weight:400}
+  #hero .en{font-family:var(--sans);font-size:10px;letter-spacing:.6em;
+    color:var(--dim);margin-top:10px}
+  #hero p{max-width:620px;margin:26px auto 0;font-family:var(--serif);
+    font-size:14px;color:var(--parchment)}
+  .rule{width:64px;height:1px;margin:26px auto 0;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+
+  /* ---------------- jobs ---------------- */
+  #jobs{max-width:1080px;margin:0 auto;padding:24px 24px 80px}
+  .job{display:flex;align-items:center;gap:40px;padding:56px 0;
+    border-bottom:1px solid #1d1810}
+  .job:last-child{border-bottom:none}
+  .job:nth-child(even){flex-direction:row-reverse}
+  .job-art{flex:1.1;position:relative;display:flex;justify-content:center;
+    align-items:flex-end;min-width:0}
+  .job-art::before{content:'';position:absolute;inset:auto 8% 4%;height:58%;
+    background:radial-gradient(ellipse at 50% 100%,var(--accent-glow),transparent 70%);
+    filter:blur(6px);pointer-events:none}
+  .job-art img{position:relative;height:clamp(300px,44vw,480px);width:auto;max-width:60%;
+    object-fit:contain;object-position:bottom;
+    filter:drop-shadow(0 18px 22px rgba(0,0,0,.65))}
+  .job-art img+img{margin-left:-9%}
+  .job-body{flex:1;min-width:0}
+  .job-no{font-family:var(--sans);font-size:10px;letter-spacing:.5em;color:var(--dim)}
+  .job-name{font-family:var(--brush);font-size:clamp(34px,5vw,46px);font-weight:400;
+    letter-spacing:.12em;color:var(--accent);line-height:1.3;margin-top:6px}
+  .job-name small{font-family:var(--serif);font-size:13px;letter-spacing:.3em;
+    color:var(--dim);margin-left:14px}
+  .job-role{font-family:var(--serif);font-size:14px;letter-spacing:.14em;
+    color:var(--gold-bright);margin-top:10px}
+  .job-text{font-family:var(--serif);font-size:13.5px;line-height:2.05;
+    color:var(--parchment);margin-top:18px}
+  .job-specs{margin-top:22px;display:grid;gap:8px;font-size:12px}
+  .job-specs div{display:flex;gap:12px;align-items:baseline}
+  .job-specs span{flex:0 0 4.5em;font-family:var(--serif);letter-spacing:.2em;
+    color:var(--dim)}
+  .job-specs b{font-weight:600;color:var(--parchment);letter-spacing:.04em}
+  .job-specs .accent{color:var(--accent)}
+
+  /* ---------------- cta ---------------- */
+  #cta{text-align:center;padding:24px 24px 96px}
+  #cta p{font-family:var(--serif);font-size:13px;letter-spacing:.2em;
+    color:var(--dim);margin-bottom:22px}
+
+  footer{border-top:1px solid #1d1810;padding:44px 24px 56px;text-align:center}
+  .flogo{font-family:var(--brush);font-size:22px;color:var(--gold);letter-spacing:.14em}
+  footer p{font-family:var(--serif);font-size:11px;color:var(--dim);
+    letter-spacing:.18em;margin-top:12px}
+
+  .fade{opacity:0;transform:translateY(18px);transition:opacity .8s,transform .8s}
+  .fade.in{opacity:1;transform:none}
+
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .job,.job:nth-child(even){flex-direction:column;gap:10px;padding:44px 0}
+    .job-art img{height:clamp(280px,60vw,380px);max-width:58%}
+    .job-body{width:100%}
+  }
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <a class="nav-logo" href="index.html">閻魔庁<small>ONLINE</small></a>
+  <div class="nav-links">
+    <a href="index.html#world">世界観<small>WORLD</small></a>
+    <a href="index.html#system">システム<small>SYSTEM</small></a>
+    <a href="index.html#gallery">ギャラリー<small>GALLERY</small></a>
+    <a href="index.html#devlog">開発記録<small>DEVLOG</small></a>
+  </div>
+  <a class="seal-btn" id="navCta" href="play.html#soul" style="margin-left:auto">魂籍を登録する</a>
+</nav>
+
+<header id="hero">
+  <div class="kicker">第二章「冥職編」</div>
+  <h1>冥職名鑑</h1>
+  <div class="en">MEISHOKU — THE FOUR SOUL VOCATIONS</div>
+  <p>賽の森の業龍を鎮めた魂は、海を渡って第六審査区へ。<br>
+    輪廻の都の広場に立つ四つの印から、魂に刻む役目を一つ選ぶ。<br>
+    刻んだ冥職は、あなたの戦い方そのものになる。</p>
+  <div class="rule"></div>
+</header>
+
+<main id="jobs">
+
+  <section class="job fade" id="rasetsu" style="--accent:#e06a50;--accent-glow:rgba(214,74,52,.22)">
+    <div class="job-art">
+      <img src="assets/meishoku/rasetsu_m.webp" alt="冥職 羅刹(男)の立ち絵" loading="lazy">
+      <img src="assets/meishoku/rasetsu_f.webp" alt="冥職 羅刹(女)の立ち絵" loading="lazy">
+    </div>
+    <div class="job-body">
+      <div class="job-no">01 / RASETSU</div>
+      <h2 class="job-name">羅刹<small>らせつ</small></h2>
+      <div class="job-role">力と肉体を活かす近接戦闘</div>
+      <p class="job-text">般若の面の下に怒りを鎮め、大太刀の一振りで敵の正面を打ち砕く冥府の先鋒。
+        駆け引きは要らない。守るべき列のいちばん前で、誰よりも深く踏み込む——それが羅刹の作法である。</p>
+      <div class="job-specs">
+        <div><span>面</span><b>般若の面</b></div>
+        <div><span>得物</span><b>大太刀</b></div>
+        <div><span>特性</span><b class="accent">最大HP+40／攻撃+4／防御+2</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="job fade" id="kagehoshi" style="--accent:#a98ad4;--accent-glow:rgba(136,99,190,.22)">
+    <div class="job-art">
+      <img src="assets/meishoku/kagehoshi_m.webp" alt="冥職 影法師(男)の立ち絵" loading="lazy">
+      <img src="assets/meishoku/kagehoshi_f.webp" alt="冥職 影法師(女)の立ち絵" loading="lazy">
+    </div>
+    <div class="job-body">
+      <div class="job-no">02 / KAGEHOSHI</div>
+      <h2 class="job-name">影法師<small>かげぼうし</small></h2>
+      <div class="job-role">速さ・会心・間合いを活かす遊撃</div>
+      <p class="job-text">狐面に薄墨の装束、影のように千切れた裾。気づいたときには懐へ潜り込み、
+        影断の双刀が急所だけを裂いて戻る。足音は残らない。残るのは、斬られたという結果だけ。</p>
+      <div class="job-specs">
+        <div><span>面</span><b>狐の面</b></div>
+        <div><span>得物</span><b>影断の双刀</b></div>
+        <div><span>特性</span><b class="accent">最大HP+20／攻撃+2／会心+8%／回避+5%</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="job fade" id="jugonshi" style="--accent:#6fa8d8;--accent-glow:rgba(78,142,196,.22)">
+    <div class="job-art">
+      <img src="assets/meishoku/jugonshi_m.webp" alt="冥職 呪禁師(男)の立ち絵" loading="lazy">
+      <img src="assets/meishoku/jugonshi_f.webp" alt="冥職 呪禁師(女)の立ち絵" loading="lazy">
+    </div>
+    <div class="job-body">
+      <div class="job-no">03 / JUGONSHI</div>
+      <h2 class="job-name">呪禁師<small>じゅごんし</small></h2>
+      <div class="job-role">知力・術・状態異常を扱う制圧</div>
+      <p class="job-text">顔に刻んだ朱の呪印は、代々の呪禁師が受け継ぐ契約の証。
+        指の間で呪符が朱く燃えるとき、印は常より速く結ばれ、敵の勢いは縛られる。
+        短刀は最後の締めに、静かに一度だけ振るわれる。</p>
+      <div class="job-specs">
+        <div><span>証</span><b>朱の呪印</b></div>
+        <div><span>得物</span><b>呪符と呪禁の法刀</b></div>
+        <div><span>特性</span><b class="accent">最大HP+10／MP+30／攻撃+2／印の再使用が3割速い</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="job fade" id="gohousou" style="--accent:#dbb45e;--accent-glow:rgba(205,165,72,.24)">
+    <div class="job-art">
+      <img src="assets/meishoku/gohousou_m.webp" alt="冥職 護法僧(男)の立ち絵" loading="lazy">
+      <img src="assets/meishoku/gohousou_f.webp" alt="冥職 護法僧(女)の立ち絵" loading="lazy">
+    </div>
+    <div class="job-body">
+      <div class="job-no">04 / GOHOUSOU</div>
+      <h2 class="job-name">護法僧<small>ごほうそう</small></h2>
+      <div class="job-role">防御・回復・支援を担う守護</div>
+      <p class="job-text">金襴の法衣に大数珠、地に突いた錫杖。金環が鳴れば仲間の傷は癒え、
+        列は崩れない。第六審査区の門を守り続けてきた、動じぬ山のような守護者である。</p>
+      <div class="job-specs">
+        <div><span>装</span><b>金襴の法衣と大数珠</b></div>
+        <div><span>得物</span><b>護法の錫杖</b></div>
+        <div><span>特性</span><b class="accent">最大HP+30／MP+20／防御+4／回向の癒しが5割深い</b></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<section id="cta">
+  <p>— 冥職は、輪廻の都の四つの印で魂に刻む —</p>
+  <a class="seal-btn" id="entryCta" href="play.html#soul">魂籍を登録する</a>
+</section>
+
+<footer>
+  <div class="flogo">閻魔庁ONLINE</div>
+  <p>あなたは死んだのではない。一度目の人生を終了しただけだ。</p>
+  <p><a href="privacy.html" style="color:var(--dim);text-decoration:underline">プライバシーポリシー・運営者表記</a></p>
+  <p>© 2026 閻魔庁ONLINE — 地獄庁 第七審査区</p>
+</footer>
+
+<script>
+'use strict';
+// ログイン済み(魂籍照合済み)ならCTAを「入庁する」に切り替える
+(function(){
+  let signedIn=false;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(/^sb-.+-auth-token$/.test(key)&&localStorage.getItem(key)){signedIn=true;break;}
+    }
+  }catch(e){}
+  if(signedIn){
+    for(const id of ['navCta','entryCta']){
+      const el=document.getElementById(id);
+      if(el){el.textContent='入庁する';el.href='play.html';}
+    }
+  }
+})();
+// スクロールでナビに背景
+const nav=document.getElementById('nav');
+addEventListener('scroll',()=>nav.classList.toggle('solid',scrollY>40),{passive:true});
+// ふわっと表示
+const io=new IntersectionObserver(entries=>{
+  for(const e of entries)if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
+},{threshold:.12});
+document.querySelectorAll('.fade').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
