@@ -221,6 +221,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   let worldSubscribed = false;
   let worldOpening = false;
   let worldRetryAt = 0;
+  let zoneRetryAt = 0;   // ゾーンチャンネルが切断された後の再接続待ち時刻
   let worldTrackedKey = '';
   let inboxChannel = null;
   let inboxOpening = false;
@@ -779,6 +780,11 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
             subscribed = false;
             remotes.clear();
             publishRemotes();
+            // 死んだまま放置するとtickの同一ゾーン判定で張り直されず、
+            // フロア移動かリロードまでお互い永久に見えなくなる。
+            // チャンネルを畳んでchannelZoneを空へ戻し、5秒後のtickに自動再接続させる。
+            zoneRetryAt = Date.now() + 5000;
+            if (channel === activeChannel) void closeChannel();
           }
         });
     } finally {
@@ -1033,7 +1039,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
     }
 
     if (nextZone !== channelZone) {
-      void switchChannel(nextZone, snapshot || {});
+      // 切断直後の連打を避けつつ再接続(閉じる方向のnextZone=''は待たずに実行)
+      if (!nextZone || Date.now() >= zoneRetryAt) void switchChannel(nextZone, snapshot || {});
       return;
     }
     if (nextZone) {
