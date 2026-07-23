@@ -1449,7 +1449,7 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
-const SAVE_VERSION=14;
+const SAVE_VERSION=15;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -1675,12 +1675,19 @@ CAVE_LINKS.push(
   {from:'muen3',at:{x:12.5,y:30},to:'muen2',entry:{x:47.5,y:34},kind:'stairup'},
 );
 /* ---- 閻魔庁(地上3階) ---- */
+// 四国外周を正確にしたことで旧配置の北側が海へ掛かったため、町全体を南へ移す。
+// xとyを同量ずらすと、等角投影上では左右位置を保ったまま画面下へ移動する。
+const TOWN_SHIFT=8;
+const townX=x=>x+TOWN_SHIFT;
+const townY=y=>y+TOWN_SHIFT;
+const townPoint=(x,y)=>({x:townX(x),y:townY(y)});
+const townTiles=tiles=>tiles.map(([x,y])=>[townX(x),townY(y)]);
 const ENMA_FIELD_ENTRIES=[
-  {x:26,y:46},{x:27,y:46},{x:28,y:46},{x:29,y:46},
+  townPoint(26,46),townPoint(27,46),townPoint(28,46),townPoint(29,46),
 ];
 const ENMA_LINKS=[
   ...ENMA_FIELD_ENTRIES.map(at=>({from:'field',at,to:'enma1',entry:{x:39,y:41}})),
-  {from:'enma1',at:{x:40,y:43},   to:'field', entry:{x:27.5,y:47.5},label:'外へ',  tone:'exit'},
+  {from:'enma1',at:{x:40,y:43},   to:'field', entry:townPoint(27.5,47.5),label:'外へ',  tone:'exit'},
   {from:'enma1',at:{x:23,y:20},   to:'enma2',entry:{x:39,y:41},label:'二階へ',tone:'up'},
   {from:'enma2',at:{x:40,y:43},   to:'enma1',entry:{x:22,y:21},label:'一階へ',tone:'down'},
   {from:'enma2',at:{x:23,y:20},   to:'enma3',entry:{x:39,y:41},label:'三階へ',tone:'up'},
@@ -1746,10 +1753,10 @@ function elevF(x,y){
   return 0;
 }
 const isB=(x,y)=>x<0||y<0||x>=mapSize||y>=mapSize||blocked[y*mapSize+x];
-const SPAWN={x:32,y:50};
+const SPAWN=townPoint(32,50);
 const BOSS_HOME={x:38,y:20};
 // 宿場町は徳島市南西部〜佐那河内村に当たる徳島平野西縁。
-const TOWN={x0:21,y0:39,x1:48,y1:60};
+const TOWN={x0:townX(21),y0:townY(39),x1:townX(48),y1:townY(60)};
 
 (function genMap(){
   // 村→ボスへ蛇行する土の道
@@ -1764,13 +1771,13 @@ const TOWN={x0:21,y0:39,x1:48,y1:60};
   // 村の石畳
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
     if(Math.hypot(x-SPAWN.x,y-SPAWN.y)<9.2)tileKind[y*FIELD_SIZE+x]=2;   // 宿場町の広場(拡張)
-    const seTown=((x-40)/8.5)**2+((y-54)/6.2)**2<1;
+    const seTown=((x-townX(40))/8.5)**2+((y-townY(54))/6.2)**2<1;
     if(seTown)tileKind[y*FIELD_SIZE+x]=2;   // 南東側に増設した居住区の広場
-    if(x>=40&&x<=48&&y>=47&&y<=50)tileKind[y*FIELD_SIZE+x]=2;   // 新しい東門へ続く通り
-    if(x>=38&&x<=41&&y>=55&&y<=60)tileKind[y*FIELD_SIZE+x]=2;   // 新しい南門へ続く通り
-    if(y>=54&&y<=57&&x>=25&&x<=34&&Math.abs(y-55.4)<1.5)tileKind[y*FIELD_SIZE+x]=2;   // 酒場へ続く通り(店前から左へ)
-    if(x>=31&&x<=34&&y>=40&&y<=47)tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁の東を回る北門通り
-    if(y>=45&&y<=47&&x>=25&&x<=34)tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁前の参道を左へ拡幅
+    if(x>=townX(40)&&x<=townX(48)&&y>=townY(47)&&y<=townY(50))tileKind[y*FIELD_SIZE+x]=2;   // 新しい東門へ続く通り
+    if(x>=townX(38)&&x<=townX(41)&&y>=townY(55)&&y<=townY(60))tileKind[y*FIELD_SIZE+x]=2;   // 新しい南門へ続く通り
+    if(y>=townY(54)&&y<=townY(57)&&x>=townX(25)&&x<=townX(34)&&Math.abs(y-townY(55.4))<1.5)tileKind[y*FIELD_SIZE+x]=2;   // 酒場へ続く通り(店前から左へ)
+    if(x>=townX(31)&&x<=townX(34)&&y>=townY(40)&&y<=townY(47))tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁の東を回る北門通り
+    if(y>=townY(45)&&y<=townY(47)&&x>=townX(25)&&x<=townX(34))tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁前の参道を左へ拡幅
   }
   // 四国輪郭: 当たり判定と描画は同じ islandF を使う。
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
@@ -1794,49 +1801,49 @@ function placeLargeBuilding(bx,by,bw,bh,kind){
     footprintW:bw,footprintH:bh,
   });
 }
-placeLargeBuilding(24,42,7,5,'enmacho');           // 町の核となる閻魔庁本殿
+placeLargeBuilding(townX(24),townY(42),7,5,'enmacho');           // 町の核となる閻魔庁本殿
 // 本殿の正面階段を左側にも広げ、四つの光るマスすべてから入庁できる。
-for(const [x,y] of [[26,45],[27,45],[28,45],[26,46],[27,46],[28,46],[29,46]])
+for(const [x,y] of townTiles([[26,45],[27,45],[28,45],[26,46],[27,46],[28,46],[29,46]]))
   blocked[y*FIELD_SIZE+x]=0;
 for(let i=0;i<ENMA_FIELD_ENTRIES.length;i++){
   const at=ENMA_FIELD_ENTRIES[i];
   props.push({x:at.x,y:at.y,kind:'hallportal',label:i===1?'入庁':'',tone:'entry'});
 }
-placeBuilding(36,46,'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
-placeBuilding(35,51,'shop','#7a5a2a','#645022');
-placeBuilding(27,53,'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
-placeBuilding(23,49,'house','#3e5a4a','#33493d');
-placeBuilding(43,52,'house','#633329','#4b2520');     // 南東居住区
-placeBuilding(44,56,'house','#304654','#253642');
-blocked[47*FIELD_SIZE+32]=1;
-props.push({x:32,y:47,kind:'stone'});
-blocked[53*FIELD_SIZE+31]=1;
-props.push({x:31,y:53,kind:'well'});
-props.push({x:29,y:51,kind:'lamp'});
-props.push({x:37,y:49,kind:'lamp'});
-props.push({x:31,y:55.6,kind:'lamp'});   // 酒場前の通り
-props.push({x:25,y:48,kind:'lamp'});     // 閻魔庁前の灯籠
-props.push({x:31,y:47,kind:'lamp'});
-props.push({x:42,y:54.5,kind:'lamp'});   // 南東居住区
-props.push({x:41,y:58.2,kind:'lamp'});
+placeBuilding(townX(36),townY(46),'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
+placeBuilding(townX(35),townY(51),'shop','#7a5a2a','#645022');
+placeBuilding(townX(27),townY(53),'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
+placeBuilding(townX(23),townY(49),'house','#3e5a4a','#33493d');
+placeBuilding(townX(43),townY(52),'house','#633329','#4b2520');     // 南東居住区
+placeBuilding(townX(44),townY(56),'house','#304654','#253642');
+blocked[townY(47)*FIELD_SIZE+townX(32)]=1;
+props.push({...townPoint(32,47),kind:'stone'});
+blocked[townY(53)*FIELD_SIZE+townX(31)]=1;
+props.push({...townPoint(31,53),kind:'well'});
+props.push({...townPoint(29,51),kind:'lamp'});
+props.push({...townPoint(37,49),kind:'lamp'});
+props.push({...townPoint(31,55.6),kind:'lamp'});   // 酒場前の通り
+props.push({...townPoint(25,48),kind:'lamp'});     // 閻魔庁前の灯籠
+props.push({...townPoint(31,47),kind:'lamp'});
+props.push({...townPoint(42,54.5),kind:'lamp'});   // 南東居住区
+props.push({...townPoint(41,58.2),kind:'lamp'});
 
 let npcs=[
-  {x:34,y:53,kind:'merchant',name:'オババ'},
-  {x:30,y:48,kind:'elder',name:'オキナ'},
-  {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
-  {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
-  {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の魂(井戸の右・通りの真ん中)
-  {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
-  {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
-  {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・レア装備の焚き上げ所
-  {x:42.3,y:49.2,kind:'repose_keeper',name:'シズメ'}, // 供養所の案内・供養・交換を担う供養守
+  {...townPoint(34,53),kind:'merchant',name:'オババ'},
+  {...townPoint(30,48),kind:'elder',name:'オキナ'},
+  {...townPoint(29.4,54.6),kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
+  {...townPoint(38.3,48.4),kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
+  {...townPoint(32.2,54.6),kind:'guest',name:'カズー'},     // 酔客の魂(井戸の右・通りの真ん中)
+  {...townPoint(34.4,42.2),kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
+  {...townPoint(38.4,42.2),kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
+  {...townPoint(43.5,48.5),kind:'repose',name:'供養所'},    // 南東区画・レア装備の焚き上げ所
+  {...townPoint(42.3,49.2),kind:'repose_keeper',name:'シズメ'}, // 供養所の案内・供養・交換を担う供養守
 ];
 
 /* ---- 町を囲う柵と門 ---- */
 const GATES=[
-  {tiles:[[33,39],[34,39]],open:false,name:'北門'},   // 閻魔庁の東を回り賽の森へ
-  {tiles:[[48,47],[48,48]],open:false,name:'東門'},   // 拡張した居住区から試練の洞窟方面へ
-  {tiles:[[39,60],[40,60]],open:false,name:'南門'},   // 拡張した居住区から浜辺と桟橋へ
+  {tiles:townTiles([[33,39],[34,39]]),open:false,name:'北門'},   // 閻魔庁の東を回り賽の森へ
+  {tiles:townTiles([[48,47],[48,48]]),open:false,name:'東門'},   // 拡張した居住区から試練の洞窟方面へ
+  {tiles:townTiles([[39,60],[40,60]]),open:false,name:'南門'},   // 拡張した居住区から浜辺と桟橋へ
 ];
 function gateAt(x,y){return GATES.find(g=>g.tiles.some(t=>t[0]===x&&t[1]===y));}
 (function buildFence(){
@@ -2443,16 +2450,22 @@ function spawnMob(type,x,y){
 }
 (function genMobs(){
   const ring=(cx,cy,r,n,type)=>{
-    for(let i=0;i<n;i++){
+    let placed=0,tries=0;
+    while(placed<n&&tries++<n*80){
       const a=rnd(0,6.28),d=rnd(1,r);
-      spawnMob(type,Math.round(cx+Math.cos(a)*d),Math.round(cy+Math.sin(a)*d));
+      const x=Math.round(cx+Math.cos(a)*d),y=Math.round(cy+Math.sin(a)*d);
+      const nearTown=x>=TOWN.x0-2&&x<=TOWN.x1+2&&y>=TOWN.y0-2&&y<=TOWN.y1+2;
+      if(nearTown||x<2||y<2||x>=FIELD_SIZE-2||y>=FIELD_SIZE-2)continue;
+      if(blocked[y*FIELD_SIZE+x]||islandF(x,y)>-4.5)continue;
+      if(mobs.some(m=>Math.hypot(m.x-x,m.y-y)<1.5))continue;
+      spawnMob(type,x,y);placed++;
     }
   };
-  ring(31,33,5,6,'goblin');   // 町の柵(y39)の外側
-  ring(38,35,4,2,'goblin_red');
-  ring(41,30,5,4,'wolf');  ring(22,34,5,4,'wolf');
-  ring(42,16,4,3,'orc');   ring(16,24,4,3,'orc');
-  ring(16,11,4,3,'skeleton');
+  ring(44,42,4,6,'goblin');   // 移設した町の北側、海岸から十分離れた森
+  ring(52,41,4,2,'goblin_red');
+  ring(52,33,5,4,'wolf');  ring(28,72,5,4,'wolf');
+  ring(58,39,4,3,'orc');   ring(34,78,4,3,'orc');
+  ring(31,88,4,3,'skeleton');
   mobs.forEach((mob,index)=>{mob.id=`field-${index}`;});
 })();
 
@@ -4533,7 +4546,13 @@ function update(dt){
       if(dh<1){m.state='idle';m.hp=m.maxHp;m.path=[];}
       else if(!m.path.length)m.path=findPath(m.x,m.y,m.home.x,m.home.y);
     }
+    const oldMobX=m.x,oldMobY=m.y;
     moveAlong(m,dt,m.def.speed);
+    // フィールドの魔物は海岸から距離を取り、スプライトが海へはみ出さないようにする。
+    if(zone==='field'&&islandF(m.x,m.y)>-4.5){
+      m.x=oldMobX;m.y=oldMobY;m.path=[];
+      if(m.state==='chase')m.state='return';
+    }
   }
   for(const b of bolts){
     // 命中処理で例外が起きても、完了済みの弾を次フレームで再処理しない。
@@ -5604,7 +5623,12 @@ function restoreSavedLocation(saved,saveVersion=SAVE_VERSION){
       saveVersion<=12?RINNE_BASE_SIZE:saveVersion===13?RINNE_PREVIOUS_SIZE:RINNE_SIZE)
     :size;
   const locationScale=savedZone==='rinne'?RINNE_SIZE/savedMapSize:1;
-  const x=clamp(saved.x*locationScale,0,size-1),y=clamp(saved.y*locationScale,0,size-1);
+  let x=clamp(saved.x*locationScale,0,size-1),y=clamp(saved.y*locationScale,0,size-1);
+  // v14以前に旧宿場町で保存した魂は、町と同じだけ南へ移して海上復帰を防ぐ。
+  if(saveVersion<15&&savedZone==='field'
+    &&x>=21-2&&x<=48+2&&y>=39-2&&y<=60+2){
+    x=clamp(x+TOWN_SHIFT,0,size-1);y=clamp(y+TOWN_SHIFT,0,size-1);
+  }
   if(!switchZone(savedZone,x,y))return false;
   if(isB(Math.round(x),Math.round(y))){
     const safe=nearestWalkable(Math.round(x),Math.round(y));

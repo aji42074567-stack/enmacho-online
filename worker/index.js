@@ -7,7 +7,7 @@ const DRAKE_RESPAWN_MS = 30 * 60_000;
 const RESPAWN_NEARBY_RADIUS = 5;
 const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
-const WORLD_VERSION = 2;
+const WORLD_VERSION = 3;
 const PLAYER_LIMIT = 80;
 const ZONE_SIZE = 72;
 const FIELD_SIZE = 120;
@@ -46,14 +46,14 @@ const FIELD_DEFINITIONS = {
 };
 
 const FIELD_SPAWNS = [
-  ['goblin', 29, 31], ['goblin', 31, 30], ['goblin', 34, 31],
-  ['goblin', 28, 34], ['goblin', 32, 35], ['goblin', 35, 34],
-  ['goblin_red', 36, 34], ['goblin_red', 40, 36],
-  ['wolf', 39, 28], ['wolf', 43, 28], ['wolf', 39, 32], ['wolf', 44, 33],
-  ['wolf', 20, 32], ['wolf', 24, 32], ['wolf', 20, 36], ['wolf', 24, 36],
-  ['orc', 40, 15], ['orc', 44, 15], ['orc', 42, 19],
-  ['orc', 14, 22], ['orc', 18, 22], ['orc', 16, 27],
-  ['skeleton', 14, 9], ['skeleton', 18, 9], ['skeleton', 16, 14],
+  ['goblin', 41, 40], ['goblin', 44, 40], ['goblin', 47, 41],
+  ['goblin', 42, 44], ['goblin', 45, 45], ['goblin', 48, 44],
+  ['goblin_red', 50, 39], ['goblin_red', 53, 40],
+  ['wolf', 49, 31], ['wolf', 53, 31], ['wolf', 50, 35], ['wolf', 55, 35],
+  ['wolf', 25, 70], ['wolf', 29, 70], ['wolf', 26, 74], ['wolf', 31, 74],
+  ['orc', 57, 36], ['orc', 60, 38], ['orc', 58, 42],
+  ['orc', 32, 76], ['orc', 36, 77], ['orc', 34, 81],
+  ['skeleton', 27, 86], ['skeleton', 31, 88], ['skeleton', 35, 87],
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -66,9 +66,17 @@ function cleanText(value, maxLength) {
 }
 
 const SHIKOKU_OUTLINE = [
-  [2, 7], [9, 13], [17, 26], [15, 39], [12, 52], [4, 66], [-9, 72],
-  [-25, 75], [-37, 68], [-43, 60], [-52, 56], [-47, 51], [-36, 48],
-  [-33, 39], [-28, 29], [-20, 22], [-9, 14],
+  [8.4,22.0],[12.9,23.1],[19.6,22.6],[22.4,27.0],[27.4,29.3],
+  [32.5,29.3],[32.5,36.0],[35.8,40.5],[34.7,43.8],[36.4,45.0],
+  [36.4,47.2],[25.2,54.5],[20.7,60.1],[18.5,68.5],[16.2,68.5],
+  [9.0,60.6],[3.9,58.4],[-1.1,59.0],[-10.6,64.0],[-12.9,66.8],
+  [-13.4,71.3],[-16.8,76.9],[-21.3,79.7],[-21.3,89.8],[-23.5,89.8],
+  [-24.6,88.1],[-26.9,89.8],[-34.2,88.6],[-33.0,83.6],[-39.8,83.0],
+  [-39.2,77.4],[-40.3,70.7],[-38.6,69.0],[-39.8,67.4],[-43.1,67.4],
+  [-42.0,61.2],[-43.1,60.6],[-51.0,65.1],[-54.3,65.1],[-54.3,62.9],
+  [-46.5,59.5],[-35.8,52.2],[-33.0,48.9],[-31.9,43.3],[-29.1,38.2],
+  [-24.1,33.2],[-21.8,33.2],[-16.8,39.9],[-9.5,37.7],[-2.2,37.1],
+  [-0.6,33.2],[-2.2,27.6],[2.8,27.6],
 ];
 
 function segmentDistance(px, py, ax, ay, bx, by) {
@@ -97,7 +105,7 @@ function islandDistance(x, y) {
 
 function onIsland(x, y) {
   return x >= 2 && y >= 2 && x <= FIELD_SIZE - 3 && y <= FIELD_SIZE - 3
-    && islandDistance(x, y) <= 1.7;
+    && islandDistance(x, y) <= -4.5;
 }
 
 // クライアントの敵配置が更新されたら部屋データを差し替えるための署名
@@ -228,7 +236,7 @@ export default {
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
     // dg5だけ新しい部屋へ切り替え、今回の更新時にゴウリュウを即時復活させる。
-    const roomName = zone === 'field' ? 'field-v2' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
+    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
     const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
