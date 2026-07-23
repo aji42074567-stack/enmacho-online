@@ -1650,9 +1650,9 @@ const CAVE_LINKS=[
   {from:'cave2',at:{x:51,y:19.5}, to:'cave3',entry:{x:14.5,y:31},  kind:'stairdown'},
   {from:'cave3',at:{x:12.5,y:31}, to:'cave2',entry:{x:49.5,y:21},  kind:'stairup'},
 ];
-/* ---- 竜の洞窟(地下5階・北部の森の奥) ---- */
-const DCAVE_DOOR={x:38,y:18.2};
-const DCAVE_TRIG={x:38,y:19.6};
+/* ---- 竜の洞窟(地下5階・南西沿岸の黒岩地帯) ---- */
+const DCAVE_DOOR={x:24,y:104};
+const DCAVE_TRIG={x:24,y:105.4};
 CAVE_LINKS.push(
   {from:'field',at:DCAVE_TRIG,        to:'dg1',entry:{x:14.5,y:30},kind:null},
   {from:'dg1',at:{x:12.5,y:30},to:'field',entry:{x:DCAVE_TRIG.x,y:DCAVE_TRIG.y+1.4},kind:'cavexit'},
@@ -1756,7 +1756,7 @@ function elevF(x,y){
 }
 const isB=(x,y)=>x<0||y<0||x>=mapSize||y>=mapSize||blocked[y*mapSize+x];
 const SPAWN=townPoint(32,50);
-const BOSS_HOME={x:38,y:20};
+const BOSS_HOME={x:DCAVE_DOOR.x,y:DCAVE_DOOR.y};
 // 宿場町は徳島市南西部〜佐那河内村に当たる徳島平野西縁。
 const TOWN={x0:townX(21),y0:townY(39),x1:townX(48),y1:townY(60)};
 
@@ -1877,7 +1877,7 @@ function toggleGate(g){
   sfx.click();
 }
 const ELDER_LINES=[
-  '「北部の竜の洞窟にゴウリュウが巣くっておる。あれはな、怒りを捨てられなんだ魂の成れの果てよ」',
+  '「南西沿岸の黒岩に竜の洞窟が口を開けておる。ゴウリュウはな、怒りを捨てられなんだ魂の成れの果てよ」',
   '「オババの店で装備を整えよ。銭は使ってこそ意味がある。生前、金を抱えたまま死んだ者を、わしは何人も見てきた」',
   '「印は徳が積まれれば自然と授かる。回向は徳位3、業火は徳位6じゃ」',
   '「店で買える品は旅立ちの備えにすぎん。徳位15を越えた魔物は、生前の執着が染みついた強い魂具を落とすことがある。名の色が違う品は手放すなよ」',
@@ -1939,11 +1939,11 @@ const KAZU_STORY=[
   {
     unlock:()=>player.story.gashaoCleared||player.story.dragonCleared,
     wait:'「南西の浜はずれに無縁塚がある。誰にも弔われず、忘れられた骨の吹き溜まりだ。地の底で骨の王ガシャオウが唸ってる。竜に挑む前に、あいつらを鎮めてやってくれ」',
-    line:'「人はな、二度死ぬんだ。体が滅んだ時と、みんなから忘れられた時だ。無縁塚の連中は二度目の死に飲まれかけて化けた。鎮めるってのは、覚えていてやるってことだ。これで北部の竜の洞窟へ進める」',
+    line:'「人はな、二度死ぬんだ。体が滅んだ時と、みんなから忘れられた時だ。無縁塚の連中は二度目の死に飲まれかけて化けた。鎮めるってのは、覚えていてやるってことだ。これで南西沿岸の竜の洞窟へ進める」',
   },
   {
     unlock:()=>player.story.dragonCaveReached,
-    wait:'「北部の森の奥に、もうひとつ洞窟がある。地の底まで降りてみな。島が何を閉じ込めているか分かる」',
+    wait:'「南西沿岸の黒岩地帯に、竜の顎みてえな洞窟がある。地の底まで降りてみな。島が何を閉じ込めているか分かる」',
     line:'「ゴウリュウも元は人だ。失ったものを許せず、怒りを手放せなかった。あいつは島を閉じ込める竜じゃない。海の向こうへ進める魂かを量る、最後の門番だ」',
   },
   {
@@ -2135,7 +2135,7 @@ for(let x=MT.x0;x<=MT.x1;x++)for(let y=MT.y0;y<=MT.y1;y++){
 }
 for(const [bx,by] of [[50,21],[51,21],[50,22],[51,22]])blocked[by*FIELD_SIZE+bx]=1;
 props.push({x:CAVE_DOOR.x,y:CAVE_DOOR.y,kind:'cave'});
-props.push({x:DCAVE_DOOR.x,y:DCAVE_DOOR.y,kind:'dcave'});   // 竜の洞窟の入口(北部の森の奥)
+props.push({x:DCAVE_DOOR.x,y:DCAVE_DOOR.y,kind:'dcave'});   // 竜の洞窟の入口(南西沿岸の黒岩地帯)
 props.push({x:MUEN_DOOR.x,y:MUEN_DOOR.y,kind:'muen'});      // 無縁塚の入口(南西の森はずれ)
 
 /* ================= 経路探索 (A*) ================= */
@@ -2890,7 +2890,7 @@ function grantMobReward(m){
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
     if(player.story.gashaoCleared)
-      log('二つの鎮魂記録がそろい、北部の竜の洞窟を塞ぐ骨が崩れた','gain');
+      log('二つの鎮魂記録がそろい、南西沿岸の竜の洞窟を塞ぐ骨が崩れた','gain');
     else
       log('カズーが次の鎮魂先を知っているようだ。千本亭へ戻ろう','sys');
   }
@@ -2899,7 +2899,7 @@ function grantMobReward(m){
     log('無数の魂が白い光の粒になって、静かに昇っていった…','gain');
     log('[系統] 無縁データ群 保全完了…参照回復…転生キューへ再接続','glitch');
     if(player.story.oniKingCleared)
-      log('二つの鎮魂記録がそろい、北部の竜の洞窟を塞ぐ骨が崩れた','gain');
+      log('二つの鎮魂記録がそろい、南西沿岸の竜の洞窟を塞ぐ骨が崩れた','gain');
     else
       log('竜への道には、試練の洞窟のオニオウの鎮魂記録も必要だ','sys');
   }
@@ -4609,8 +4609,6 @@ const terrainTexture=new Image();
 const groundTiles={};
 let terrainAssetsStarted=false,groundRenderQueued=false;
 const GROUND_TILE_SOURCES=[
-  ['path','assets/map_tile_path.png'],
-  ['stone','assets/map_tile_stone.png'],
   ['sand','assets/map_tile_sand.png'],
   ['sea','assets/map_tile_sea.png'],
   ['cavefloor','assets/map_cave_floor.png'],
@@ -4676,10 +4674,7 @@ function renderGround(){
   const prepared=prepareGroundCanvas(tgt,FIELD_SIZE);
   const g=prepared.context,gW=prepared.logicalWidth,gH=prepared.logicalHeight;
   const renderScale=prepared.scale;
-  const terrainPattern=terrainTexture.complete&&terrainTexture.naturalWidth
-    ?g.createPattern(terrainTexture,'repeat'):null;
   const seaPattern=groundTiles.sea?g.createPattern(groundTiles.sea,'repeat'):null;
-  const sandPattern=groundTiles.sand?g.createPattern(groundTiles.sand,'repeat'):null;
   const GX=(x,y)=>(x-y)*TW/2+gW/2;
   const GY=(x,y)=>(x+y)*TH/2+TH/2;
   // なめらかノイズ: 隣のマスと色が近くなる→格子に見えない
@@ -4693,13 +4688,6 @@ function renderGround(){
   }
   const lerp=(a,b,t)=>a+(b-a)*t;
   g.fillStyle='#0b0d12';g.fillRect(0,0,gW,gH);
-  function diamond(x,y){
-    const cx=GX(x,y),cy=GY(x,y);
-    g.beginPath();
-    g.moveTo(cx,cy-TH/2-1);g.lineTo(cx+TW/2+1.5,cy);
-    g.lineTo(cx,cy+TH/2+1);g.lineTo(cx-TW/2-1.5,cy);
-    g.closePath();
-  }
   // 1) 地形: タイルではなく「島の形」で塗る(海岸線がなめらかになる)
   if(seaPattern){g.fillStyle=seaPattern;g.fillRect(0,0,gW,gH);}
   else{g.fillStyle='#0f2a3a';g.fillRect(0,0,gW,gH);}
@@ -4767,69 +4755,59 @@ function renderGround(){
       g.beginPath();g.moveTo(cx-tx*14,cy-ty*14);g.lineTo(cx+tx*14,cy+ty*14);g.stroke();
     }
   }
-  // 草地の色ムラ(海岸から離れた内側のみ。ひし形の縁を出さない)
-  for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
-    if(tkF[y*FIELD_SIZE+x]!==0)continue;
-    if(islandF(x,y)>-1.2||elevF(x,y)>0)continue;
-    const n=vnoise(x/5,y/5)*0.65+vnoise(x/13+7,y/13+3)*0.35;
-    g.fillStyle=`rgba(${lerp(20,50,n)|0},${lerp(32,62,n)|0},${lerp(24,44,n)|0},0.22)`;
-    diamond(x,y);g.fill();
+  // 草地の色ムラ: 1マス単位の塗りをやめ、数マスをまたぐ不定形な斑へ統合する。
+  for(let y=2;y<FIELD_SIZE-2;y+=3)for(let x=2;x<FIELD_SIZE-2;x+=3){
+    if(tkF[y*FIELD_SIZE+x]!==0||islandF(x,y)>-1.2||elevF(x,y)>0)continue;
+    const n=vnoise(x/7,y/7)*0.62+vnoise(x/17+7,y/17+3)*0.38;
+    const jx=(hash2(x*5,y*7)-.5)*2.2,jy=(hash2(x*11,y*3)-.5)*2.2;
+    const cx=GX(x+jx,y+jy),cy=GY(x+jx,y+jy);
+    const rx=TW*(1.25+hash2(x*13,y*17)*.65),ry=TH*(1.15+hash2(x*19,y*23)*.5);
+    g.fillStyle=n>.52
+      ?`rgba(${lerp(54,82,n)|0},${lerp(74,102,n)|0},${lerp(48,68,n)|0},0.045)`
+      :`rgba(5,18,11,0.065)`;
+    g.beginPath();g.ellipse(cx,cy,rx,ry,(hash2(x*29,y*31)-.5)*.35,0,6.29);g.fill();
   }
-  // 四国山地の標高色。主稜線は暗い杉林、高峰は岩肌を混ぜる。
-  for(let y=1;y<FIELD_SIZE-1;y++)for(let x=1;x<FIELD_SIZE-1;x++){
+  // 四国山地の標高色も連続した大きな斑で重ね、格子状の境界を残さない。
+  for(let y=2;y<FIELD_SIZE-2;y+=2)for(let x=2;x<FIELD_SIZE-2;x+=2){
     if(tkF[y*FIELD_SIZE+x]!==0||islandF(x,y)>-1.1)continue;
     const r=reliefF(x,y);if(r<.12)continue;
-    const slopeX=reliefF(x+1,y)-reliefF(x-1,y);
-    const slopeY=reliefF(x,y+1)-reliefF(x,y-1);
-    g.fillStyle=r>.72?`rgba(70,68,58,${.12+r*.16})`:`rgba(15,38,23,${.07+r*.17})`;
-    diamond(x,y);g.fill();
-    if(r>.34&&Math.abs((r*5)%1)<.16){
-      const cx=GX(x,y),cy=GY(x,y);
-      g.strokeStyle=`rgba(167,180,137,${.04+r*.08})`;g.lineWidth=1;
-      g.beginPath();g.moveTo(cx-13-slopeY*8,cy+4+slopeX*4);
-      g.quadraticCurveTo(cx,cy-4,cx+13-slopeY*8,cy-4-slopeX*4);g.stroke();
+    const jx=(hash2(x*17,y*7)-.5)*1.4,jy=(hash2(x*3,y*19)-.5)*1.4;
+    const cx=GX(x+jx,y+jy),cy=GY(x+jx,y+jy);
+    g.fillStyle=r>.72?`rgba(70,68,58,${.045+r*.055})`:`rgba(9,31,17,${.035+r*.055})`;
+    g.beginPath();g.ellipse(cx,cy,TW*.92,TH*1.08,(hash2(x,y)-.5)*.28,0,6.29);g.fill();
+    if(r>.48&&hash2(x*23,y*13)>.82){
+      g.strokeStyle=`rgba(167,180,137,${.035+r*.05})`;g.lineWidth=1;
+      g.beginPath();g.moveTo(cx-18,cy+5);g.quadraticCurveTo(cx,cy-5,cx+18,cy-3);g.stroke();
     }
   }
-  // 2) 土の道: マス形ではなく柔らかい楕円を重ねて不定形の道に
+  // 2) 土の道: テクスチャタイルを並べず、柔らかい土の斑を重ねて連続させる。
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
     if(tkF[y*FIELD_SIZE+x]!==1)continue;
     const n=vnoise(x/4+3,y/4+9);
-    const cx=GX(x,y)+(hash2(x,y)-0.5)*14, cy=GY(x,y)+(hash2(y,x)-0.5)*7;
-    const img=groundTiles.path;
-    if(img){
-      const w=TW*1.65,h=w*img.height/img.width;
-      g.globalAlpha=0.86;
-      g.drawImage(img,cx-w/2,cy-h/2,w,h);
-      g.globalAlpha=1;
-    }else{
-      g.fillStyle=`rgba(${lerp(78,100,n)|0},${lerp(60,76,n)|0},${lerp(40,52,n)|0},0.9)`;
-      g.beginPath();g.ellipse(cx,cy,TW*0.62,TH*0.62,0,0,6.29);g.fill();
+    const cx=GX(x,y)+(hash2(x,y)-0.5)*12, cy=GY(x,y)+(hash2(y,x)-0.5)*6;
+    g.fillStyle=`rgba(${lerp(68,94,n)|0},${lerp(52,72,n)|0},${lerp(34,48,n)|0},0.78)`;
+    g.beginPath();g.ellipse(cx,cy,TW*.73,TH*.84,(hash2(x*7,y*5)-.5)*.22,0,6.29);g.fill();
+    if(hash2(x*13,y*11)>.54){
+      g.fillStyle='rgba(135,116,82,0.22)';
+      g.beginPath();g.ellipse(cx+(hash2(x,y*3)-.5)*25,cy+(hash2(y,x*3)-.5)*10,5,2.2,0,0,6.29);g.fill();
     }
   }
-  // 3) 村の石畳: ダイヤ模様をやめ、丸石を敷き詰める
+  // 3) 村の石畳: ひし形画像を並べず、連続した下地の上へ丸石を散らす。
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
     if(tkF[y*FIELD_SIZE+x]!==2)continue;
-    const cx=GX(x,y),cy=GY(x,y);
-    const img=groundTiles.stone;
-    if(img){
-      const w=TW*1.46,h=w*img.height/img.width;
-      g.globalAlpha=0.88;
-      g.drawImage(img,cx-w/2,cy-h/2,w,h);
-      g.globalAlpha=1;
-    }else{
-      g.fillStyle='rgba(56,57,60,0.95)';
-      g.beginPath();g.ellipse(cx,cy,TW*0.6,TH*0.6,0,0,6.29);g.fill();
-    }
+    const cx=GX(x,y)+(hash2(x*3,y*5)-.5)*5,cy=GY(x,y)+(hash2(x*7,y*11)-.5)*3;
+    const n=vnoise(x/5+13,y/5+4);
+    g.fillStyle=`rgba(${lerp(48,64,n)|0},${lerp(47,62,n)|0},${lerp(46,60,n)|0},0.90)`;
+    g.beginPath();g.ellipse(cx,cy,TW*.71,TH*.82,(hash2(x*13,y*17)-.5)*.16,0,6.29);g.fill();
   }
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
     if(tkF[y*FIELD_SIZE+x]!==2)continue;
-    if(groundTiles.stone)continue;
     const cx=GX(x,y),cy=GY(x,y);
-    for(let i=0;i<3;i++){
+    for(let i=0;i<4;i++){
       const h1=hash2(x*3+i,y*7),h2=hash2(x*7,y*3+i),h3=hash2(x+i*13,y+i*5);
       const sxp=cx+(h1-0.5)*TW*0.8, syp=cy+(h2-0.5)*TH*0.8;
-      const rw=7+h3*8;
-      g.fillStyle=`rgb(${88+h3*26|0},${86+h3*26|0},${86+h3*24|0})`;
+      const rw=4+h3*6;
+      g.fillStyle=`rgba(${76+h3*28|0},${74+h3*27|0},${73+h3*25|0},0.78)`;
       g.beginPath();g.ellipse(sxp,syp,rw,rw*0.55,(h1-0.5)*0.6,0,6.29);g.fill();
     }
   }
@@ -4895,9 +4873,6 @@ function renderGround(){
     }
     g.fillStyle=rockPat||'#3d3a35';
     dia2(x,y,off);g.fill();
-    g.fillStyle='rgba(96,88,70,0.20)';
-    dia2(x,y,off);g.fill();
-    if(e<1){g.fillStyle='rgba(0,0,0,0.12)';dia2(x,y,off);g.fill();}
   }
   tgt._groundReady=true;
 }
@@ -5774,6 +5749,7 @@ loadSprite('beach_4','assets/beach_4.png');
 loadSprite('pier','assets/pier.png');
 loadSprite('ferry','assets/map_ferry.png');
 loadSprite('map_cave_entrance','assets/map_cave_entrance.png');
+loadSprite('map_dragon_cave_entrance','assets/map_dragon_cave_entrance.png');
 loadSprite('map_muen_entrance','assets/map_muen_entrance.png');
 loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_house_red','assets/map_house_red.png');
@@ -6721,6 +6697,21 @@ function drawCaveEntrance(sx,sy,label='試練の洞窟'){
   ctx.fillText(label,0,18);
   ctx.restore();
 }
+function drawDragonCaveEntrance(sx,sy){
+  const img=SPRITES.map_dragon_cave_entrance;
+  if(!img){drawCaveEntrance(sx,sy,'竜の洞窟');return;}
+  const w=230,h=w*img.height/img.width;
+  const y=sy-h+34;
+  const pulse=0.62+Math.sin(time*3.1)*0.16;
+  const glow=ctx.createRadialGradient(sx,sy-h*0.42,2,sx,sy-h*0.42,58);
+  glow.addColorStop(0,`rgba(215,35,18,${0.22*pulse})`);
+  glow.addColorStop(.42,`rgba(125,18,12,${0.12*pulse})`);
+  glow.addColorStop(1,'rgba(90,8,5,0)');
+  ctx.fillStyle=glow;ctx.fillRect(sx-70,sy-h*.78,140,112);
+  ctx.drawImage(img,sx-w/2,y,w,h);
+  ctx.fillStyle='#e0c5ac';ctx.font='9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('竜の洞窟',sx,sy+42);
+}
 function drawMuenEntrance(sx,sy){
   const img=SPRITES.map_muen_entrance;
   if(!img){drawCaveEntrance(sx,sy,'無縁塚');return;}
@@ -7116,7 +7107,7 @@ function render(){
       case 'mountain':drawMountain(sx,sy,it.o);break;
       case 'lamp':case 'well':drawVillageProp(sx,sy,it.o);break;
       case 'cave':drawCaveEntrance(sx,sy);break;
-      case 'dcave':drawCaveEntrance(sx,sy,'竜の洞窟');break;
+      case 'dcave':drawDragonCaveEntrance(sx,sy);break;
       case 'muen':drawMuenEntrance(sx,sy);break;
       case 'shoal':drawShoal(sx,sy,it.o);break;
       case 'palm':drawPalm(sx,sy,it.o);break;
@@ -7363,7 +7354,7 @@ function hud(){
       :player.quests.trial===1?'東の岩山 試練の洞窟へ'
       :!player.story.oniKingCleared?'試練の洞窟 最深部のオニオウを鎮めよ'
       :!player.story.gashaoCleared?'カズーの話を聞き、南西の無縁塚へ'
-      :'北部の竜の洞窟 最深部のゴウリュウを鎮めよ';
+      :'南西沿岸の竜の洞窟 最深部のゴウリュウを鎮めよ';
   }
   let bf='';
   const fmtT=t=>{t=Math.ceil(t);return t>=60?`${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`:`${t}秒`;};
