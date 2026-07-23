@@ -1121,8 +1121,8 @@
         <span class="key">E</span><span class="icon">✦</span><span>破魔</span>
         <span class="cdov hidden" id="cdBolt"></span>
       </button>
-      <button class="skill" id="btnHeal" title="回向の印 (R) MP12 / 徳位3で習得">
-        <span class="key">R</span><span class="icon">✚</span><span>回向</span>
+      <button class="skill" id="btnHeal" title="ヒールの印 (R) MP12 / 徳位3で習得">
+        <span class="key">R</span><span class="icon">✚</span><span>ヒール</span>
         <span class="lock hidden" id="lockHeal">徳3</span>
         <span class="cdov hidden" id="cdHeal"></span>
       </button>
@@ -1181,7 +1181,7 @@
           <li><b>地面をクリック / タップ</b> … 移動</li>
           <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
           <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-          <li><b>E</b> 破魔 / <b>R</b> 回向 / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
+          <li><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
         </ul>
         <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
         <button class="btn" id="startBtn">入庁する</button>
@@ -1674,7 +1674,7 @@ const MEISHOKU={
   gohousou:{
     name:'護法僧',role:'防御・回復・支援を担う守護',
     hp:30,mp:20,atk:1,def:4,heal:1.5,
-    detail:'最大HP+30、MP+20、攻撃+1、防御+4、回向の癒しが5割深い。錫杖で仲間を守る守護の冥職。',
+    detail:'最大HP+30、MP+20、攻撃+1、防御+4、ヒールの癒しが5割深い。錫杖で仲間を守る守護の冥職。',
     starter:'goho_staff',
   },
 };
@@ -3020,7 +3020,7 @@ function gainXp(n){
     addFloat(player.x,player.y-0.8,'徳位上昇！','#ffe27a',true);
     burst(player.x,player.y,'#ffe27a',20);
     log(`徳が高まり、徳位${player.lv}になった`,'gain');
-    if(player.lv===3)log('印「回向」を授かった！','gain');
+    if(player.lv===3)log('印「ヒール」を授かった！','gain');
     if(player.lv===6)log('印「業火」を授かった！','gain');
     if(Math.random()<0.15)log('[系統] 人格学習スコア: 良好','glitch');
     sfx.lvup();
@@ -3071,7 +3071,7 @@ function castBolt(){
 }
 function castHeal(){
   if(player.dead||!started)return;
-  if(player.lv<3){log('印「回向」は徳位3で授かる','sys');return;}
+  if(player.lv<3){log('印「ヒール」は徳位3で授かる','sys');return;}
   if(player.cd.heal>0)return;
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
   const allyNear=party.id&&partyMemberNear(6);
@@ -3088,7 +3088,7 @@ function castHeal(){
   // 仲間が近くにいれば回向は届き、支援参加として10秒間チーム討伐の徳が全額入る
   if(allyNear){
     netOutbox.push({type:'party_heal',partyId:party.id,amount:n,x:player.x,y:player.y,zone});
-    if(player.partySupportT<=0)log('回向の支援 — 10秒のあいだ仲間の討伐で徳が全て入る','sys');
+    if(player.partySupportT<=0)log('ヒールの支援 — 10秒のあいだ仲間の討伐で徳が全て入る','sys');
     player.partySupportT=10;
   }
 }
@@ -4463,7 +4463,7 @@ function playRemoteActionEffect(e,raw){
   const targetX=Number.isFinite(raw.targetX)?raw.targetX:e.x;
   const targetY=Number.isFinite(raw.targetY)?raw.targetY:e.y;
   addActionEffect(kind,e.x,e.y,targetX,targetY);
-  if(kind==='heal')addFloat(e.x,e.y-0.65,'回向','#8ff0a0');
+  if(kind==='heal')addFloat(e.x,e.y-0.65,'ヒール','#8ff0a0');
   else if(String(kind).startsWith('potion_'))addFloat(e.x,e.y-0.65,'甘露','#8ff0a0');
   else if(kind==='haste')addFloat(e.x,e.y-0.65,'韋駄天','#9fe0ff');
   else if(kind==='crit')addFloat(e.x,e.y-0.65,'修羅','#ffb46a');
@@ -9484,7 +9484,7 @@ window.EnmaGameBridge={
     addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
     addActionEffect('heal',player.x,player.y);
     burst(player.x,player.y,'#7fe07f',12);
-    log(`${msg.from.displayName} の回向に癒やされた`,'gain');
+    log(`${msg.from.displayName} のヒールに癒やされた`,'gain');
     sfx.heal();
   },
   receivePartyLoot(msg){
