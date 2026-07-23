@@ -4591,12 +4591,15 @@ function update(dt){
     player.forcedFollowing=forcedFollow;
     if(player.target){
       const m=player.target;
-      if(m.dead){player.target=null;}
+      if(m.dead){player.target=null;player.chaseStuckMs=0;player.chaseTargetId=null;}
       else{
         player.combatT=COMBAT_HOLD_SECONDS;
         const d=dist(player,m);
-        if(d<=RANGE){player.path=[];if(player.atkCd<=0)playerAttack();}
+        if(d<=RANGE){player.path=[];player.chaseStuckMs=0;if(player.atkCd<=0)playerAttack();}
         else{
+          if(player.chaseTargetId!==m){
+            player.chaseTargetId=m;player.chaseStuckMs=0;player.chaseLastDist=d;
+          }
           player.repath-=dt;
           if(player.repath<=0||!player.path.length){
             player.repath=0.35;
@@ -4605,8 +4608,20 @@ function update(dt){
             // AUTO中は4秒間その敵を対象外にして、届く別の敵へ切り替える
             if(!player.path.length&&player.autoMode){
               m.autoSkipUntil=performance.now()+4000;
-              player.target=null;
+              player.target=null;player.chaseStuckMs=0;player.chaseTargetId=null;
             }
+          }
+          // 経路はあるのに障害物や敵の小刻みな移動で実際には近づけていない場合の保険。
+          // 距離が縮んでいるかを直接監視し、3秒進展が無ければ見切って他の敵へ切り替える
+          if(player.target&&player.autoMode){
+            if(d>=(player.chaseLastDist??d)-0.03){
+              player.chaseStuckMs=(player.chaseStuckMs||0)+dt*1000;
+              if(player.chaseStuckMs>3000){
+                m.autoSkipUntil=performance.now()+4000;
+                player.target=null;player.chaseStuckMs=0;player.chaseTargetId=null;
+              }
+            }else player.chaseStuckMs=0;
+            player.chaseLastDist=d;
           }
         }
       }
