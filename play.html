@@ -6132,7 +6132,7 @@ function drawPlayerCorpse(sx,sy,e){
   if(img)ctx.drawImage(img,0,0,128,128,sx-D/2,sy-D+3,D,D);
 }
 // 画面外にいるチーム仲間の方角を、画面端の青い三角+名前で示す(スマホ/PC共通)
-function drawPartyOffscreenArrows(viewScale){
+function drawPartyOffscreenArrows(viewScale,SX,SY){
   if(!started||!party.id)return;
   const margin=20;
   for(const e of remotePlayers.values()){
@@ -7451,7 +7451,7 @@ function render(){
     cv.addColorStop(0,'rgba(0,0,0,0)');cv.addColorStop(1,`rgba(2,3,8,${Math.min(0.78,0.35+CAVE_DEPTH[zone]*0.09)})`);
     ctx.fillStyle=cv;ctx.fillRect(0,0,W,H);
   }
-  drawPartyOffscreenArrows(viewScale);
+  drawPartyOffscreenArrows(viewScale,SX,SY);
   drawPlayerMobileHud(playerHudX,playerHudY);
 }
 
