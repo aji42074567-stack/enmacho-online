@@ -67,15 +67,13 @@
     font-variant-numeric:tabular-nums}
   #worldClock .phase{color:#f0d383}
   #worldClock.night .phase{color:#a9c8ff}
-  #sndBtn,#accountBtn,#muteBtn{position:absolute;right:12px;width:38px;height:38px;
+  #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:var(--parchment);cursor:pointer;padding:0;line-height:1}
   #sndBtn{top:82px;font-size:19px}
   #accountBtn{top:126px;width:46px;font-family:var(--serif);font-size:11px;
     letter-spacing:.05em}
-  #muteBtn{top:170px;font-size:16px}
-  #muteBtn.muted{opacity:.62;filter:grayscale(.6)}
-  #sndBtn:hover,#accountBtn:hover,#muteBtn:hover{border-color:#6b5730}
+  #sndBtn:hover,#accountBtn:hover{border-color:#6b5730}
   #accountBtn .status-dot{display:inline-block;width:6px;height:6px;margin-right:3px;
     border-radius:50%;background:#645b4b;box-shadow:0 0 0 1px #1a150f}
   #accountBtn.online{border-color:#6f9b65;color:#d6efcf}
@@ -885,7 +883,6 @@
   </div>
 
   <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
-  <button id="muteBtn" title="ミュート切替" aria-label="ミュート切替">🔊</button>
   <button id="accountBtn" title="魂籍を開く" aria-label="魂籍を開く">
     <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
     <span id="onlineCount" hidden aria-hidden="true">1</span>
@@ -1228,6 +1225,10 @@
       <h2 id="settingsTitle">設定</h2>
       <div class="sub">音響・画面・操作</div>
       <div class="settings-list">
+        <label class="setting-toggle" for="muteSetting">
+          <span>ミュート(すべての音を消す)</span>
+          <input id="muteSetting" type="checkbox">
+        </label>
         <label class="setting-row" for="bgmVolume">
           <span class="setting-head"><span>BGM音量</span><output id="bgmValue">55%</output></span>
           <input id="bgmVolume" type="range" min="0" max="100" step="5" value="55">
@@ -1257,7 +1258,7 @@
           </select>
         </label>
       </div>
-      <p class="setting-note">音量を0%にすると消音になります。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
+      <p class="setting-note">ミュートは音量の設定を保ったまま、すべての音をまとめて消します。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
       <button class="btn small" id="settingsClose">設定を閉じる</button>
     </div>
   </div>
@@ -7953,6 +7954,7 @@ function renderSettings(){
   $('sfxVolume').value=settings.sfx;$('sfxValue').textContent=`${settings.sfx}%`;
   $('brightnessSetting').value=settings.brightness;
   $('brightnessValue').textContent=`${settings.brightness}%`;
+  $('muteSetting').checked=settings.muted;
   $('screenShakeSetting').checked=settings.shake;
   $('vpadEnabledSetting').checked=settings.vpadEnabled;
   $('vpadSideSetting').value=settings.vpadSide;
@@ -8001,17 +8003,10 @@ $('vpadSideSetting').addEventListener('change',ev=>{
   if(started||hasSaveData)save();
 });
 $('sndBtn').addEventListener('click',openSettings);
-function renderMuteBtn(){
-  const b=$('muteBtn');
-  b.textContent=settings.muted?'🔇':'🔊';
-  b.classList.toggle('muted',settings.muted);
-  b.title=b.ariaLabel=settings.muted?'ミュート解除':'ミュート';
-}
-$('muteBtn').addEventListener('click',()=>{
-  settings.muted=!settings.muted;
-  audio();               // 初回クリックでも音声系を初期化してから反映
+$('muteSetting').addEventListener('change',ev=>{
+  settings.muted=ev.target.checked;
+  audio();               // 初回操作でも音声系を初期化してから反映
   applyAudioSettings();
-  renderMuteBtn();
   if(started||hasSaveData)save();
   if(!settings.muted)sfx.click();   // 解除時だけ音で知らせる
 });
@@ -8183,7 +8178,6 @@ hasSaveData=load();
 applyVisualSettings();
 applyVpadSettings();
 renderSettings();
-renderMuteBtn();
 window.EnmaGameBridge={
   exportSave(){
     try{
