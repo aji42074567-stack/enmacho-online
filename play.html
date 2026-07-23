@@ -6785,8 +6785,6 @@ function drawStairs(sx,sy,down){
     ctx.fillStyle=g3;ctx.fillRect(-56,-h,112,h+20);
     // 透過画像内の石段の最下端をマス中央へ接地させる。
     ctx.drawImage(img,-w/2,-h*0.78,w,h);
-    ctx.fillStyle=down?'#ffb9a0':'#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
-    ctx.fillText(down?'下り階段':'上り階段',0,20);
     ctx.restore();
     return;
   }
@@ -6803,8 +6801,6 @@ function drawStairs(sx,sy,down){
   }
   if(down){ctx.fillStyle='#090607';
     ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(9,-17);ctx.lineTo(0,-12);ctx.lineTo(-9,-17);ctx.closePath();ctx.fill();}
-  ctx.fillStyle=down?'#ffb9a0':'#cfe8ff';ctx.font='9px sans-serif';ctx.textAlign='center';
-  ctx.fillText(down?'下り階段':'上り階段',0,20);
   ctx.restore();
 }
 function drawHallPortal(sx,sy,p){
