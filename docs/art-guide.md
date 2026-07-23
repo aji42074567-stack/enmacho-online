@@ -107,7 +107,7 @@ enmacho-online/
 
 ### 羅刹(第二章の職)素材 — `_wip_src/rasetsu_*.png`(2026-07-22、組込済み)
 
-第二章「転生編」の四職のうち「羅刹」の原画一式。**gitignore対象なのでローカルにのみ存在する**
+第二章「冥職編」の四職のうち「羅刹」の原画一式。**gitignore対象なのでローカルにのみ存在する**
 (このMacの `~/enmacho-online/_wip_src/`)。緑背景のクロマキー素材を加工し、
 配信用の透過PNGを `assets/char_rasetsu_{m,f}*.png` として組み込んでいる。
 
