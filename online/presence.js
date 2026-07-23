@@ -662,15 +662,18 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       });
   }
 
-  async function closeChannel() {
+  async function closeChannel(options = {}) {
     const oldChannel = channel;
     channel = null;
     channelZone = '';
     subscribed = false;
     lastSentKey = '';
     lastSentAttackSeq = 0;
-    remotes.clear();
-    publishRemotes();
+    // keepRemotes: 一時的な切断では名簿を残し、再接続までの数秒を最後の位置でつなぐ
+    if (!options.keepRemotes) {
+      remotes.clear();
+      publishRemotes();
+    }
     if (!oldChannel) return;
     try {
       await oldChannel.untrack();
@@ -779,13 +782,25 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
             publishRemotes();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             subscribed = false;
-            remotes.clear();
-            publishRemotes();
+            // 数秒の途切れで仲間を即消しすると「たまに消える」体験になるため、
+            // 名簿は保持したまま(最後に見えた位置で表示継続)静かに再接続する。
+            // 管理画面の異常記録に切断の瞬間を残し、体感の「消えた」と突き合わせられるようにする。
+            try {
+              window.dispatchEvent(new CustomEvent('enma:system-event', {
+                detail: {
+                  source: 'presence',
+                  code: 'zone_socket_closed',
+                  severity: 'warning',
+                  message: '位置同期チャンネルが切断されました(自動再接続)',
+                  details: { zone: channelZone, status },
+                },
+              }));
+            } catch {}
             // 死んだまま放置するとtickの同一ゾーン判定で張り直されず、
             // フロア移動かリロードまでお互い永久に見えなくなる。
-            // チャンネルを畳んでchannelZoneを空へ戻し、5秒後のtickに自動再接続させる。
-            zoneRetryAt = Date.now() + 5000;
-            if (channel === activeChannel) void closeChannel();
+            // チャンネルを畳んでchannelZoneを空へ戻し、2秒後のtickに自動再接続させる。
+            zoneRetryAt = Date.now() + 2000;
+            if (channel === activeChannel) void closeChannel({ keepRemotes: true });
           }
         });
     } finally {
@@ -1050,7 +1065,8 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       sendControlOutbox(snapshot);
     }
 
-    const staleBefore = Date.now() - IDLE_HEARTBEAT_MS * 4;
+    // 接続中は8秒で除名。切断中(再接続待ち)は30秒まで最後の位置を保って即消しを防ぐ
+    const staleBefore = Date.now() - (subscribed ? IDLE_HEARTBEAT_MS * 4 : 30_000);
     let removed = false;
     for (const [key, remote] of remotes) {
       if (remote.lastSeen < staleBefore) {
