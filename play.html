@@ -113,9 +113,10 @@
     box-shadow:0 5px 18px rgba(0,0,0,.52),inset 0 0 0 1px rgba(224,193,119,.05);
     text-align:left;touch-action:manipulation}
   #miniMapHud[hidden]{display:none}
-  /* 着任研修の表示中は、チェックリストと重ならないよう地図を下げる */
+  /* 着任研修の表示中は、チェックリストと地図・右端ボタン類が重ならないよう配置を調整 */
   body.tutorial-on #miniMapHud{top:210px}
   body.tutorial-on #miniMapMinBtn{top:202px}
+  body.tutorial-on #quest{padding-right:60px}
   #miniMapHud:hover{border-color:#9a7d42}
   #miniMapHud:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   #miniMapMinBtn{position:absolute;top:90px;right:56px;z-index:6;width:24px;height:24px;
