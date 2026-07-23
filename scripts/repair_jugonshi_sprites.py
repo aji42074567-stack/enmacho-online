@@ -11,7 +11,6 @@ from PIL import Image, ImageChops
 from assemble_walk_sheet import (
     mirrored_direction,
     normalized_row,
-    opposite_leg_cycle,
     validate_grounding,
 )
 from process_rasetsu_sprites import alpha_bbox
@@ -80,20 +79,11 @@ def main() -> None:
     parser.add_argument("--idle-source", type=Path, required=True)
     parser.add_argument("--walk-out", type=Path, required=True)
     parser.add_argument("--idle-out", type=Path, required=True)
-    parser.add_argument("--leg-cut-ratio", type=float, default=0.62)
-    parser.add_argument("--leg-feather", type=int, default=2)
-    parser.add_argument("--leg-mask-half-width", type=int)
     args = parser.parse_args()
 
     base = Image.open(args.base_walk).convert("RGBA")
     side = normalized_row(
         args.side_source, cell_size=CELL_SIZE, padding=PADDING
-    )
-    side = opposite_leg_cycle(
-        side,
-        cut_ratio=args.leg_cut_ratio,
-        feather=args.leg_feather,
-        mask_half_width=args.leg_mask_half_width,
     )
     validate_side_cycle(side)
     walk = assemble_walk(base, side)

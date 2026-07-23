@@ -1498,7 +1498,7 @@ const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
 const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   // 冥装(スプライト)が揃い選択できる職
 const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'';
-const JUGONSHI_SPRITE_VERSION='20260723-jugon3';
+const JUGONSHI_SPRITE_VERSION='20260723-jugon4';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
   const src=MEISHOKU_READY.has(e?.meishoku)
