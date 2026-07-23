@@ -7693,7 +7693,7 @@ const TUTORIAL_STEPS=[
   {label:'迷える魂を1体成仏させる',cond:()=>kills>0},
   {label:'川辺のオキナと話す',cond:()=>player.quests.trial>0},
   {label:'メニュー(I)で資質を割り振る',cond:()=>player.story.statAllocated},
-  {label:'高札でお勤めを受ける',cond:()=>activeQuests().length>0||Object.keys(player.qb.done).length>0},
+  {label:'クエスト看板でお勤めを受ける',cond:()=>activeQuests().length>0||Object.keys(player.qb.done).length>0},
 ];
 let tutorialRendered='';
 function checkTutorial(){
