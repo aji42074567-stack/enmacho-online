@@ -95,7 +95,9 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
     }
     if (message?.type === 'snapshot' && message.zone === socketZone) {
       if (Array.isArray(message.monsters) && message.monsters.length) {
-        bridge?.setSharedMonsters?.(message.monsters, message.zone);
+        bridge?.setSharedMonsters?.(message.monsters, message.zone, {
+          full: message.full === true,
+        });
       }
       return;
     }

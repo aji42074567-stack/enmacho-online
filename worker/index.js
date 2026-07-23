@@ -7,7 +7,7 @@ const DRAKE_RESPAWN_MS = 30 * 60_000;
 const RESPAWN_NEARBY_RADIUS = 5;
 const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
-const WORLD_VERSION = 3;
+const WORLD_VERSION = 4;
 const PLAYER_LIMIT = 80;
 const ZONE_SIZE = 72;
 const FIELD_SIZE = 120;
@@ -256,7 +256,7 @@ export default {
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
     // 旧B5ルームの停止した復活状態を引き継がず、新しい部屋で作り直す。
-    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v3' : `${zone}-v1`;
+    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v4' : `${zone}-v1`;
     const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
