@@ -39,6 +39,7 @@ TXTレコードは確認後も削除しない。
 
 | イベント名 | 発火タイミング | パラメータ |
 |---|---|---|
+| `tutorial_step` | 着任研修（初回チェックリスト）の各段階を達成した時 | `step`（1〜5） |
 | `first_kill` | 初めて敵を成仏させた時（セーブの`story.firstKillDone`で1回のみ） | `mob`（敵の種類ID） |
 | `quest_accept` | 高札でクエストを受注した時 | `quest_id` |
 | `quest_complete` | クエストを達成した時 | `quest_id` |
@@ -48,8 +49,6 @@ TXTレコードは確認後も削除しない。
 | `stat_allocate` | 魂の資質を初めて割り振った時（セーブの`story.statAllocated`で1回のみ） | なし |
 | `account_register` | 魂籍の登録（signUp）に成功した時 | なし |
 | `cloud_save` | クラウド自動保存が成功した時（1ページ表示につき初回のみ） | なし |
-
-`tutorial_step`（着任チェックリストの各ステップ）は、チェックリスト本体（retention-plan.md A-1）の実装時に追加する。
 
 ゲーム内の名前、メールアドレス、チャット本文など、個人を識別できる値をイベントへ追加しない。
 

@@ -84,6 +84,14 @@
   #quest .goal{font-family:var(--serif);font-size:12px;color:var(--parchment);letter-spacing:.08em}
   #quest .n{font-family:var(--sans);font-size:11px;color:var(--dim);margin-top:4px;
     font-variant-numeric:tabular-nums}
+  #tutorialList{margin-top:2px;text-align:right;font:11px/1.75 var(--sans);letter-spacing:.05em}
+  #tutorialList .tut-head{font-family:var(--serif);font-size:12px;color:#e8c76a;letter-spacing:.12em}
+  #tutorialList .tut-step{color:var(--dim)}
+  #tutorialList .tut-step.done{color:#8fb573}
+  #tutorialList .tut-step.now{color:var(--parchment)}
+  #howtoPanelList{list-style:none;margin:14px 0;padding:0;text-align:left;
+    font:13px/2.1 var(--sans);letter-spacing:.04em;color:var(--parchment)}
+  #howtoPanelList b{color:var(--gold)}
   #worldClock{display:flex;justify-content:flex-end;gap:8px;margin-top:5px;
     padding-top:5px;border-top:1px solid rgba(201,162,74,.18);
     font:10px/1.2 var(--sans);letter-spacing:.08em;color:#b8ad95;
@@ -387,8 +395,10 @@
     background-position:0 0;background-size:400% 100%;background-repeat:no-repeat;
     image-rendering:pixelated;color:transparent}
   .skill .key{position:absolute;top:2px;left:4px;font-size:9px;color:var(--dim)}
-  .skill .badge{position:absolute;bottom:2px;right:4px;font-size:10px;color:var(--gold);
-    font-variant-numeric:tabular-nums}
+  .skill .badge{position:absolute;bottom:2px;right:3px;min-width:15px;padding:1px 4px;
+    border-radius:9px;background:#c43a2b;border:1px solid rgba(232,176,138,.7);color:#fff;
+    font-size:10px;line-height:1.3;text-align:center;font-variant-numeric:tabular-nums}
+  .skill .badge:empty{display:none}
   .skill.page-switch{width:36px;color:var(--gold);gap:4px}
   .skill.page-switch .icon{font-size:16px}
   .skill.page-switch b{font-size:11px}
@@ -1028,6 +1038,7 @@
 
   <div id="quest">
     <div class="goal">賽の森のゴウリュウを鎮めよ</div>
+    <div id="tutorialList" hidden></div>
     <div class="n">成仏させた魂 <span id="kills">0</span></div>
     <div id="worldClock"><span class="phase" id="worldPhase">昼</span><span id="worldRemain">次刻まで —</span></div>
   </div>
@@ -1449,7 +1460,18 @@
       <p class="setting-note">ミュートは音量の設定を保ったまま、すべての音をまとめて消します。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
       <button class="btn small" id="fullscreenBtn" type="button" hidden>⛶ 全画面で遊ぶ</button>
       <p class="setting-note" id="fullscreenNote" hidden>iPhone/iPadは共有メニューの「ホーム画面に追加」から起動すると全画面で遊べます。</p>
+      <button class="btn small" id="howtoBtn" type="button">操作説明を見る</button>
       <button class="btn small" id="settingsClose">設定を閉じる</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="howtoPanel" role="dialog" aria-modal="true"
+    aria-labelledby="howtoTitle">
+    <div class="scroll">
+      <h2 id="howtoTitle">操作説明</h2>
+      <div class="sub">基本の遊び方</div>
+      <ul id="howtoPanelList"></ul>
+      <button class="btn small" id="howtoClose">閉じる</button>
     </div>
   </div>
 
@@ -1502,7 +1524,7 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
-const SAVE_VERSION=15;
+const SAVE_VERSION=16;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -2299,6 +2321,7 @@ const worldByZone=z=>({field:FIELD,rinne:RINNE,
   ||(z&&z.startsWith('dg')?DGW[+z.slice(2)-1]
   :z&&z.startsWith('muen')?MUENW[+z.slice(4)-1]:null));
 let kills=0,time=0,started=false,hasSaveData=false,hitstop=0,drakeChkT=5;
+let tutorialStep=0;  // 着任チェックリスト進行(0〜5、5=修了。旧セーブは修了扱いで移行)
 let shakeT=0,shakeDur=0,shakePower=0;
 const xpNext=lv=>Math.floor(50*Math.pow(lv,1.9));
 const ST=()=>player.stats;
@@ -2349,6 +2372,7 @@ function save(){
         gmDash:Math.max(0,Math.round(player.gmDashT)),foodAtk:Math.max(0,Math.round(player.foodAtkT)),
         foodDef:Math.max(0,Math.round(player.foodDefT)),foodRegen:Math.max(0,Math.round(player.foodRegenT))},
       quests:player.quests,qb:player.qb,plus:player.plus,
+      tutorial:{step:tutorialStep},
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
@@ -2415,6 +2439,8 @@ function load(){
       player.statPts+=migrationStatGrant;
     }
     player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
+    // v15以前の記録には研修が無い=既プレイヤーなので修了扱いで移行する
+    tutorialStep=(d.tutorial&&Number.isInteger(d.tutorial.step))?clamp(d.tutorial.step,0,5):5;
     player.qb=normalizeQuestBoard(d.qb);
     const oldKazuDone=d.v<4&&!!player.qb.done.q_tokkuri;
     const st=d.story&&typeof d.story==='object'?d.story:{};
@@ -7226,6 +7252,15 @@ function drawNpc(sx,sy,n){
       ctx.fillStyle=`rgba(255,225,120,${puls})`;
       ctx.font='bold 12px sans-serif';ctx.fillText('!',sx,sy-D-4);
     }
+    // 着任研修「オキナと話す」の間だけ、大きな道標「!」を跳ねさせる(retention-plan A-2)
+    if(tutorialStep===2&&n.kind==='elder'){
+      const bounce=Math.abs(Math.sin(time*4))*6;
+      ctx.font='bold 24px sans-serif';
+      ctx.strokeStyle='rgba(40,24,4,.9)';ctx.lineWidth=4;
+      ctx.strokeText('!',sx,sy-D-14-bounce);
+      ctx.fillStyle='#ffd94e';
+      ctx.fillText('!',sx,sy-D-14-bounce);
+    }
     ctx.fillStyle=isSoul?'#d4dde5':'#ffe9a0';ctx.font='10px sans-serif';
     ctx.fillText(n.name,sx,sy+12);
     return;
@@ -7648,6 +7683,46 @@ const el={
   buffs:$('buffs'),pt:$('ptN'),
   goal:document.querySelector('#quest .goal')
 };
+/* ---- 着任チェックリスト(初回の5段ガイド。retention-plan A-1) ---- */
+const TUTORIAL_STEPS=[
+  {label:'地面をタップして移動',cond:()=>player.moving||player.path.length>0},
+  {label:'迷える魂を1体成仏させる',cond:()=>kills>0},
+  {label:'川辺のオキナと話す',cond:()=>player.quests.trial>0},
+  {label:'メニュー(I)で資質を割り振る',cond:()=>player.story.statAllocated},
+  {label:'高札でお勤めを受ける',cond:()=>activeQuests().length>0||Object.keys(player.qb.done).length>0},
+];
+let tutorialRendered='';
+function checkTutorial(){
+  let advanced=false;
+  while(tutorialStep<TUTORIAL_STEPS.length&&TUTORIAL_STEPS[tutorialStep].cond()){
+    tutorialStep++;advanced=true;
+    window.enmachoAnalytics?.track('tutorial_step',{step:tutorialStep});
+    if(tutorialStep<TUTORIAL_STEPS.length){
+      log(`✓ ${TUTORIAL_STEPS[tutorialStep-1].label}(着任研修 ${tutorialStep}/5)`,'gain');
+      sfx.click();
+    }else{
+      player.potions+=3;player.gold+=50;
+      banner={txt:'着任研修 修了！',age:0};
+      log('着任研修を修了した！ 恩賞として甘露水S×3と50モンを受け取った','gain');
+      sfx.lvup();
+    }
+  }
+  if(advanced)save();
+  renderTutorialList();
+}
+function renderTutorialList(){
+  const listEl=$('tutorialList');
+  const active=started&&tutorialStep<TUTORIAL_STEPS.length;
+  listEl.hidden=!active;
+  el.goal.style.display=active?'none':'';
+  if(!active)return;
+  const key=String(tutorialStep);
+  if(tutorialRendered===key)return;
+  tutorialRendered=key;
+  listEl.innerHTML='<div class="tut-head">着任研修</div>'+TUTORIAL_STEPS.map((s,i)=>
+    `<div class="tut-step ${i<tutorialStep?'done':i===tutorialStep?'now':''}">${
+      i<tutorialStep?'✓':i===tutorialStep?'▶':'・'} ${s.label}</div>`).join('');
+}
 function hud(){
   refreshPlayerIdentityUi();
   renderMiniMap();
@@ -7681,6 +7756,7 @@ function hud(){
   $('quickPageBtn').setAttribute('aria-label',
     `アイテムページ${player.quickPage+1}。押すとページ${(player.quickPage+1)%3+1}`);
   el.pt.textContent=player.statPts>0?player.statPts:'';
+  if(started&&tutorialStep<TUTORIAL_STEPS.length)checkTutorial();
   const tracking=activeQuests();
   if(tracking.length){
     const q=tracking[Math.floor(time/4)%tracking.length];
@@ -8686,6 +8762,17 @@ function renderMiniMap(force=false){
     const p=point(landmark.x,landmark.y);
     g.beginPath();g.rect(p.x-3,p.y-3,6,6);g.fill();g.stroke();
   }
+  // 着任研修「オキナと話す」の間だけ、オキナの位置に光点(retention-plan A-2)
+  if(tutorialStep===2&&zone==='field'){
+    const okina=npcs.find(n=>n.kind==='elder');
+    if(okina){
+      const p=point(okina.x,okina.y),tp=2+Math.sin(time*5)*1.2;
+      g.shadowColor='rgba(140,220,255,.95)';g.shadowBlur=10;
+      g.fillStyle='#9fdcff';g.strokeStyle='#eaf7ff';g.lineWidth=2;
+      g.beginPath();g.arc(p.x,p.y,4+tp,0,Math.PI*2);g.fill();g.stroke();
+      g.shadowBlur=0;
+    }
+  }
   const current=point(player.x,player.y),pulse=1.5+Math.sin(time*5)*.8;
   g.shadowColor='rgba(255,215,92,.95)';g.shadowBlur=10;
   g.fillStyle='#f6cc55';g.strokeStyle='#fff7d1';g.lineWidth=3;
@@ -8740,6 +8827,11 @@ window.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'&&!$('accountPanel').classList.contains('hidden')){
     ev.preventDefault();
     closeAccount();
+    return;
+  }
+  if(ev.key==='Escape'&&!$('howtoPanel').classList.contains('hidden')){
+    ev.preventDefault();
+    $('howtoPanel').classList.add('hidden');
     return;
   }
   if(ev.key==='Escape'&&!$('settingsPanel').classList.contains('hidden')){
@@ -8904,6 +8996,15 @@ $('muteSetting').addEventListener('change',ev=>{
   if(!settings.muted)sfx.click();   // 解除時だけ音で知らせる
 });
 $('settingsClose').addEventListener('click',closeSettings);
+$('howtoBtn').addEventListener('click',()=>{
+  $('howtoPanelList').innerHTML=howtoItemsHtml();
+  $('howtoPanel').classList.remove('hidden');
+  sfx.click();
+});
+$('howtoClose').addEventListener('click',()=>{
+  $('howtoPanel').classList.add('hidden');
+  sfx.click();
+});
 // 全画面: 対応ブラウザ(Android/PC)はボタン、iOSは「ホーム画面に追加」の案内を出す
 {
   const fsBtn=$('fullscreenBtn'),fsNote=$('fullscreenNote');
@@ -9628,14 +9729,19 @@ if(hasSaveData){
   $('nameFixed').classList.remove('hidden');
 }
 $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
-// スマホ(タッチ端末)は操作説明をタップ向けに差し替え、キーボードの行は出さない
-if(matchMedia('(pointer:coarse)').matches){
-  $('howtoList').innerHTML=`
+// 操作説明(タッチ/PC自動切替)。タイトル画面と設定画面の両方で使う(retention-plan A-3)
+function howtoItemsHtml(){
+  return matchMedia('(pointer:coarse)').matches?`
     <li><b>地面をタップ</b> … 移動(左下のパッドでも歩ける)</li>
     <li><b>迷える魂をタップ</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をタップ</b> … 会話・買い物</li>
-    <li><b>画面下のボタン</b> … 印・道具・メニュー　／　右上の<b>地図</b> … 全体地図</li>`;
+    <li><b>画面下のボタン</b> … 印・道具・メニュー　／　右上の<b>地図</b> … 全体地図</li>`:`
+    <li><b>地面をクリック / タップ</b> … 移動</li>
+    <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
+    <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
+    <li><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>`;
 }
+$('howtoList').innerHTML=howtoItemsHtml();
 // スマホのキーボード表示で画面全体が上へずれるのを防ぐ:
 // ゲーム画面は固定のまま、縮んだ分だけチャット窓を持ち上げる(狩りの状況を見ながら打てる)
 if(window.visualViewport){
