@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=overlays-content">
+<link rel="canonical" href="https://enmacho.com/play">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,6 +12,8 @@
 <link rel="apple-touch-icon" href="assets/apple_touch_icon.png">
 <meta name="theme-color" content="#0b0d12">
 <title>閻魔庁ONLINE — 死後に知る。生前こそが地獄だった。</title>
+<script defer src="online/analytics-config.js?v=20260723a"></script>
+<script defer src="online/analytics.js?v=20260723a"></script>
 <style>
   :root{
     --ink:#0b0d12;
@@ -1009,7 +1012,7 @@
   }
 </style>
 </head>
-<body>
+<body data-clarity-mask="true">
 <div id="stage">
   <canvas id="game"></canvas>
 
@@ -8928,6 +8931,7 @@ $('startBtn').addEventListener('click',()=>{
     else renderGroundCave();
   }
   audio();startBgm();
+  window.enmachoAnalytics?.track('game_start',{returning_player:hasSaveData});
   if(hasSaveData){
     log(`おかえり、${[meishokuLabel(player),player.name].filter(Boolean).join(' ')} (徳位${player.lv} / ${player.gold} モン)`,'sys');
     if(migrationStatGrant>0)

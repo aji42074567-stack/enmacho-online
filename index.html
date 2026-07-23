@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="canonical" href="https://enmacho.com/">
 <title>閻魔庁ONLINE 公式サイト — 死後に知る。生前こそが地獄だった。</title>
 <meta name="description" content="和風ダークファンタジーMMORPG『閻魔庁ONLINE』公式サイト。第二章「冥職編」開幕。輪廻の都で魂の役目を選べる、ブラウザですぐ遊べるオンラインRPG。">
 <meta property="og:title" content="閻魔庁ONLINE">
@@ -10,6 +11,8 @@
 <meta property="og:image" content="https://enmacho.com/assets/title_enmacho_pc.jpg">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://enmacho.com/">
+<script defer src="online/analytics-config.js?v=20260723a"></script>
+<script defer src="online/analytics.js?v=20260723a"></script>
 <script>
 // 旧メール確認・パスワード再設定リンク(/#access_token等)はゲーム側で処理する
 (function(){
@@ -334,7 +337,8 @@
     <a href="#gallery">ギャラリー<small>GALLERY</small></a>
     <a href="#devlog">開発記録<small>DEVLOG</small></a>
   </div>
-  <a class="seal-btn" id="navCta" href="play.html#soul" style="margin-left:auto">魂籍を登録する</a>
+  <a class="seal-btn" id="navCta" href="play.html#soul" style="margin-left:auto"
+    data-analytics-event="registration_cta_click" data-analytics-placement="navigation">魂籍を登録する</a>
 </nav>
 
 <header id="hero">
@@ -347,7 +351,8 @@
     <p class="hero-description">転生、寿命、徳、罪、記憶。<br>
       すべてが管理される冥府で、あなたは世界の正体を知る。</p>
     <div class="hero-cta">
-      <a class="seal-btn" id="heroCta" href="play.html#soul">魂籍を登録する</a>
+      <a class="seal-btn" id="heroCta" href="play.html#soul"
+        data-analytics-event="registration_cta_click" data-analytics-placement="hero">魂籍を登録する</a>
       <a class="ghost-btn" href="#world">世界の真実を見る</a>
     </div>
     <p class="hero-sub" id="heroSub">登録は無料。<a href="play.html">登録せず端末の記録で入庁する</a>こともできます。</p>
@@ -603,8 +608,10 @@
   <div class="torii fade">転生門</div>
   <h2 class="fade">さあ、入庁の刻だ。</h2>
   <div class="hero-cta fade">
-    <a class="seal-btn" id="entryCta" href="play.html#soul">魂籍を登録する</a>
-    <a class="ghost-btn" href="play.html">登録せず入庁する</a>
+    <a class="seal-btn" id="entryCta" href="play.html#soul"
+      data-analytics-event="registration_cta_click" data-analytics-placement="footer">魂籍を登録する</a>
+    <a class="ghost-btn" href="play.html"
+      data-analytics-event="guest_play_click" data-analytics-placement="footer">登録せず入庁する</a>
   </div>
 </section>
 

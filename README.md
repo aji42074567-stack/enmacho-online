@@ -49,3 +49,4 @@
 - [docs/world.md](docs/world.md) — 世界観設計書(ネタバレ注意)
 - [docs/roadmap.md](docs/roadmap.md) — 開発ロードマップ
 - [docs/online-setup.md](docs/online-setup.md) — Supabase・Resend設定手順
+- [docs/analytics-setup.md](docs/analytics-setup.md) — Search Console・GA4・ヒートマップ設定手順
