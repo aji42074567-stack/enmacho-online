@@ -1,4 +1,5 @@
 const config = window.ENMA_ONLINE_CONFIG || {};
+const analyticsConfig = window.ENMACHO_ANALYTICS_CONFIG || {};
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -76,6 +77,41 @@ function renderMetrics() {
   $('metrics').innerHTML = values.map(([label, value, unit, className = '']) =>
     `<div class="metric panel ${className}"><span>${label}</span><b>${esc(value)}</b><small>${unit}</small></div>`
   ).join('');
+}
+
+function renderAnalyticsTools() {
+  const gaId = /^G-[A-Z0-9]+$/i.test(analyticsConfig.googleAnalyticsId || '')
+    ? String(analyticsConfig.googleAnalyticsId).toUpperCase() : '';
+  const clarityId = /^[a-z0-9]+$/i.test(analyticsConfig.clarityProjectId || '')
+    ? String(analyticsConfig.clarityProjectId).toLowerCase() : '';
+  const tools = [
+    {
+      name: 'Google Analytics 4', active: Boolean(gaId), id: gaId || '測定ID未設定',
+      description: 'ページ閲覧、流入元、端末、登録導線、ゲーム開始を集計',
+      url: 'https://analytics.google.com/analytics/web/#/a112482859p546813112/reports/intelligenthome',
+      action: 'GA4を開く',
+    },
+    {
+      name: 'Microsoft Clarity', active: Boolean(clarityId), id: clarityId || 'プロジェクトID未設定',
+      description: 'トップ・冥職名鑑のヒートマップと匿名化した操作記録',
+      url: clarityId ? `https://clarity.microsoft.com/projects/view/${encodeURIComponent(clarityId)}/dashboard` : '',
+      action: 'Clarityを開く',
+    },
+    {
+      name: 'Google Search Console', active: true, id: 'enmacho.com',
+      description: '検索流入、掲載順位、インデックス状況、サイトマップを確認',
+      url: 'https://search.google.com/search-console?resource_id=sc-domain%3Aenmacho.com',
+      action: 'Search Consoleを開く',
+    },
+  ];
+  $('analyticsTools').innerHTML = tools.map(tool => `<article class="analytics-card panel">
+    <div class="analytics-card-head"><h3>${esc(tool.name)}</h3>
+      <span class="analytics-state ${tool.active ? '' : 'off'}">${tool.active ? '計測有効' : '要設定'}</span></div>
+    <div class="analytics-id">${esc(tool.id)}</div><p>${esc(tool.description)}</p>
+    <div class="analytics-actions">${tool.url
+      ? `<a class="btn small" href="${esc(tool.url)}" target="_blank" rel="noopener noreferrer">${esc(tool.action)}</a>`
+      : '<span class="btn small" aria-disabled="true">設定が必要</span>'}</div>
+  </article>`).join('');
 }
 
 function readPresence() {
@@ -434,6 +470,7 @@ async function openAdmin(session) {
   }
   $('forbiddenPanel').classList.add('hidden');
   $('adminApp').classList.remove('hidden');
+  renderAnalyticsTools();
   await Promise.all([refreshAll(), connectPresence()]);
 }
 
