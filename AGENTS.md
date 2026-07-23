@@ -60,14 +60,13 @@ Cloudflare Pages のダッシュボードから古いデプロイを手動リト
 
 ## キャッシュの注意(重要)
 
-- enmacho.com はCloudflareゾーン設定の「ブラウザキャッシュTTL(4時間)」が効いており、
-  `_headers` の max-age=0 を上書きする(pages.dev側では `_headers` が有効)。
-- そのため **`online/*.js` を変更したら、`play.html` のscriptタグと
-  `online/account.js` のimportにある `?v=バージョン` を必ず上げること**。
-  上げ忘れると、最大4時間、古いJSと新しいHTMLが混ざって不具合になる
-  (例: 2026-07-21 ログイン済みでもチャット入力欄が無効のままになった)。
-- 恒久対応はCloudflareダッシュボードで enmacho.com ゾーンの
-  Caching → Browser Cache TTL を「Respect Existing Headers」へ変更(ユーザー操作が必要)。
+- **2026-07-23解決済み**: enmacho.com ゾーンの Browser Cache TTL を「既存のヘッダーを尊重する
+  (Respect Existing Headers)」に変更済み。`_headers` の max-age=0 が本番でも効くようになった
+  (curlで cache-control: max-age=0 を確認済み。以前は4時間キャッシュが上書きしていて
+  「直したのに古いのが見える」の原因だった)。
+- それでも **`online/*.js` を変更したら `play.html` のscriptタグと
+  `online/account.js` のimportの `?v=バージョン` を上げる**運用は継続する
+  (すでに古いJSを4時間キャッシュで抱えている訪問者への保険+変更の追跡が楽になるため)。
 
 ## オンライン連携の配置
 
