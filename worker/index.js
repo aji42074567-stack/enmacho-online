@@ -1,4 +1,7 @@
 const PROTOCOL = 'enma-world-v1';
+// scripts/deploy_worker.sh が --define BUILD_SHA でコミットSHAを埋め込む。
+// 素の wrangler deploy だと 'unknown' になる=正規手順を踏んでいない印。
+const BUILD = typeof BUILD_SHA === 'string' ? BUILD_SHA : 'unknown';
 const TICK_MS = 100;
 // 差分だけを送りつつ、移動は10fpsで届かせて補間の遅れを抑える。
 const SNAPSHOT_MS = 100;
@@ -19,7 +22,6 @@ const ALLOWED_ORIGINS = new Set([
   'https://enmacho.com',
   'https://www.enmacho.com',
   'https://enmacho-online.pages.dev',
-  'https://aji42074567-stack.github.io',
   'http://127.0.0.1:8765',
   'http://localhost:8765',
   'http://127.0.0.1:8935',
@@ -254,6 +256,7 @@ function healthResponse() {
     ok: true,
     service: 'enmacho-world',
     version: WORLD_VERSION,
+    build: BUILD,
     respawnSeconds: RESPAWN_MS / 1_000,
     dragonRespawnSeconds: DRAKE_RESPAWN_MS / 1_000,
   }, { headers });
@@ -455,6 +458,7 @@ export class WorldRoom {
       return Response.json({
         ok: true,
         zone: this.zone,
+        build: BUILD,
         initialized: this.simReady(),
         players: sockets.length,
         boss: bossState,
