@@ -2890,12 +2890,15 @@ function markMobDead(m,respawn=m.type==='drake'?DRAKE_RESPAWN_SECONDS:
   if(player.target===m)player.target=null;
   return true;
 }
-function grantMobReward(m){
+function grantMobReward(m,firstAttackerId){
   kills++;
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
-  gainXp(m.def.xp);
-  log(`${m.name}を成仏させた (+${m.def.xp} 徳 / +${gold} モン)`);
+  // FA(最初に攻撃した人)以外は徳(経験値)半分。firstAttackerId不明(ソロ討伐等)は従来通り全額
+  const isFA=!firstAttackerId||firstAttackerId===myUserId();
+  const xp=isFA?m.def.xp:Math.round(m.def.xp*0.5);
+  gainXp(xp);
+  log(`${m.name}を成仏させた (+${xp} 徳${isFA?'':'・FA無し'} / +${gold} モン)`);
   // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
   const lootTo=()=>{
     if(!party.id)return null;
@@ -2957,9 +2960,10 @@ function grantMobReward(m){
       announceRareDrop(m.name,`${wpn?'武器':'防具'}強化の巻物`);
     }
   }
-  // 討伐の知らせをチームへ(受け取った側が距離・支援状態で徳の分け前を判定)
+  // 討伐の知らせをチームへ(受け取った側が距離・支援状態・FA判定で徳の分け前を決める)
   if(party.id)netOutbox.push({type:'party_kill',partyId:party.id,
-    xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
+    xp:m.def.xp,firstAttackerId:firstAttackerId||myUserId(),
+    mobName:m.name,x:m.x,y:m.y,zone});
   if(m.def.boss)announceBossDefeat(m.name);  // 鬼王/骨王/竜の討伐は毎回、全体へ告知(討伐から日時が空いても誰が倒したか分かるように)
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
@@ -9268,11 +9272,11 @@ window.EnmaGameBridge={
       }
     }
   },
-  awardSharedMob(mobId){
+  awardSharedMob(mobId,firstAttackerId){
     const mob=worldByZone(sharedWorld.zone)?.mobs?.find(candidate=>candidate.id===String(mobId||''));
     if(!mob)return;
     markMobDead(mob,Math.max(0,mob.respawn||MOB_RESPAWN_SECONDS));
-    grantMobReward(mob);
+    grantMobReward(mob,firstAttackerId);
   },
   applySharedPlayerDamage(result){
     if(!sharedWorldActive()||player.dead)return;
@@ -9462,9 +9466,12 @@ window.EnmaGameBridge={
     const support=player.partySupportT>0;
     const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=18;  // 近く〜中距離
     if(!support&&!near)return;  // 遠く離れていて支援もしていなければ入らない
-    gainXp(msg.xp);  // 範囲内なら討伐者と同じだけ徳が入る
-    addFloat(player.x,player.y-0.9,`+${msg.xp} 徳(チーム)`,'#d9c07a');
-    log(`${msg.from?.displayName||'仲間'} の討伐分 +${msg.xp} 徳（チーム）`,'gain');
+    // 近く〜支援中なら誰でも分け前は入るが、FA(最初に攻撃した人)以外は半分
+    const isFA=msg.firstAttackerId&&msg.firstAttackerId===myUserId();
+    const xp=isFA?msg.xp:Math.round(msg.xp*0.5);
+    gainXp(xp);
+    addFloat(player.x,player.y-0.9,`+${xp} 徳(チーム${isFA?'':'・FA無し'})`,'#d9c07a');
+    log(`${msg.from?.displayName||'仲間'} の討伐分 +${xp} 徳（チーム${isFA?'':'・FA無し'}）`,'gain');
     save();
   },
   receivePartyHeal(msg){

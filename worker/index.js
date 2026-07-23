@@ -411,6 +411,7 @@ export class WorldRoom {
         hp: definition.hp,
         maxHp: definition.hp,
         dead: false,
+        firstAttackerId: '',   // FA(最初に攻撃したプレイヤー)。respawn()のたびに空へ戻す
         respawnAt: 0,
         forceRespawnAt: 0,
         respawnMs: spawn.respawnMs || RESPAWN_MS,
@@ -620,6 +621,7 @@ export class WorldRoom {
     const kind = data.kind === 'melee' ? 'melee' : data.kind === 'fire' ? 'fire' : 'bolt';
     const range = kind === 'melee' ? 3.4 : 10;
     if (distance(player, monster) > range) return;
+    if (!monster.firstAttackerId) monster.firstAttackerId = player.userId;   // FA記録
     const damage = clamp(Math.trunc(finite(data.damage)), 1, 3_000);
     monster.hp = Math.max(0, monster.hp - damage);
     monster.targetId = player.clientId;
@@ -633,7 +635,8 @@ export class WorldRoom {
       monster.state = 'dead';
       monster.moving = false;
       if (monster.type === 'drake') this.pendingDragonRespawnNoticeAt = 0;
-      this.send(socket, { type: 'reward', mobId: monster.id });
+      this.send(socket, { type: 'reward', mobId: monster.id,
+        firstAttackerId: monster.firstAttackerId || player.userId });
       // ルームが無人になっても復活時刻にWorkerを起こす。
       void this.persist(now, true);
     }
@@ -834,6 +837,7 @@ export class WorldRoom {
     monster.y = monster.homeY;
     monster.hp = monster.maxHp;
     monster.dead = false;
+    monster.firstAttackerId = '';
     monster.respawnAt = 0;
     monster.forceRespawnAt = 0;
     monster.killedWindow = 0;

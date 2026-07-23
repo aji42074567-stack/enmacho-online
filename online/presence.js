@@ -722,6 +722,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           const y = cleanNumber(payload.y, NaN);
           if (!partyId || !Number.isFinite(x) || !Number.isFinite(y)) return;
           bridge?.receivePartyKill?.({ from, partyId, xp, x, y,
+            firstAttackerId: cleanText(payload.firstAttackerId, 64),
             zone: channelZone, mobName: cleanText(payload.mobName, 24) });
         })
         .on('broadcast', { event: 'party_heal' }, ({ payload }) => {
@@ -973,6 +974,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         if (item.type === 'party_kill') {
           channel.send({ type: 'broadcast', event: 'party_kill', payload: { ...base,
             xp: Math.trunc(cleanNumber(item.xp, 0)),
+            firstAttackerId: cleanText(item.firstAttackerId, 64),
             x: cleanNumber(item.x, 0), y: cleanNumber(item.y, 0),
             mobName: cleanText(item.mobName, 24) } }).catch(() => {});
         } else if (item.type === 'party_heal') {

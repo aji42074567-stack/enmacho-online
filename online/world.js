@@ -114,7 +114,7 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       return;
     }
     if (message?.type === 'reward') {
-      bridge?.awardSharedMob?.(message.mobId);
+      bridge?.awardSharedMob?.(message.mobId, message.firstAttackerId);
       return;
     }
     if (message?.type === 'player_damage') {
