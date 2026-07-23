@@ -194,6 +194,14 @@ function normalizeBossNotice(raw, ownSessionId) {
   return { ...identity, mobName };
 }
 
+function normalizeDragonRespawnNotice(raw, ownSessionId) {
+  const identity = chatIdentity(raw, ownSessionId);
+  if (!identity) return null;
+  const respawnedAt = Math.max(0, cleanNumber(raw.respawnedAt, 0));
+  if (!respawnedAt) return null;
+  return { ...identity, respawnedAt };
+}
+
 export function createPresenceController(client, bridge = window.EnmaGameBridge) {
   const sessionId = newSessionId();
   const remotes = new Map();
@@ -403,6 +411,11 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         if (activeChannel !== worldChannel) return;
         const notice = normalizeBossNotice(payload, sessionId);
         if (notice) bridge?.receiveBossNotice?.(notice);
+      })
+      .on('broadcast', { event: 'dragon_respawn' }, ({ payload }) => {
+        if (activeChannel !== worldChannel) return;
+        const notice = normalizeDragonRespawnNotice(payload, sessionId);
+        if (notice) bridge?.receiveDragonRespawnNotice?.(notice);
       })
       .subscribe(async status => {
         if (activeChannel !== worldChannel) return;
@@ -822,11 +835,12 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
   function sendChatOutbox(snapshot) {
     const outbox = bridge?.drainChatOutbox?.();
     if (!Array.isArray(outbox) || !outbox.length) return;
+    const retry = [];
     for (const item of outbox.slice(0, 4)) {
       const now = Date.now();
       if (item?.channel === 'drop') {
         // レアドロップ告知は全体チャンネルへ。連投制限の対象外(そもそも稀)
-        if (!worldChannel || !worldSubscribed) continue;
+        if (!worldChannel || !worldSubscribed) { retry.push(item); continue; }
         const itemName = cleanText(item.itemName, 24);
         const mobName = cleanText(item.mobName, 24);
         if (!itemName || !mobName) continue;
@@ -839,13 +853,25 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
       }
       if (item?.channel === 'boss') {
         // ボス討伐告知も全体チャンネルへ。稀少なので連投制限の対象外
-        if (!worldChannel || !worldSubscribed) continue;
+        if (!worldChannel || !worldSubscribed) { retry.push(item); continue; }
         const mobName = cleanText(item.mobName, 24);
         if (!mobName) continue;
         worldChannel.send({
           type: 'broadcast',
           event: 'boss',
           payload: { ...identityFor(snapshot), mobName, sentAt: now },
+        }).catch(() => {});
+        continue;
+      }
+      if (item?.channel === 'dragon_respawn') {
+        // Workerから一度だけ渡された竜の復活を、全体チャンネルへ中継する。
+        if (!worldChannel || !worldSubscribed) { retry.push(item); continue; }
+        const respawnedAt = Math.max(0, cleanNumber(item.respawnedAt, 0));
+        if (!respawnedAt) continue;
+        worldChannel.send({
+          type: 'broadcast',
+          event: 'dragon_respawn',
+          payload: { ...identityFor(snapshot), respawnedAt, sentAt: now },
         }).catch(() => {});
         continue;
       }
@@ -892,6 +918,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         }).catch(() => {});
       }
     }
+    if (retry.length) bridge?.requeueChatOutbox?.(retry);
   }
 
   // チーム勧誘・フレンド申請と、その返事を相手の受信箱へ送る

@@ -235,8 +235,8 @@ export default {
     const identity = await authenticate(request, env);
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
-    // dg5だけ新しい部屋へ切り替え、今回の更新時にゴウリュウを即時復活させる。
-    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v2' : `${zone}-v1`;
+    // 旧B5ルームの停止した復活状態を引き継がず、新しい部屋で作り直す。
+    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v3' : `${zone}-v1`;
     const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
@@ -259,15 +259,21 @@ export class WorldRoom {
     this.lastPersistAt = 0;
     this.hitWindows = new Map();
     this.lastBroadcastState = new Map();
+    this.pendingDragonRespawnNoticeAt = 0;
     this.ready = state.blockConcurrencyWhile(async () => {
       const saved = await state.storage.get('world');
       if (saved?.version === WORLD_VERSION) {
         this.zone = saved.zone || '';
         this.zoneData = saved.zoneData || null;
         if (Array.isArray(saved.mobs)) this.mobs = saved.mobs;
+        this.pendingDragonRespawnNoticeAt = Math.max(
+          0, finite(saved.pendingDragonRespawnNoticeAt, 0),
+        );
       }
       if (this.zone === 'field' && !this.mobs.length) this.mobs = this.initialMobs();
-      this.reconcileRespawns(Date.now());
+      const now = Date.now();
+      if (this.reconcileRespawns(now)) await this.persist(now);
+      await this.syncRespawnAlarm(now);
     });
   }
 
@@ -339,6 +345,10 @@ export class WorldRoom {
     if (!this.zone) this.zone = cleanText(request.headers.get('x-enma-zone'), 16);
     // fieldは組み込みデータで即席可能(初回接続や旧バージョンからの移行時)
     if (this.zone === 'field' && !this.mobs.length) this.mobs = this.initialMobs();
+    // 無人中に復活時刻を越えた敵を、死亡スナップショット送信前に戻す。
+    const now = Date.now();
+    if (this.reconcileRespawns(now, sockets)) await this.persist(now);
+    await this.syncRespawnAlarm(now);
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -359,6 +369,7 @@ export class WorldRoom {
     this.state.acceptWebSocket(server);
     if (this.simReady()) {
       this.send(server, this.snapshot(Date.now(), true));
+      if (this.dispatchDragonRespawnNotice([server])) void this.persist(Date.now(), true);
       this.startTicking();
     } else {
       // 部屋が空っぽ: 最初のクライアントにゾーンデータを要求する
@@ -396,7 +407,9 @@ export class WorldRoom {
     this.zoneData = zoneData;
     this.mobs = this.initialMobs();
     this.lastBroadcastState.clear();
-    void this.persist();
+    if (this.zone === 'dg5') this.pendingDragonRespawnNoticeAt = Date.now();
+    this.dispatchDragonRespawnNotice();
+    void this.persist(Date.now(), true);
     this.broadcastFull();
     this.startTicking();
   }
@@ -410,14 +423,14 @@ export class WorldRoom {
     const attachment = socket.deserializeAttachment?.();
     if (attachment?.clientId) this.hitWindows.delete(attachment.clientId);
     socket.close(1000, 'Closed');
-    if (this.state.getWebSockets().length === 0) void this.persist();
+    if (this.state.getWebSockets().length === 0) void this.persist(Date.now(), true);
   }
 
   webSocketError(socket) {
     const attachment = socket.deserializeAttachment?.();
     if (attachment?.clientId) this.hitWindows.delete(attachment.clientId);
     socket.close(1011, 'Socket error');
-    if (this.state.getWebSockets().length === 0) void this.persist();
+    if (this.state.getWebSockets().length === 0) void this.persist(Date.now(), true);
   }
 
   updatePlayer(socket, data) {
@@ -479,8 +492,10 @@ export class WorldRoom {
       monster.targetId = '';
       monster.state = 'dead';
       monster.moving = false;
+      if (monster.type === 'drake') this.pendingDragonRespawnNoticeAt = 0;
       this.send(socket, { type: 'reward', mobId: monster.id });
-      void this.persist();
+      // ルームが無人になっても復活時刻にWorkerを起こす。
+      void this.persist(now, true);
     }
     this.broadcast(this.snapshot(now));
   }
@@ -498,12 +513,16 @@ export class WorldRoom {
       const now = Date.now();
       const dt = Math.min(0.25, Math.max(0.01, (now - this.lastTickAt) / 1_000));
       this.lastTickAt = now;
-      this.tickWorld(now, dt, sockets);
+      const respawnChanged = this.tickWorld(now, dt, sockets);
       if (now - this.lastSnapshotAt >= SNAPSHOT_MS) {
         this.lastSnapshotAt = now;
         this.broadcast(this.snapshot(now), sockets);
       }
-      if (now - this.lastPersistAt >= 5_000) void this.persist(now);
+      if (respawnChanged) {
+        this.dispatchDragonRespawnNotice(sockets);
+        void this.persist(now, true);
+      }
+      else if (now - this.lastPersistAt >= 5_000) void this.persist(now);
       this.timer = setTimeout(run, TICK_MS);
     };
     this.timer = setTimeout(run, TICK_MS);
@@ -516,25 +535,11 @@ export class WorldRoom {
       if (player && now - player.lastSeenAt < 10_000) players.set(player.clientId, { socket, ...player });
     }
 
+    let respawnChanged = false;
     for (const monster of this.mobs) {
       monster.moving = false;
       if (monster.dead) {
-        if (monster.schedule === 'dragon30m') {
-          // ゴウリュウは討伐から30分後、付近のプレイヤー有無にかかわらず復活する。
-          if (now >= monster.respawnAt) this.respawn(monster, now);
-          continue;
-        }
-        if (now >= monster.respawnAt) {
-          const home = { x: monster.homeX, y: monster.homeY };
-          const playerNearby = [...players.values()]
-            .some(player => !player.dead && distance(home, player) < RESPAWN_NEARBY_RADIUS);
-          const forceRespawnAt = finite(monster.forceRespawnAt, 0);
-          if (playerNearby && now < forceRespawnAt) {
-            monster.respawnAt = Math.min(forceRespawnAt, now + RESPAWN_RETRY_MS);
-          } else {
-            this.respawn(monster, now);
-          }
-        }
+        if (this.reconcileMonsterRespawn(monster, now, players)) respawnChanged = true;
         continue;
       }
       const definition = this.definitions()[monster.type];
@@ -613,6 +618,7 @@ export class WorldRoom {
         this.moveToward(monster, monster.wanderX, monster.wanderY, definition.speed * 0.65, dt);
       }
     }
+    return respawnChanged;
   }
 
   strike(monster, definition, target) {
@@ -649,6 +655,7 @@ export class WorldRoom {
   }
 
   respawn(monster, now) {
+    const announceDragon = monster.type === 'drake' && monster.dead;
     monster.x = monster.homeX;
     monster.y = monster.homeY;
     monster.hp = monster.maxHp;
@@ -661,15 +668,81 @@ export class WorldRoom {
     monster.strikeAt = 0;
     monster.swingUntil = 0;
     monster.wanderAt = now + randomInt(1_000, 4_000);
+    if (announceDragon) this.pendingDragonRespawnNoticeAt = now;
   }
 
-  reconcileRespawns(now) {
+  reconcileMonsterRespawn(monster, now, players = new Map()) {
+    if (!monster.dead || now < monster.respawnAt) return false;
+    if (monster.schedule === 'dragon30m') {
+      // ゴウリュウは討伐から30分後、付近のプレイヤー有無にかかわらず復活する。
+      this.respawn(monster, now);
+      return true;
+    }
+    const home = { x: monster.homeX, y: monster.homeY };
+    const playerNearby = [...players.values()]
+      .some(player => !player.dead && distance(home, player) < RESPAWN_NEARBY_RADIUS);
+    const forceRespawnAt = finite(monster.forceRespawnAt, 0);
+    if (playerNearby && now < forceRespawnAt) {
+      monster.respawnAt = Math.min(forceRespawnAt, now + RESPAWN_RETRY_MS);
+    } else {
+      this.respawn(monster, now);
+    }
+    return true;
+  }
+
+  reconcileRespawns(now, sockets = []) {
+    const players = new Map();
+    for (const socket of sockets) {
+      const player = socket.deserializeAttachment?.();
+      if (player && now - player.lastSeenAt < 10_000) players.set(player.clientId, player);
+    }
+    let changed = false;
+    for (const monster of this.mobs) {
+      if (this.reconcileMonsterRespawn(monster, now, players)) changed = true;
+    }
+    return changed;
+  }
+
+  async syncRespawnAlarm(now = Date.now()) {
+    let nextRespawnAt = Infinity;
     for (const monster of this.mobs) {
       if (!monster.dead) continue;
-      if (now >= monster.respawnAt) {
-        this.respawn(monster, now);
-      }
+      const respawnAt = finite(monster.respawnAt, 0);
+      if (respawnAt > 0) nextRespawnAt = Math.min(nextRespawnAt, respawnAt);
     }
+    const current = await this.state.storage.getAlarm();
+    if (!Number.isFinite(nextRespawnAt)) {
+      if (current !== null) await this.state.storage.deleteAlarm();
+      return;
+    }
+    const target = Math.max(now + 100, nextRespawnAt);
+    if (current === null || Math.abs(current - target) > 50) {
+      await this.state.storage.setAlarm(target);
+    }
+  }
+
+  async alarm() {
+    await this.ready;
+    const now = Date.now();
+    const sockets = this.state.getWebSockets();
+    const changed = this.reconcileRespawns(now, sockets);
+    if (sockets.length) this.dispatchDragonRespawnNotice(sockets);
+    await this.persist(now, true);
+    if (sockets.length) {
+      if (changed) this.broadcast(this.snapshot(now), sockets);
+      this.startTicking();
+    }
+  }
+
+  dispatchDragonRespawnNotice(sockets = this.state.getWebSockets()) {
+    if (!this.pendingDragonRespawnNoticeAt || !sockets.length) return false;
+    const [socket] = sockets;
+    this.send(socket, {
+      type: 'dragon_respawn',
+      respawnedAt: this.pendingDragonRespawnNoticeAt,
+    });
+    this.pendingDragonRespawnNoticeAt = 0;
+    return true;
   }
 
   publicMonster(monster, now) {
@@ -738,14 +811,16 @@ export class WorldRoom {
     }
   }
 
-  async persist(now = Date.now()) {
+  async persist(now = Date.now(), syncAlarm = false) {
     this.lastPersistAt = now;
     await this.state.storage.put('world', {
       version: WORLD_VERSION,
       zone: this.zone,
       zoneData: this.zoneData,
       mobs: this.mobs,
+      pendingDragonRespawnNoticeAt: this.pendingDragonRespawnNoticeAt,
       savedAt: now,
     });
+    if (syncAlarm) await this.syncRespawnAlarm(now);
   }
 }

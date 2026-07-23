@@ -5339,7 +5339,7 @@ const DG_DEFS=[
   {rooms:[[11,27,17,33],[17,29,33,31],[33,25,39,37],[39,30,53,32],[47,22,55,28],[49,26,51,30]],
    mobs:[['skeleton',22,30],['skeleton',35,28],['dark_dog',36,34],['dark_dog',45,31]]},
   {rooms:[[11,27,17,33],[17,30,25,32],[25,20,31,40],[31,28,45,32],[45,24,53,36]],
-   mobs:[['oni_bone',27,24],['oni_bone',28,36],['dark_dog',37,30],['gozu',48,27]]},
+   mobs:[['oni_bone',27,24],['oni_bone',28,36],['dark_dog',37,30],['gozu',49,30]]},
   {rooms:[[11,27,17,33],[17,29,27,31],[27,21,33,39],[33,23,41,25],[33,35,41,37],[41,21,49,39]],
    mobs:[['gozu',30,24],['gozu',30,36],['oni_bone',37,24],['gozu',45,30],['dark_dog',44,23]]},
   {rooms:[[11,27,17,33],[17,29,23,31],[23,21,29,39],[29,29,43,31],[43,19,51,41]],
@@ -7647,6 +7647,7 @@ const CHAT_CHANNELS={
 };
 const chat={open:false,tab:'general',online:false,worldOnline:false,teamOnline:false,
   guildOnline:false,outbox:[],history:[],unread:0,lastSentAt:0};
+let lastDragonRespawnNoticeAt=0;
 const chatMessageDomLimit=()=>MOBILE_RENDER?36:80;
 const chatLogDomLimit=()=>MOBILE_RENDER?60:150;
 function chatMsgNode(m){
@@ -7820,11 +7821,21 @@ function announceRareDrop(mobName,itemName){
 }
 function announceBossDefeat(mobName){
   // ボス討伐を全体へ告知(自分の画面には即時表示、他プレイヤーへは全体チャンネル経由)
+  const suffix=mobName==='ゴウリュウ'?' （30分後に復活）':'';
   addChatMessage({channel:'world',kind:'boss',self:true,
     name:player.name||'ナナシ',level:player.lv,userId:'',
-    text:`${player.name||'ナナシ'} が ${mobName} を鎮めた`,
+    text:`${player.name||'ナナシ'} が ${mobName} を鎮めた${suffix}`,
     ts:Date.now()});
   chat.outbox.push({channel:'boss',mobName});
+}
+function announceDragonRespawn(respawnedAt){
+  const at=Math.max(0,Number(respawnedAt)||Date.now());
+  if(at<=lastDragonRespawnNoticeAt)return;
+  lastDragonRespawnNoticeAt=at;
+  addChatMessage({channel:'world',kind:'boss',self:true,
+    name:'閻魔庁',level:1,userId:'',
+    text:'地の底から咆哮が響いた——ゴウリュウが復活した',ts:at});
+  chat.outbox.push({channel:'dragon_respawn',respawnedAt:at});
 }
 $('chatToggle').addEventListener('click',()=>{
   chat.open?closeChat():openChat();
@@ -8983,6 +8994,11 @@ window.EnmaGameBridge={
   drainChatOutbox(){
     return chat.outbox.splice(0,chat.outbox.length);
   },
+  requeueChatOutbox(items){
+    if(!Array.isArray(items)||!items.length)return;
+    chat.outbox.unshift(...items.slice(0,8));
+    if(chat.outbox.length>24)chat.outbox.length=24;
+  },
   receiveChatMessage(msg){
     if(!msg||typeof msg!=='object')return;
     const text=String(msg.text||'').slice(0,60);
@@ -9191,10 +9207,23 @@ window.EnmaGameBridge={
     const name=String(msg.displayName||'ナナシ').slice(0,16);
     const mobName=String(msg.mobName||'').slice(0,24);
     if(!mobName)return;
+    const suffix=mobName==='ゴウリュウ'?' （30分後に復活）':'';
     addChatMessage({channel:'world',kind:'boss',self:false,
       name,level:Math.max(1,msg.level|0),userId:String(msg.userId||''),
-      text:`${name} が ${mobName} を鎮めた`,
+      text:`${name} が ${mobName} を鎮めた${suffix}`,
       ts:Date.now()});
+  },
+  announceSharedDragonRespawn(msg){
+    announceDragonRespawn(msg?.respawnedAt);
+  },
+  receiveDragonRespawnNotice(msg){
+    if(!msg||typeof msg!=='object')return;
+    const at=Math.max(0,Number(msg.respawnedAt)||0);
+    if(!at||at<=lastDragonRespawnNoticeAt)return;
+    lastDragonRespawnNoticeAt=at;
+    addChatMessage({channel:'world',kind:'boss',self:false,
+      name:'閻魔庁',level:1,userId:'',
+      text:'地の底から咆哮が響いた——ゴウリュウが復活した',ts:at});
   },
   playRemoteAttack(raw){
     const id=String(raw?.userId||''),sessionId=String(raw?.sessionId||'');
@@ -9285,6 +9314,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260723c"></script>
+<script type="module" src="online/account.js?v=20260723d"></script>
 </body>
 </html>

@@ -105,6 +105,12 @@ export function createWorldController(config, bridge = window.EnmaGameBridge) {
       if (init && init.zone === socketZone) send({ type: 'zone_init', ...init });
       return;
     }
+    if (message?.type === 'dragon_respawn' && sourceZone === 'dg5') {
+      bridge?.announceSharedDragonRespawn?.({
+        respawnedAt: finite(message.respawnedAt, Date.now()),
+      });
+      return;
+    }
     if (message?.type === 'reward') {
       bridge?.awardSharedMob?.(message.mobId);
       return;
