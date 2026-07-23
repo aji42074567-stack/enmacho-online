@@ -4530,7 +4530,26 @@ function update(dt){
         }
       }
     }
-    if(player.autoMode&&!player.moveHold
+    // チーム仲間への追従: リーダーが離れすぎたら、戦闘中でも追従を最優先する
+    // (敵に構ってリーダーに置いていかれるのを防ぐ)。近ければ数歩後ろで通常AUTOと両立。
+    const FOLLOW_LEASH=7,FOLLOW_CATCHUP=2.6;
+    let forcedFollow=false,followTarget=null;
+    if(followUserId&&!player.dead){
+      if(!partyHas(followUserId))followUserId='';
+      else{
+        const fr=remotePlayers.get(followUserId);
+        if(fr&&fr.zone===zone&&!fr.dead
+          &&!player.moveHold&&!player.talkTarget&&!player.gateTarget&&!vpad.active){
+          followTarget=fr;
+          if(dist(player,fr)>FOLLOW_LEASH){
+            if(!player.forcedFollowing)player.followRepath=0;  // 切替直後は即座に経路を引き直す
+            forcedFollow=true;
+            player.target=null;   // 戦闘を中断してでもリーダーを追う
+          }
+        }
+      }
+    }
+    if(player.autoMode&&!forcedFollow&&!player.moveHold
       &&!player.target&&!player.talkTarget&&!player.gateTarget){
       let best=null,bd=AUTO_RANGE;
       for(const m of mobs){
@@ -4541,28 +4560,21 @@ function update(dt){
       }
       if(best)player.target=best;
     }
-    // チーム仲間への追従: 数歩後ろ(約2マス)を保って付いて歩く。
-    // 戦闘中・手動移動中・会話中は一時停止し、終わると自動で再開する
-    if(followUserId&&!player.dead){
-      if(!partyHas(followUserId))followUserId='';
-      else{
-        const fr=remotePlayers.get(followUserId);
-        if(fr&&fr.zone===zone&&!fr.dead
-          &&!player.target&&!player.moveHold&&!player.talkTarget
-          &&!player.gateTarget&&player.attackDur<=0&&!vpad.active){
-          const fd=dist(player,fr);
-          if(fd>2.6){
-            player.followRepath=(player.followRepath||0)-dt;
-            if(player.followRepath<=0){
-              player.followRepath=0.45;
-              player.path=findPath(player.x,player.y,fr.x,fr.y);
-            }
-          }else if(fd<1.8&&player.path.length){
-            player.path=[];   // 数歩後ろに到着
-          }
+    if(followTarget&&(forcedFollow
+      ||(!player.target&&!player.moveHold&&!player.talkTarget
+        &&!player.gateTarget&&player.attackDur<=0&&!vpad.active))){
+      const fd=dist(player,followTarget);
+      if(fd>FOLLOW_CATCHUP){
+        player.followRepath=(player.followRepath||0)-dt;
+        if(player.followRepath<=0){
+          player.followRepath=0.45;
+          player.path=findPath(player.x,player.y,followTarget.x,followTarget.y);
         }
+      }else if(fd<1.8&&player.path.length){
+        player.path=[];   // 数歩後ろに到着
       }
     }
+    player.forcedFollowing=forcedFollow;
     if(player.target){
       const m=player.target;
       if(m.dead){player.target=null;}
