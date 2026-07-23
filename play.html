@@ -2209,7 +2209,7 @@ function nearestWalkable(tx,ty){
   }
   return null;
 }
-function findPath(fx,fy,tx,ty){
+function findPath(fx,fy,tx,ty,maxIt=4000){
   const sx=clamp(Math.round(fx),0,mapSize-1),sy=clamp(Math.round(fy),0,mapSize-1);
   const goal=nearestWalkable(Math.round(tx),Math.round(ty));
   if(!goal)return[];
@@ -2221,7 +2221,7 @@ function findPath(fx,fy,tx,ty){
   open.push({x:sx,y:sy,f:h(sx,sy)});g.set(key(sx,sy),0);
   const DIRS=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.4],[1,-1,1.4],[-1,1,1.4],[-1,-1,1.4]];
   let it=0;
-  while(open.length&&it++<4000){
+  while(open.length&&it++<maxIt){
     let bi=0;for(let i=1;i<open.length;i++)if(open[i].f<open[bi].f)bi=i;
     const cur=open.splice(bi,1)[0];
     const ck=key(cur.x,cur.y);
@@ -4532,7 +4532,7 @@ function update(dt){
     }
     // チーム仲間への追従: リーダーが離れすぎたら、戦闘中でも追従を最優先する
     // (敵に構ってリーダーに置いていかれるのを防ぐ)。近ければ数歩後ろで通常AUTOと両立。
-    const FOLLOW_LEASH=7,FOLLOW_CATCHUP=2.6;
+    const FOLLOW_LEASH=4,FOLLOW_CATCHUP=2.6,FOLLOW_PATH_ITER=30000;
     let forcedFollow=false,followTarget=null;
     if(followUserId&&!player.dead){
       if(!partyHas(followUserId))followUserId='';
@@ -4567,8 +4567,12 @@ function update(dt){
       if(fd>FOLLOW_CATCHUP){
         player.followRepath=(player.followRepath||0)-dt;
         if(player.followRepath<=0){
-          player.followRepath=0.45;
-          player.path=findPath(player.x,player.y,followTarget.x,followTarget.y);
+          // 通常の経路探索(4000反復)は遠距離だと打ち切られ「諦める」ように見えるため、
+          // 追従だけは反復上限を大きく取り、どれだけ離れていても経路を見つけにいく
+          const p=findPath(player.x,player.y,followTarget.x,followTarget.y,FOLLOW_PATH_ITER);
+          player.path=p;
+          // 経路が見つからない(一時的に到達不能)時は、重い全域探索を連発しないよう間隔を空ける
+          player.followRepath=p.length?0.45:3;
         }
       }else if(fd<1.8&&player.path.length){
         player.path=[];   // 数歩後ろに到着
