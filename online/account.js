@@ -291,7 +291,7 @@ function renderUnconfigured() {
   setGatewayCopy('端末記録で入庁', 'ゲーム画面へ進む');
   content.innerHTML = `
     <div class="account-seal" aria-hidden="true">準備中</div>
-    <p class="account-lead">魂籍は、亡者から転生者になっても残るオンライン上の身分証です。</p>
+    <p class="account-lead">魂籍は、転生の前後を通して残るオンライン上の身分証です。</p>
     <div class="account-card">
       <span class="account-label">現在の状態</span>
       <b>端末内の記録で遊べます</b>
@@ -377,7 +377,7 @@ function renderSignedOut() {
 function stageLabel(stage) {
   if (stage === 'reincarnated') return '転生者';
   if (stage === 'rebirth_candidate') return '転生候補者';
-  return '亡者';
+  return '転生審査中';
 }
 
 // 冥職を授かっていれば「身分」には職名を出す(未授職はこれまでどおり亡者など)

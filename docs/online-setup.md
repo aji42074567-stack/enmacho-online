@@ -87,7 +87,7 @@ Edge Function用とSMTP用のAPIキーは分離する。
 
 ## 5. 現在用意されるテーブル
 
-- `profiles`: 魂籍番号、魂名、亡者／転生状態
+- `profiles`: 魂籍番号、魂名、転生状態
 - `account_preferences`: 本人だけが読めるメール配信設定
 - `game_saves`: アカウント単位のクラウドセーブ
 - `friendships`: フレンド申請と承認状態

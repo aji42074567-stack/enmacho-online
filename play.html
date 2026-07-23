@@ -28,6 +28,7 @@
     min-width:200px;pointer-events:none}
   #plate .job,#plate .name{font-family:var(--serif);font-size:15px;letter-spacing:.06em}
   #plate .job{color:var(--gold);margin-right:6px}
+  #plate .job:empty{display:none}
   #plate .name{color:var(--parchment)}
   #plate .lv{color:var(--gold);font-family:var(--sans);font-size:12px;margin-left:6px;
     font-variant-numeric:tabular-nums}
@@ -802,7 +803,8 @@
     #plate{min-width:126px;padding:8px 10px}
     #partyFrames{top:92px}
     .pframe{min-width:122px;padding:4px 8px 5px}
-    #plate .name{display:none}
+    #plate .name{display:inline}
+    #plate .job:not(:empty)+.name{display:none}
     #plate .job{margin-right:0;font-size:13px}
     #plate .lv{margin-left:0}
     #log{bottom:150px;font-size:10.5px}
@@ -879,7 +881,7 @@
   <canvas id="game"></canvas>
 
   <div id="plate">
-    <span class="job" id="pjob">亡者</span><span class="name" id="pname">アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
+    <span class="job" id="pjob"></span><span class="name" id="pname">アジ</span><span class="lv">徳位 <span id="lv">1</span></span>
     <div class="row"><span>徳</span><div class="meter" id="xpbar"><i></i></div></div>
     <div class="row"><span>攻撃 <span class="v" id="atkv">8</span></span>
       <span>防御 <span class="v" id="defv">1</span></span>
@@ -940,8 +942,8 @@
       <i id="pcPortrait"></i>
       <div class="pc-id">
         <b id="pcName">ナナシ</b>
-        <span id="pcMeta">徳位1・亡者</span>
-        <span id="pcTitle" class="pc-title">新入りの亡者</span>
+        <span id="pcMeta">徳位1・賽の森</span>
+        <span id="pcTitle" class="pc-title">新入り</span>
       </div>
     </div>
     <div class="pc-ach">
@@ -1174,7 +1176,7 @@
   <div class="overlay hidden" id="board">
     <div class="scroll">
       <h2>クエスト</h2>
-      <div class="sub">町の亡者からの頼み事</div>
+      <div class="sub">町の人々からの頼み事</div>
       <div id="boardList"></div>
       <button class="btn small" id="boardClose">立ち去る</button>
     </div>
@@ -1202,7 +1204,7 @@
   <div class="overlay hidden" id="kessha">
     <div class="scroll">
       <h2>結社係 ムスビ</h2>
-      <div class="sub">講(亡者の相互扶助結社)の記帳窓口</div>
+      <div class="sub">講(魂の相互扶助結社)の記帳窓口</div>
       <div id="kesshaBody"></div>
       <button class="btn small" id="kesshaClose">窓口を離れる</button>
     </div>
@@ -1302,8 +1304,11 @@
 <script>
 'use strict';
 /* ================= 基本設定 ================= */
-const TW=64, TH=32, WORLD_SIZE=72, FIELD_SIZE=120, RINNE_SIZE=120;
-let mapSize=FIELD_SIZE;   // 賽の森と輪廻大陸は120マス、屋内・洞窟は72マス。
+const TW=64, TH=32, WORLD_SIZE=72, FIELD_SIZE=120;
+const RINNE_BASE_SIZE=120,RINNE_SIZE=208,RINNE_SCALE=RINNE_SIZE/RINNE_BASE_SIZE;
+const rinneCoord=value=>value*RINNE_SCALE;
+const rinnePoint=point=>[rinneCoord(point[0]),rinneCoord(point[1]),...point.slice(2)];
+let mapSize=FIELD_SIZE;   // 賽の森は120マス、輪廻大陸は208マス、屋内・洞窟は72マス。
 const RANGE=1.4;
 const AUTO_RANGE=8;
 const COMBAT_HOLD_SECONDS=4;
@@ -1314,7 +1319,7 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
-const SAVE_VERSION=12;
+const SAVE_VERSION=13;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
 const ACCOUNT_SAVE_PREFIX='enma_account_save_v1:';
@@ -1485,7 +1490,7 @@ const MEISHOKU={
 const meishokuDef=e=>MEISHOKU[e?.meishoku]||null;
 const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   // 冥装(スプライト)が揃い選択できる職
 const meishokuReady=job=>MEISHOKU_READY.has(job);
-const meishokuLabel=e=>meishokuDef(e)?.name||'亡者';
+const meishokuLabel=e=>meishokuDef(e)?.name||'';
 const JUGONSHI_SPRITE_VERSION='20260723-jugon3';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
@@ -1548,14 +1553,14 @@ const ENMA_LINKS=[
   {from:'enma2',at:{x:23,y:20},   to:'enma3',entry:{x:39,y:41},label:'三階へ',tone:'up'},
   {from:'enma3',at:{x:40,y:43},   to:'enma2',entry:{x:22,y:21},label:'二階へ',tone:'down'},
 ];
-const RINNE_COAST_ENTRY={x:96,y:94};
-const RINNE_COAST_FERRY={x:104,y:104};
-const RINNE_ENTRY={x:51,y:51};
+const RINNE_COAST_ENTRY={x:rinneCoord(96),y:rinneCoord(94)};
+const RINNE_COAST_FERRY={x:rinneCoord(104),y:rinneCoord(104)};
+const RINNE_ENTRY={x:rinneCoord(51),y:rinneCoord(51)};
 const MEISHOKU_SEALS=[
-  {x:37,y:45,job:'rasetsu', label:'羅刹'},
-  {x:45,y:37,job:'kagehoshi',label:'影法師'},
-  {x:43,y:49,job:'jugonshi', label:'呪禁師'},
-  {x:49,y:43,job:'gohousou', label:'護法僧'},
+  {x:rinneCoord(37),y:rinneCoord(45),job:'rasetsu', label:'羅刹'},
+  {x:rinneCoord(45),y:rinneCoord(37),job:'kagehoshi',label:'影法師'},
+  {x:rinneCoord(43),y:rinneCoord(49),job:'jugonshi', label:'呪禁師'},
+  {x:rinneCoord(49),y:rinneCoord(43),job:'gohousou', label:'護法僧'},
 ];
 const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
@@ -1685,7 +1690,7 @@ let npcs=[
   {x:30,y:48,kind:'elder',name:'オキナ'},
   {x:29.4,y:54.6,kind:'einer',name:'エイネル'},   // 酒場の主人(店の右前)
   {x:38.3,y:48.4,kind:'smith',name:'カナヤマ'},   // 鍛冶屋の東側・復活石像と通路を空ける
-  {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の亡者(井戸の右・通りの真ん中)
+  {x:32.2,y:54.6,kind:'guest',name:'カズー'},     // 酔客の魂(井戸の右・通りの真ん中)
   {x:34.4,y:42.2,kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
   {x:38.4,y:42.2,kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
   {x:43.5,y:48.5,kind:'repose',name:'供養所'},    // 南東区画・レア装備の焚き上げ所
@@ -1737,9 +1742,9 @@ const ELDER_LINES=[
   '「ここだけの話じゃがな……この世界、時々"ほころび"のようなものが見える。まあ、わしの気のせいじゃろうて」',
 ];
 const OKAMI_LINES=[
-  '「いらっしゃい。ここは千本亭。転生待ちの亡者が、束の間の憂さを晴らす店だ」',
+  '「いらっしゃい。ここは千本亭。転生待ちの魂が、束の間の憂さを晴らす店だ」',
   '「まかない飯は体にいいぞ。……体なんて、もうないはずなんだけどな。おかしな話だ」',
-  '「クエストの頼み事、受けてやってくれよ。この町の亡者は気が弱いのばかりでな」',
+  '「クエストの頼み事、受けてやってくれよ。この町の連中は気が弱いのばかりでな」',
   '「オキナの旦那は長生きだな。おれがこの店を開いた時にはもう、あの姿だった」',
   '「たまにな、客が急に止まるんだ。徳利を持ったまま、ぴたりと。……瞬きしたら元に戻ってるんだけどな」',
 ];
@@ -2134,7 +2139,7 @@ function save(){
       story:player.story,ferrymanCoin:player.ferrymanCoin,
       meishoku:player.meishoku,meishokuLv:player.meishokuLv,
       location:{zone,x:Math.round(player.x*1000)/1000,y:Math.round(player.y*1000)/1000,
-        dir:player.dir},
+        dir:player.dir,mapSize},
       friends:player.friends,giftsUsed:player.giftsUsed,settings
     });
     localStorage.setItem(SAVE_KEY,serialized);
@@ -2243,7 +2248,7 @@ function load(){
     settings.muted=cfg.muted===true;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
-    if(d.v>=12)restoreSavedLocation(d.location);
+    if(d.v>=12)restoreSavedLocation(d.location,d.v);
     return true;
   }catch(e){return false;}
 }
@@ -3165,8 +3170,8 @@ function acceptQuest(id){
 }
 function renderKessha(){
   const host=$('kesshaBody');
-  const intro='<div class="suggest-note">「ここは結社の窓口。亡者同士が助け合う結社——<b>講</b>の記帳を担っております」<br>'
-    +'「講に入るのは、亡者の身分でもどなたでも。講の仲間とは離れていても言葉を交わせ、名の上に講名を戴けます」</div>';
+  const intro='<div class="suggest-note">「ここは結社の窓口。魂同士が助け合う結社——<b>講</b>の記帳を担っております」<br>'
+    +'「講にはどなたでも入れます。仲間とは離れていても言葉を交わせ、名の上に講名を戴けます」</div>';
   if(guildState.id){
     host.innerHTML=intro
       +`<div class="suggest-note">「あなたは講【<b>${esc(guildState.name)}</b>】の${guildRoleLabel(guildState.myRole)}として記帳済み。`
@@ -3550,7 +3555,7 @@ function renderStatTab(){
       (player.statPts>0?`<button class="buyb" data-st="${k}">+1</button>`:'')+`</div>`;
   }
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px;margin-top:8px">
-    <span class="fx">─ ${meishokuLabel(player)} ${esc(player.name||'ナナシ')} の現在 ─</span></div>`;
+    <span class="fx">─ ${[meishokuLabel(player),esc(player.name||'ナナシ')].filter(Boolean).join(' ')} の現在 ─</span></div>`;
   html+=`<div class="statline"><span>攻撃</span><b>${atkTotal()}</b></div>`;
   html+=`<div class="statline"><span>防御</span><b>${defTotal()}</b></div>`;
   html+=`<div class="statline"><span>会心率</span><b>${Math.round(critRate()*100)}%</b></div>`;
@@ -3939,7 +3944,7 @@ function openNpc(npc){
       player.smithIntro=true;player.wScrolls++;player.aScrolls++;save();
       setTalkPortrait('smith');
       $('talkTitle').textContent='カナヤマ';$('talkSub').textContent='鍛冶屋';
-      $('talkText').textContent='「よう、亡者さん。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは失敗すりゃ+0に戻る博打だ。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
+      $('talkText').textContent='「よう。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは失敗すりゃ+0に戻る博打だ。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
       $('talk').classList.remove('hidden');
       log('武器強化の巻物と防具強化の巻物を1枚ずつもらった！','gain');
     }else{renderSmith();$('smith').classList.remove('hidden');}
@@ -3986,7 +3991,7 @@ function openNpc(npc){
     $('talkTitle').textContent='オキナ';$('talkSub').textContent='三途の川の番人';
     let line;
     if(player.quests.trial===0){
-      line='「よう来たな、亡者よ。業龍に挑むにはまだ早い。東の岩山に試練の洞窟がある。骨の武者どもを越え、主のアオオニを鎮めて力を示すのじゃ」';
+      line='「よう来たな。業龍に挑むにはまだ早い。東の岩山に試練の洞窟がある。骨の武者どもを越え、主のアオオニを鎮めて力を示すのじゃ」';
       player.quests.trial=1;save();
     }else if(player.quests.trial===1){
       line='「試練の洞窟は東じゃ。森を東へ抜ければ岩山の口が見える。中は暗く、帰り道は入口の青い光。甘露水を忘れるなよ」';
@@ -4868,7 +4873,8 @@ function paintRinneGroundChunk(W2,clip,canvas){
   paintKind(2,38,19,.22); // 都の石畳
 
   // 広い色むらと小さな草土の斑点で、同じテクスチャの繰り返しも崩す。
-  for(let i=0;i<180;i++){
+  const colorPatchCount=Math.round(180*(size/RINNE_BASE_SIZE)**2);
+  for(let i=0;i<colorPatchCount;i++){
     const x=2+rinneHash(i,4,21)*(size-4),y=2+rinneHash(i,8,22)*(size-4);
     const kind=W2.tileKind[Math.floor(y)*size+Math.floor(x)],r=24+rinneHash(i,3,23)*86;
     const px=GX(x,y),py=GY(x,y);
@@ -5059,7 +5065,7 @@ const rinneHash=(x,y,s=0)=>{
   return n-Math.floor(n);
 };
 function rinneRegionAt(x,y){
-  const depth=x+y;
+  const depth=(x+y)/RINNE_SCALE;
   return depth<112?'city':depth>184?'coast':'wilds';
 }
 function rinneSetBlocked(world,x,y,value=1){
@@ -5067,21 +5073,18 @@ function rinneSetBlocked(world,x,y,value=1){
   const gx=Math.round(x),gy=Math.round(y);
   if(gx>0&&gy>0&&gx<size-1&&gy<size-1)world.blocked[gy*size+gx]=value;
 }
-function addRinneTree(world,x,y,type,scale=1){
-  rinneSetBlocked(world,x,y,1);
-  world.props.push({x,y,kind:'rinne_tree',type,s:scale});
-}
 function buildRinneContinent(){
-  // 関西地方を1枚の120×120マップに置く。地域境界でswitchZoneしない。
+  // 関西地方を1枚の208×208マップに置く。地域境界でswitchZoneしない。
+  // 形状は120マス版の設計座標で定義し、距離だけをRINNE_SCALEで拡張する。
   // u=x-yが東西、v=x+yが南北。北に都、北東に琵琶湖、南に紀伊半島と渡船場を置く。
   const city=newRinneWorld(),size=RINNE_SIZE;
-  const mainTrail=[[51,51],[58,52],[66,57],[75,68],[83,74],[89,83],[96,94]];
-  const okayamaTrail=[[51,51],[45,58],[36,67],[27,75],[23,75]];
-  const gifuTrail=[[51,51],[61,51],[72,44],[80,34],[83,31]];
+  const mainTrail=[[51,51],[58,52],[66,57],[75,68],[83,74],[89,83],[96,94]].map(rinnePoint);
+  const okayamaTrail=[[51,51],[45,58],[36,67],[27,75],[23,75]].map(rinnePoint);
+  const gifuTrail=[[51,51],[61,51],[72,44],[80,34],[83,31]].map(rinnePoint);
 
   // 琵琶湖・大阪湾・伊勢湾と紀伊半島。判定はマス、表示は連続マスクでつなぐ。
   for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    const u=x-y,v=x+y,index=y*size+x;
+    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,index=y*size+x;
     const lakeNorth=((u-30)/9)**2+((v-69)/27)**2;
     const lakeSouth=((u-25)/7.5)**2+((v-93)/17)**2;
     const lake=lakeNorth<1||lakeSouth<1;
@@ -5101,13 +5104,13 @@ function buildRinneContinent(){
     else if(shellBeach)city.tileKind[index]=3;
   }
 
-  carveRinneTrail(city,mainTrail,3.15,1);
-  carveRinneTrail(city,okayamaTrail,2.35,1);
-  carveRinneTrail(city,gifuTrail,2.35,1);
+  carveRinneTrail(city,mainTrail,rinneCoord(3.15),1);
+  carveRinneTrail(city,okayamaTrail,rinneCoord(2.35),1);
+  carveRinneTrail(city,gifuTrail,rinneCoord(2.35),1);
 
   // 輪廻の都。水路と無作為な橋は置かず、広い石畳で街道につなぐ。
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-    const depth=x+y,side=Math.abs(x-y);
+    const depth=(x+y)/RINNE_SCALE,side=Math.abs(x-y)/RINNE_SCALE;
     const mainApproach=depth>=44&&depth<=108&&side<=5;
     const upperCourt=depth>=56&&depth<72&&side<=9;
     const grandCourt=depth>=68&&depth<=100&&side<=15;
@@ -5116,60 +5119,55 @@ function buildRinneContinent(){
     }
   }
   for(const depth0 of [66,84,96])for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    if(Math.abs(x+y-depth0)<=1&&Math.abs(x-y)<=18){city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;}
+    const depth=(x+y)/RINNE_SCALE,side=Math.abs(x-y)/RINNE_SCALE;
+    if(Math.abs(depth-depth0)<=1&&side<=18){city.blocked[y*size+x]=0;city.tileKind[y*size+x]=2;}
   }
 
   // 岡山方面と岐阜方面は陸の続きを見せつつ、山並みの向こうを現章では通行不可にする。
   for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
-    const u=x-y,v=x+y,index=y*size+x;
+    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,index=y*size+x;
     if(v<128&&(u<-49||u>52)&&city.tileKind[index]!==4&&city.tileKind[index]!==8)
       city.blocked[index]=1;
   }
   for(const [u,side] of [[-50,'west'],[52,'east']])for(let v=76;v<=124;v+=8){
-    const x=(v+u)/2,y=(v-u)/2;
+    const x=rinneCoord((v+u)/2),y=rinneCoord((v-u)/2);
     if(x<=2||y<=2||x>=size-2||y>=size-2)continue;
-    if(((v/8)&1)===0)addRinneTree(city,x,y,'pine',.82+rinneHash(x,y,61)*.22);
-    else city.props.push({x,y,kind:'rinne_rock',coastal:false,s:.82+rinneHash(x,y,62)*.28});
-    city.props.push({x:x+(side==='west'?1:-1),y:y+(side==='west'?-1:1),kind:'rinne_clutter',v:'talisman'});
+    rinneSetBlocked(city,x,y);
+    city.props.push({x,y,kind:'rinne_rock',coastal:false,s:.82+rinneHash(x,y,62)*.28});
+    city.props.push({x:x+rinneCoord(side==='west'?1:-1),y:y+rinneCoord(side==='west'?-1:1),
+      kind:'rinne_clutter',v:'talisman'});
   }
 
-  // 旧建物アトラスはセル越境と透過不良があるため、再制作まで配置と当たり判定を止める。
+  // 個別素材は大陸拡張後に配置する。ここでは中央広場と四職印の導線を先に確定する。
   for(const seal of MEISHOKU_SEALS)city.props.push({...seal,kind:'jobseal'});
-  for(const [x,y,type,s] of [
-    [19,29,'ginkgo',1],[29,19,'maple',.95],[25,36,'ginkgo',.85],[36,25,'ginkgo',.9],
-    [34,47,'maple',.82],[47,34,'maple',.9],[20,38,'maple',1.04],[38,20,'ginkgo',1.05],
-  ])addRinneTree(city,x,y,type,s);
   for(const [x,y] of [[48,48],[44,44],[40,40],[36,36],[32,32],[28,28]])
-    city.props.push({x:x+.8,y:y-.8,kind:'rinne_lantern'});
+    city.props.push({x:rinneCoord(x+.8),y:rinneCoord(y-.8),kind:'rinne_lantern'});
 
-  // 旧竹・樟セルは白残りと切断があるため隔離。再制作まで黒松とススキだけで植生を構成する。
+  // 植生の個別素材は新しい大陸上の距離感を見てから配置する。現段階はススキだけで密度を確認する。
   for(let y=4;y<size-4;y+=3)for(let x=4;x<size-4;x+=3){
     const index=y*size+x,kind=city.tileKind[index],region=rinneRegionAt(x,y);
     if(kind!==0||region==='city')continue;
-    const u=x-y,v=x+y,restricted=v<128&&(u<-49||u>52);
+    const u=(x-y)/RINNE_SCALE,v=(x+y)/RINNE_SCALE,restricted=v<128&&(u<-49||u>52);
     if(city.blocked[index]&&!restricted)continue;
     const d=Math.min(...mainTrail.slice(1).map((p,i)=>rinneTrailDistance(x,y,mainTrail[i],p)));
-    const h=rinneHash(x,y,41),grove=rinneHash(Math.floor(x/9),Math.floor(y/9),52);
-    const nearCoast=region==='coast'||(v>124&&(Math.abs(u)>22||v>174));
-    const treeThreshold=restricted?.58:nearCoast?.7:.68;
-    if(d>5.2&&grove>.43&&h>treeThreshold){
-      addRinneTree(city,x+(rinneHash(x,y,42)-.5)*.9,y+(rinneHash(y,x,43)-.5)*.9,
-        'pine',.78+rinneHash(y,x,44)*.34);
-    }else if(d>3.2&&h>.5){
+    const h=rinneHash(x,y,41);
+    if(d>rinneCoord(3.2)&&h>.5){
       city.props.push({x:x+.3,y:y+.2,kind:'rinne_pampas',s:.65+rinneHash(x,y,45)*.48});
     }
   }
   // 琵琶湖の湖岸は建物を置かず、石と薄だけで縁取る。
   for(const [x,y] of [[46,18],[52,22],[58,28],[56,35],[49,36],[43,29]]){
-    city.props.push({x,y,kind:'rinne_rock',coastal:false,s:.64+rinneHash(x,y,71)*.18});
-    city.props.push({x:x-.6,y:y+.5,kind:'rinne_pampas',s:.62+rinneHash(x,y,72)*.22});
+    const rx=rinneCoord(x),ry=rinneCoord(y);
+    city.props.push({x:rx,y:ry,kind:'rinne_rock',coastal:false,s:.64+rinneHash(rx,ry,71)*.18});
+    city.props.push({x:rx-.6,y:ry+.5,kind:'rinne_pampas',s:.62+rinneHash(rx,ry,72)*.22});
   }
 
-  city.props.push({x:101,y:101,kind:'rinne_pier'});
-  city.npcs.push({x:97,y:93,kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
-  city.props.push({x:92,y:89,kind:'rinne_lantern'},{x:69,y:61,kind:'rinne_lantern'});
+  city.props.push({x:rinneCoord(101),y:rinneCoord(101),kind:'rinne_pier'});
+  city.npcs.push({x:rinneCoord(97),y:rinneCoord(93),kind:'rinne_guide',name:'渡し守レン',sprite:'npc_soul_ren'});
+  city.props.push({x:rinneCoord(92),y:rinneCoord(89),kind:'rinne_lantern'},
+    {x:rinneCoord(69),y:rinneCoord(61),kind:'rinne_lantern'});
   for(const [x,y] of [[109,96],[105,101],[99,104],[92,103],[111,91]])
-    city.props.push({x,y,kind:'rinne_rock',s:.72+rinneHash(x,y)*.34});
+    city.props.push({x:rinneCoord(x),y:rinneCoord(y),kind:'rinne_rock',s:.72+rinneHash(x,y)*.34});
   RINNE=city;
 }
 /* ---- 竜の洞窟(地下5階) ---- */
@@ -5390,7 +5388,7 @@ function switchZone(z,px,py){
   mapSize=z==='field'?FIELD_SIZE:z==='rinne'?RINNE_SIZE:WORLD_SIZE;
   blocked=W2.blocked;tileKind=W2.tileKind;props=W2.props;
   npcs=W2.npcs;mobs=W2.mobs;ground=W2.ground;
-  // 120マスの巨大マップは二枚同時に保持せず、船移動のときだけ再生成する。
+  // 賽の森と輪廻大陸の巨大マップは二枚同時に保持せず、船移動のときだけ再生成する。
   if(previousGround!==ground&&(MOBILE_RENDER||previousGround===FIELD?.ground||previousGround===RINNE?.ground))
     releaseGroundCanvas(previousGround);
   if(started&&!ground._groundReady){
@@ -5441,14 +5439,20 @@ function switchZone(z,px,py){
   }
   return true;
 }
-function restoreSavedLocation(saved){
+function restoreSavedLocation(saved,saveVersion=SAVE_VERSION){
   if(!saved||typeof saved!=='object')return false;
   const savedZone=saved.zone==='rinne_coast'||saved.zone==='rinne_wilds'
     ?'rinne':String(saved.zone||'');
   if(!worldByZone(savedZone)||typeof saved.x!=='number'||typeof saved.y!=='number'
     ||!Number.isFinite(saved.x)||!Number.isFinite(saved.y))return false;
   const size=savedZone==='field'?FIELD_SIZE:savedZone==='rinne'?RINNE_SIZE:WORLD_SIZE;
-  const x=clamp(saved.x,0,size-1),y=clamp(saved.y,0,size-1);
+  // v12の輪廻大陸は120マス。旧座標を同じ地域の208マス座標へ移す。
+  const savedMapSize=savedZone==='rinne'
+    ?(Number.isFinite(+saved.mapSize)&&+saved.mapSize>0?+saved.mapSize:
+      saveVersion<=12?RINNE_BASE_SIZE:RINNE_SIZE)
+    :size;
+  const locationScale=savedZone==='rinne'?RINNE_SIZE/savedMapSize:1;
+  const x=clamp(saved.x*locationScale,0,size-1),y=clamp(saved.y*locationScale,0,size-1);
   if(!switchZone(savedZone,x,y))return false;
   if(isB(Math.round(x),Math.round(y))){
     const safe=nearestWalkable(Math.round(x),Math.round(y));
@@ -5605,7 +5609,7 @@ loadSprite('map_enmacho_3f',MOBILE_RENDER?'assets/map_enmacho_3f_mobile.jpg':'as
 loadSprite('rinne_terrain_atlas','assets/map_rinne_terrain_atlas.png');
 loadSprite('rinne_vegetation_atlas','assets/map_rinne_vegetation_atlas.png');
 loadSprite('rinne_props_atlas','assets/map_rinne_props_atlas.png');
-// map_rinne_buildings_atlas.pngはセル越境と透過不良の修復後に個別素材として再導入する。
+// 検品済みの個別素材は、208マス大陸の導線確定後に読み込む。
 loadSprite('npc_enma','assets/npc_enma.png');
 loadSprite('npc_soul_kayo','assets/npc_soul_kayo.png');
 loadSprite('npc_soul_genta','assets/npc_soul_genta.png');
@@ -6765,7 +6769,7 @@ function drawNpc(sx,sy,n){
     ctx.fillStyle='#7a4a3a';
     ctx.beginPath();ctx.ellipse(9,-13,2.6,3.6,0.2,0,6.29);ctx.fill();   // 徳利
   }else if(n.kind==='guest'){
-    // 酔客: 青白い亡者+徳利、ゆらゆら
+    // 酔客: 青白い魂+徳利、ゆらゆら
     const sway=Math.sin(time*1.8)*2;
     ctx.save();ctx.translate(sway,0);ctx.rotate(sway*0.02);
     ctx.fillStyle='rgba(150,170,200,0.75)';
@@ -7345,7 +7349,7 @@ canvas.addEventListener('pointerdown',ev=>{
     sfx.click();
     return;
   }
-  // 近くの亡者(他プレイヤー)クリック → プレイヤーカード
+  // 近くの魂(他プレイヤー)クリック → プレイヤーカード
   let hitPlayer=null,bestPlayer=1e9;
   for(const e of remotePlayers.values()){
     if(e.zone!==zone||e.dead)continue;
@@ -7380,7 +7384,7 @@ function refreshPlayerIdentityUi(force=false){
   const key=[guildState.name,player.meishoku,player.gender,player.name].join('|');
   if(!force&&key===identityUiKey)return;
   identityUiKey=key;
-  $('pjob').textContent=job?.name||'亡者';
+  $('pjob').textContent=job?.name||'';
   $('pname').textContent=(guildState.name?`【${guildState.name}】`:'')+(player.name||'ナナシ');
   const icon=$('menuJobIcon');
   icon.classList.toggle('has-job',Boolean(job));
@@ -7389,7 +7393,7 @@ function refreshPlayerIdentityUi(force=false){
   $('btnEquip').title=job?`${job.name}のメニュー (I)`:'メニュー (I)';
   $('btnEquip').setAttribute('aria-label',job?`${job.name}のメニュー`:'メニュー');
   const fixedName=$('nameFixed')?.querySelector('b');
-  if(fixedName)fixedName.textContent=`${job?.name||'亡者'} ${player.name||'ナナシ'}`;
+  if(fixedName)fixedName.textContent=[job?.name,player.name||'ナナシ'].filter(Boolean).join(' ');
 }
 const CHAT_CHANNELS={
   general:{label:'一般',color:'#c9a24a'},
@@ -7622,15 +7626,15 @@ const ZONE_LABELS={field:'賽の森',rinne:'輪廻大陸',cave:'試練B1',cave2:
   dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5',
   muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3'};
 const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
-const STAGE_LABELS={deceased:'亡者',rebirth_candidate:'転生候補者',reincarnated:'転生者'};
+const STAGE_LABELS={deceased:'転生審査中',rebirth_candidate:'転生候補者',reincarnated:'転生者'};
 function playerTitle(ach,level){
   if(!ach)return '流離いの魂';
   if(ach.dragon)return '業竜を鎮めし者';
   if(ach.oniKing)return '王鬼を討ちし者';
   if(ach.trial)return '試練を越えし者';
   if((ach.kills|0)>=100)return '成仏請負人';
-  if((level|0)>=10)return '駆け出しの亡者';
-  return '新入りの亡者';
+  if((level|0)>=10)return '駆け出し';
+  return '新入り';
 }
 const partyHas=id=>party.members.some(m=>m.userId===id&&!m.self);
 const isFriend=id=>player.friends.some(f=>f.id===id);
@@ -7673,8 +7677,11 @@ function openPlayerCard(e){
   playerCard.userId=e.userId;
   $('pcPortrait').style.backgroundImage=`url(${playerSpriteAsset(e)})`;
   $('pcName').textContent=e.name||'ナナシ';
-  $('pcMeta').textContent=
-    `徳位${e.level||1}・${meishokuDef(e)?.name||STAGE_LABELS[e.ach?.stage]||'亡者'}・${zoneLabel(e.zone)}`;
+  $('pcMeta').textContent=[
+    `徳位${e.level||1}`,
+    meishokuDef(e)?.name||STAGE_LABELS[e.ach?.stage]||STAGE_LABELS.deceased,
+    zoneLabel(e.zone),
+  ].filter(Boolean).join('・');
   $('pcTitle').textContent=playerTitle(e.ach,e.level);
   $('pcKills').textContent=e.ach?String(e.ach.kills):'—';
   setAchMark('pcTrial',e.ach?.trial);
@@ -8113,7 +8120,7 @@ $('startBtn').addEventListener('click',()=>{
   }
   audio();startBgm();
   if(hasSaveData){
-    log(`おかえり、${meishokuLabel(player)} ${player.name} (徳位${player.lv} / ${player.gold} モン)`,'sys');
+    log(`おかえり、${[meishokuLabel(player),player.name].filter(Boolean).join(' ')} (徳位${player.lv} / ${player.gold} モン)`,'sys');
     if(migrationStatGrant>0)
       log(`毎徳位の新制度により、魂の資質ポイントを${migrationStatGrant}補填した`,'gain');
   }else{
