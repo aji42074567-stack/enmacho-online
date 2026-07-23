@@ -7361,11 +7361,7 @@ function render(){
     drawRemotePlayerLabel(sx,sy,e);
     if(e.chatFx&&!drawChatBubbleFx(sx,sy,e.chatFx))e.chatFx=null;
   }
-  if(player.chatFx){
-    const bx=SX(player.x,player.y);
-    const by=SY(player.x,player.y)-(zone==='field'?ELEV_PX*elevF(player.x,player.y):0);
-    if(!drawChatBubbleFx(bx,by,player.chatFx))player.chatFx=null;
-  }
+  // 自分の吹き出しは名前・HP/MPバーより手前に出すため、最後(drawPlayerMobileHudの後)で描く
   const playerHudWorldX=SX(player.x,player.y);
   const playerHudWorldY=SY(player.x,player.y)
     -(zone==='field'?ELEV_PX*elevF(player.x,player.y):0);
@@ -7475,6 +7471,8 @@ function render(){
   }
   drawPartyOffscreenArrows(viewScale,SX,SY);
   drawPlayerMobileHud(playerHudX,playerHudY);
+  if(player.chatFx&&!drawChatBubbleFx(playerHudX,playerHudY-14,player.chatFx,true))
+    player.chatFx=null;
 }
 
 /* ================= HUD ================= */
