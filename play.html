@@ -4486,11 +4486,25 @@ function update(dt){
       }
     }
     if(player.moveHold&&!player.path.length)player.moveHold=false;  // 指示地点に到着
+    // 立ち止まっている間、他プレイヤーと重なっていたらそっと離れる(お互いの画面で自然に分離する)
+    if(!player.dead&&!player.path.length&&player.attackDur<=0&&!vpad.active){
+      for(const e of remotePlayers.values()){
+        if(e.zone!==zone||e.dead)continue;
+        const ox=player.x-e.x,oy=player.y-e.y,od=Math.hypot(ox,oy);
+        if(od<0.45){
+          const ang=od>0.01?Math.atan2(oy,ox):Math.random()*6.28;
+          const nx=player.x+Math.cos(ang)*1.1*dt,ny=player.y+Math.sin(ang)*1.1*dt;
+          if(!isB(Math.round(nx),Math.round(ny))){player.x=nx;player.y=ny;}
+          break;
+        }
+      }
+    }
     if(player.autoMode&&!player.moveHold
       &&!player.target&&!player.talkTarget&&!player.gateTarget){
       let best=null,bd=AUTO_RANGE;
       for(const m of mobs){
         if(m.dead)continue;
+        if((m.autoSkipUntil||0)>performance.now())continue;  // 経路の無い敵はしばらく対象外
         const d=dist(player,m);
         if(d<bd){bd=d;best=m;}
       }
@@ -4508,6 +4522,12 @@ function update(dt){
           if(player.repath<=0||!player.path.length){
             player.repath=0.35;
             player.path=findPath(player.x,player.y,m.x,m.y);
+            // 障害物で辿り着けない敵に固執して棒立ちになるのを防ぐ:
+            // AUTO中は4秒間その敵を対象外にして、届く別の敵へ切り替える
+            if(!player.path.length&&player.autoMode){
+              m.autoSkipUntil=performance.now()+4000;
+              player.target=null;
+            }
           }
         }
       }
