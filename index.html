@@ -231,6 +231,37 @@
   .gcard.wide img{image-rendering:auto;width:100%;height:100%;object-fit:cover;filter:none}
   .gcard.art img{image-rendering:auto;width:64%;height:84%}
   .gal-grid>a{display:block}
+
+  /* ---------------- 因果顕現(ボスカットイン劇場) ---------------- */
+  #inga{background:linear-gradient(180deg,#0b0a0e,#07080c)}
+  .inga-lead{max-width:640px;margin:-26px auto 44px;text-align:center;
+    font-family:var(--serif);font-size:13px;letter-spacing:.14em;color:var(--dim)}
+  .inga-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+    max-width:1180px;margin:0 auto}
+  .inga-card{position:relative;margin:0}
+  .inga-frame{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:6px;
+    border:1px solid var(--panel-edge);background:#0a090d}
+  .inga-frame video{width:100%;height:100%;object-fit:cover;display:block}
+  .inga-cover{position:absolute;inset:0;width:100%;border:0;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    background:radial-gradient(ellipse at 50% 70%,var(--acc-glow),transparent 62%),
+      linear-gradient(180deg,#100e14,#0b0a0e);transition:opacity .45s}
+  .inga-cover img{width:92px;height:92px;object-fit:contain;image-rendering:pixelated;
+    filter:drop-shadow(0 10px 12px rgba(0,0,0,.65))}
+  .inga-cover .play{display:flex;align-items:center;justify-content:center;
+    width:44px;height:44px;border:1px solid var(--acc);border-radius:50%;
+    color:var(--acc);font-size:15px;padding-left:3px;background:rgba(4,5,8,.55);
+    transition:background .3s,color .3s}
+  .inga-cover:hover .play{background:var(--acc);color:#0a0407}
+  .inga-card.playing .inga-cover{opacity:0;pointer-events:none}
+  .inga-card figcaption{margin-top:12px;text-align:center}
+  .inga-card figcaption b{font-family:var(--serif);font-size:15px;letter-spacing:.18em;
+    color:var(--parchment);font-weight:600}
+  .inga-card figcaption small{display:block;margin-top:4px;font-size:10.5px;
+    letter-spacing:.1em;color:var(--dim)}
+  .inga-note{margin-top:44px;text-align:center;font-family:var(--serif);
+    font-size:12px;letter-spacing:.24em;color:var(--dim)}
+  @media (max-width:860px){.inga-grid{grid-template-columns:1fr;max-width:520px}}
   /* 4方向スプライトシートから正面1コマだけ切り出して表示 */
   .gcard .cell{width:60%;aspect-ratio:1;margin-bottom:10%;
     background-repeat:no-repeat;background-size:400% 100%;background-position:0 0;
@@ -421,6 +452,15 @@
     <a href="meishoku.html#gohousou"><figure class="gcard art fade">
       <img src="assets/meishoku/gohousou_m.webp" alt="冥職 護法僧" loading="lazy">
       <figcaption>冥職　護法僧</figcaption></figure></a>
+    <a href="#inga"><figure class="gcard fade">
+      <img src="assets/mob_orc_blue.png" alt="鬼王 オニオウ" loading="lazy">
+      <figcaption>鬼王　オニオウ</figcaption></figure></a>
+    <a href="#inga"><figure class="gcard fade">
+      <img src="assets/mob_skeleton.png" alt="骨王 ガシャオウ" loading="lazy">
+      <figcaption>骨王　ガシャオウ</figcaption></figure></a>
+    <a href="#inga"><figure class="gcard fade">
+      <img src="assets/mob_drake.png" alt="業龍 ゴウリュウ" loading="lazy">
+      <figcaption>業龍　ゴウリュウ</figcaption></figure></a>
     <figure class="gcard fade"><i class="cell" role="img" aria-label="新入りの魂（男）"
         style="background-image:url(assets/char_player_m.png)"></i>
       <figcaption>新入りの魂</figcaption></figure>
@@ -440,6 +480,48 @@
     <figure class="gcard fade"><img src="assets/mob_drake.png" alt="ゴウリュウ">
       <figcaption>賽の森の主 ゴウリュウ</figcaption></figure>
   </div>
+</section>
+
+<section id="inga">
+  <div class="sec-head fade">
+    <small>BOSS CUT-IN</small>
+    <h2>因果顕現 — 地獄の主たち</h2>
+    <div class="rule"></div>
+  </div>
+  <p class="inga-lead fade">審査区の最深部に至った魂の前で、主たちの因果が顕現する。<br>▶で開幕の一幕を見よ。</p>
+  <div class="inga-grid">
+    <figure class="inga-card fade" style="--acc:#d8643f;--acc-glow:rgba(216,100,63,.26)">
+      <div class="inga-frame">
+        <video src="assets/boss_oni_intro.mp4" preload="none" playsinline></video>
+        <button class="inga-cover" type="button" aria-label="鬼王 オニオウのカットインを再生">
+          <img src="assets/mob_orc_blue.png" alt="">
+          <span class="play">▶</span>
+        </button>
+      </div>
+      <figcaption><b>鬼王 オニオウ</b><small>怒りの成れの果て ／ 試練の洞窟 最深部</small></figcaption>
+    </figure>
+    <figure class="inga-card fade" style="--acc:#9c80ce;--acc-glow:rgba(156,128,206,.26)">
+      <div class="inga-frame">
+        <video src="assets/boss_gashao_intro.mp4" preload="none" playsinline></video>
+        <button class="inga-cover" type="button" aria-label="骨王 ガシャオウのカットインを再生">
+          <img src="assets/mob_skeleton.png" alt="">
+          <span class="play">▶</span>
+        </button>
+      </div>
+      <figcaption><b>骨王 ガシャオウ</b><small>孤独の成れの果て ／ 無縁塚 最深部</small></figcaption>
+    </figure>
+    <figure class="inga-card fade" style="--acc:#d89a3d;--acc-glow:rgba(216,154,61,.26)">
+      <div class="inga-frame">
+        <video src="assets/boss_dragon_intro.mp4" preload="none" playsinline></video>
+        <button class="inga-cover" type="button" aria-label="業龍 ゴウリュウのカットインを再生">
+          <img src="assets/mob_drake.png" alt="">
+          <span class="play">▶</span>
+        </button>
+      </div>
+      <figcaption><b>業龍 ゴウリュウ</b><small>災厄にして、最後の守護者 ／ 竜の洞窟 最深部</small></figcaption>
+    </figure>
+  </div>
+  <p class="inga-note fade">— 顕現のあとに紡がれる「因果の言葉」は、戦いの中で —</p>
 </section>
 
 <section id="devlog">
@@ -534,6 +616,22 @@
       'この端末に冒険の記録があります。<a href="play.html">続きから入庁する</a>';
   }
 })();
+// 因果顕現: カバーをタップで動画再生(他は停止)。終わるとカバーが戻る
+for(const card of document.querySelectorAll('.inga-card')){
+  const video=card.querySelector('video'),cover=card.querySelector('.inga-cover');
+  cover.addEventListener('click',()=>{
+    for(const other of document.querySelectorAll('.inga-card.playing')){
+      if(other===card)continue;
+      other.classList.remove('playing');
+      const v=other.querySelector('video');v.pause();v.currentTime=0;
+    }
+    card.classList.add('playing');
+    video.currentTime=0;video.muted=false;
+    video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
+  });
+  video.addEventListener('ended',()=>{card.classList.remove('playing');});
+  video.addEventListener('click',()=>{video.pause();card.classList.remove('playing');});
+}
 // スクロールでナビに背景
 const nav=document.getElementById('nav');
 addEventListener('scroll',()=>nav.classList.toggle('solid',scrollY>40),{passive:true});
