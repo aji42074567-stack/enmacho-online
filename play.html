@@ -2308,8 +2308,9 @@ const atkTotal=()=>6+ST().str+ITEMS[player.eq.weapon].atk+weaponPlus(player.eq.w
   +(meishokuDef(player)?.atk||0)+(player.foodAtkT>0?4:0);
 const dispName=id=>{const p=weaponPlus(id);return ITEMS[id].name+(p>0?` +${p}`:'');};
 /* ---- 装備強化(鍛冶屋カナヤマ・巻物式) ---- */
-const ENH_MAX=9;
-const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25];  // 次が+1〜+9のときの成功率
+// 新仕様(docs/chatgame-design.md §3): 失敗しても+値は維持・上限なし・+16以降は一律1%
+const ENH_RATE=[1,1,1,0.8,0.65,0.5,0.4,0.3,0.25,0.15,0.1,0.07,0.05,0.03,0.02];  // 次が+1〜+15のときの成功率
+const enhRate=n=>ENH_RATE[n-1]??0.01;              // +16以降は一律1%(無限峠)
 const enhNeedsBlood=n=>n>=7;                       // 武器の+7以降は竜の血が必要
 const SCROLL_DROP_RATE=0.07;   // 中ボス・竜からの強化巻物ドロップ率
 const defTotal=()=>eqSum('def')+weaponPlus(player.eq.body)+Math.floor(ST().con/4)
@@ -2449,7 +2450,12 @@ function load(){
           lv:Math.max(1,f.lv|0),at:f.at|0})).slice(0,50)
       :[];
     player.giftsUsed=(d.giftsUsed&&typeof d.giftsUsed==='object')?d.giftsUsed:{};
-    player.plus=(d.plus&&typeof d.plus==='object')?d.plus:{};
+    // 上限撤廃で値域の自然な歯止めが消えたため、破損・改ざんセーブの非数値や負値をここで弾く
+    player.plus={};
+    if(d.plus&&typeof d.plus==='object')for(const [pid,pv] of Object.entries(d.plus)){
+      const n=Math.max(0,Math.trunc(Number(pv)||0));
+      if(n>0&&ITEMS[pid])player.plus[pid]=n;
+    }
     player.wScrolls=Math.max(0,d.wScrolls|0);player.aScrolls=Math.max(0,d.aScrolls|0);
     player.smithIntro=!!d.smithIntro;
     // v7以前は2時間の出現枠を記録していたため、更新時は討伐待ちを解除する。
@@ -3332,15 +3338,10 @@ function renderSmith(){
     const it=ITEMS[r.id];
     if(!it){html+=`<div class="itemrow"><span class="nm">${r.label}: 装備なし</span></div>`;continue;}
     const cur=weaponPlus(r.id);
-    if(cur>=ENH_MAX){
-      html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
-        <span class="nm">${esc(dispName(r.id))} <span class="fx">これ以上は強化できない</span></span></div>`;
-      continue;
-    }
-    const nx=cur+1,rate=ENH_RATE[nx-1],blood=r.k==='w'&&enhNeedsBlood(nx);
+    const nx=cur+1,rate=enhRate(nx),blood=r.k==='w'&&enhNeedsBlood(nx);
     const lack=r.scr<1||(blood&&player.dragonBlood<1);
     html+=`<div class="itemrow"><img class="icn" src="assets/${it.icon}" alt="">
-      <span class="nm">${esc(dispName(r.id))} → +${nx} <span class="fx">成功${Math.round(rate*100)}%${rate<1?' / 失敗で+0に戻る':''}${blood?' / 竜の血1が必要':''}</span></span>
+      <span class="nm">${esc(dispName(r.id))} → +${nx} <span class="fx">成功${Math.round(rate*100)}%${rate<1?' / 失敗しても+値はそのまま':''}${blood?' / 竜の血1が必要':''}</span></span>
       <button class="buyb" data-senh="${r.k}" ${lack?'disabled':''}>強化</button></div>`;
   }
   html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個(武器の+7以降で使う)</div>`;
@@ -3354,8 +3355,7 @@ function enhance(kind){
   const id=kind==='w'?player.eq.weapon:player.eq.body;
   if(!ITEMS[id])return;
   const cur=weaponPlus(id);
-  if(cur>=ENH_MAX)return;
-  const nx=cur+1,rate=ENH_RATE[nx-1],blood=kind==='w'&&enhNeedsBlood(nx);
+  const nx=cur+1,rate=enhRate(nx),blood=kind==='w'&&enhNeedsBlood(nx);
   if(kind==='w'){if(player.wScrolls<1)return;}else{if(player.aScrolls<1)return;}
   if(blood&&player.dragonBlood<1)return;
   if(kind==='w')player.wScrolls--;else player.aScrolls--;
@@ -3367,8 +3367,8 @@ function enhance(kind){
     burst(player.x,player.y,'#ffe27a',16);
     sfx.coin();
   }else{
-    delete player.plus[id];
-    log(`強化失敗… ${ITEMS[id].name}の強化値が失われた`,'sys');
+    // 新仕様: 失敗しても強化値は維持(巻物と、+7以降の武器なら竜の血だけ消費)
+    log(`強化失敗… だが${dispName(id)}の強化値はそのままだ`,'sys');
     addFloat(player.x,player.y-0.8,'失敗…','#ff7a6a',true);
     burst(player.x,player.y,'#8a4a3a',14);
     sfx.hit();
@@ -4232,7 +4232,7 @@ function openNpc(npc){
       player.smithIntro=true;player.wScrolls++;player.aScrolls++;save();
       setTalkPortrait('smith');
       $('talkTitle').textContent='カナヤマ';$('talkSub').textContent='鍛冶屋';
-      $('talkText').textContent='「よう。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは失敗すりゃ+0に戻る博打だ。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
+      $('talkText').textContent='「よう。武器と防具は強化の巻物で鍛えられる。+3までは俺の腕で確実、+4からは運試しだ。だが失敗しても強化値は減らねぇ、失うのは巻物だけよ。上に果てはねぇ——腕と巻物の続く限りな。巻物は売り物じゃねぇ——洞窟の主や竜みてぇな大物が稀に持ってる。ほれ、最初の一枚ずつはくれてやる。使うときはまた俺んとこへ来な」';
       $('talk').classList.remove('hidden');
       log('武器強化の巻物と防具強化の巻物を1枚ずつもらった！','gain');
     }else{renderSmith();$('smith').classList.remove('hidden');}
