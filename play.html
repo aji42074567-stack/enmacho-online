@@ -8716,6 +8716,17 @@ for(const [zn,w] of [['cave',CAVE],['cave2',CAVE2],['cave3',CAVE3],
   ['dg1',DGW[0]],['dg2',DGW[1]],['dg3',DGW[2]],['dg4',DGW[3]],['dg5',DGW[4]],
   ['muen1',MUENW[0]],['muen2',MUENW[1]],['muen3',MUENW[2]]])
   w?.mobs?.forEach((mob,i)=>{mob.id=`${zn}-${i}`;});
+// ?debugmob 付きで開くと、現在ゾーンの敵名簿をログタブへ5秒ごとに出す(不具合調査用)
+if(new URLSearchParams(location.search).has('debugmob')){
+  setInterval(()=>{
+    try{
+      log(`[mob] zone=${zone} shared=${sharedWorld.connected?'on':'off'} n=${mobs.length}`,'sys');
+      mobs.forEach((m,i)=>log(`[mob] ${m.id||i} ${m.type} (${m.x.toFixed(1)},${m.y.toFixed(1)}) `
+        +`${m.dead?'dead':'alive'}`
+        +(Number.isFinite(m.serverX)?` srv(${m.serverX.toFixed(1)},${m.serverY.toFixed(1)})`:''),'sys'));
+    }catch(e){log('[mob] err '+(e&&e.message||e),'sys');}
+  },5000);
+}
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
 // 運営ギフト: ?gift=コード 付きで開くと一度だけ授かる。コードはハッシュでしか持たない
