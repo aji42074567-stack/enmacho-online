@@ -765,6 +765,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           if (activeChannel !== channel) return;
           if (status === 'SUBSCRIBED') {
             subscribed = true;
+            zoneRetryAt = 0;
             const current = bridge?.getRealtimeState?.() || snapshot;
             try {
               await activeChannel.track(payloadFor(current));
