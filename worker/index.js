@@ -744,10 +744,36 @@ export class WorldRoom {
           monster.y = monster.homeY;
           monster.hp = monster.maxHp;
           monster.state = 'idle';
+          monster.returnStuckMs = 0;
           monster.wanderAt = now + randomInt(2_000, 6_000);
         } else {
+          // 帰宅は直線移動なので、迷路の壁に引っかかると永遠に立ち往生する。
+          // 進めない状態が4秒続いたら定位置へ瞬間帰還させる(リネ式リーシュ)。
+          const beforeX = monster.x;
+          const beforeY = monster.y;
           this.moveToward(monster, monster.homeX, monster.homeY, definition.speed, dt);
+          const moved = Math.hypot(monster.x - beforeX, monster.y - beforeY);
+          if (moved < definition.speed * dt * 0.25) {
+            monster.returnStuckMs = (monster.returnStuckMs || 0) + dt * 1_000;
+            if (monster.returnStuckMs >= 4_000) {
+              monster.x = monster.homeX;
+              monster.y = monster.homeY;
+              monster.hp = monster.maxHp;
+              monster.state = 'idle';
+              monster.returnStuckMs = 0;
+              monster.wanderAt = now + randomInt(2_000, 6_000);
+            }
+          } else {
+            monster.returnStuckMs = 0;
+          }
         }
+        continue;
+      }
+
+      // 追跡ややり残しで定位置から離れすぎた敵(過去に立ち往生した個体を含む)は帰宅させる。
+      if (Math.hypot(monster.x - monster.homeX, monster.y - monster.homeY) > 6) {
+        monster.state = 'return';
+        monster.targetId = '';
         continue;
       }
 
