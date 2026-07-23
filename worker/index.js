@@ -216,6 +216,10 @@ function healthResponse() {
   }, { headers });
 }
 
+const roomNameForZone = zone => zone === 'field'
+  ? 'field-v3'
+  : zone === 'dg5' ? 'dg5-v4' : `${zone}-v1`;
+
 async function authenticate(request, env) {
   const protocols = parseProtocols(request);
   const authProtocol = protocols.find(value => value.startsWith('auth.'));
@@ -242,6 +246,14 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
+      if (url.searchParams.get('zone') === 'dg5') {
+        const roomId = env.WORLD_ROOMS.idFromName(roomNameForZone('dg5'));
+        const headers = new Headers({
+          'x-enma-health-inspect': '1',
+          'x-enma-zone': 'dg5',
+        });
+        return env.WORLD_ROOMS.get(roomId).fetch(new Request(request, { headers }));
+      }
       return healthResponse();
     }
     const zoneMatch = url.pathname.match(/^\/world\/([a-z0-9]+)$/);
@@ -256,7 +268,7 @@ export default {
     if (!identity) return new Response('Unauthorized', { status: 401 });
 
     // 旧B5ルームの停止した復活状態を引き継がず、新しい部屋で作り直す。
-    const roomName = zone === 'field' ? 'field-v3' : zone === 'dg5' ? 'dg5-v4' : `${zone}-v1`;
+    const roomName = roomNameForZone(zone);
     const roomId = env.WORLD_ROOMS.idFromName(roomName);
     const headers = new Headers(request.headers);
     headers.set('x-enma-user-id', identity.userId);
@@ -372,6 +384,35 @@ export class WorldRoom {
   async fetch(request) {
     await this.ready;
     const sockets = this.state.getWebSockets();
+    if (request.headers.get('x-enma-health-inspect') === '1') {
+      const now = Date.now();
+      if (this.reconcileRespawns(now, sockets)) await this.persist(now, true);
+      const drake = this.mobs.find(monster => monster.type === 'drake');
+      return Response.json({
+        ok: true,
+        zone: this.zone || 'dg5',
+        initialized: this.simReady(),
+        players: sockets.length,
+        drake: drake ? {
+          alive: !drake.dead,
+          hp: drake.hp,
+          maxHp: drake.maxHp,
+          x: Math.round(drake.x * 100) / 100,
+          y: Math.round(drake.y * 100) / 100,
+          respawnSeconds: drake.dead
+            ? Math.ceil(Math.max(0, drake.respawnAt - now) / 1_000)
+            : 0,
+          killedAt: drake.dead
+            ? Math.max(0, drake.respawnAt - (drake.respawnMs || DRAKE_RESPAWN_MS))
+            : 0,
+        } : null,
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
     if (sockets.length >= PLAYER_LIMIT) return new Response('Room full', { status: 503 });
 
     if (!this.zone) this.zone = cleanText(request.headers.get('x-enma-zone'), 16);
