@@ -3,11 +3,12 @@ const TICK_MS = 100;
 // 差分だけを送りつつ、移動は10fpsで届かせて補間の遅れを抑える。
 const SNAPSHOT_MS = 100;
 const RESPAWN_MS = 45_000;
+const BOSS_RESPAWN_MS = 120_000;
 const DRAKE_RESPAWN_MS = 30 * 60_000;
 const RESPAWN_NEARBY_RADIUS = 5;
 const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
-const WORLD_VERSION = 5;
+const WORLD_VERSION = 6;
 const PLAYER_LIMIT = 80;
 const ZONE_SIZE = 72;
 const FIELD_SIZE = 120;
@@ -45,20 +46,37 @@ const FIELD_DEFINITIONS = {
   },
 };
 
-const DRAKE_DEFINITION = {
-  name: 'ゴウリュウ',
-  hp: 13_600,
-  damage: [80, 180],
-  speed: 2.1,
-  aggro: 5,
-  attackCooldown: 2.1,
-};
-const DRAKE_SPAWN = {
-  type: 'drake',
-  x: 44,
-  y: 30,
-  respawnMs: DRAKE_RESPAWN_MS,
-  schedule: 'dragon30m',
+const CANONICAL_ZONE_BOSSES = {
+  cave3: {
+    definition: {
+      name: 'オニオウ', hp: 2_600, damage: [34, 52],
+      speed: 2, aggro: 6, attackCooldown: 1.8,
+    },
+    spawn: {
+      type: 'oni_king', x: 51, y: 30,
+      respawnMs: BOSS_RESPAWN_MS, schedule: '',
+    },
+  },
+  muen3: {
+    definition: {
+      name: 'ガシャオウ', hp: 6_800, damage: [52, 92],
+      speed: 2, aggro: 6, attackCooldown: 1.9,
+    },
+    spawn: {
+      type: 'gashao', x: 51, y: 30,
+      respawnMs: BOSS_RESPAWN_MS, schedule: '',
+    },
+  },
+  dg5: {
+    definition: {
+      name: 'ゴウリュウ', hp: 13_600, damage: [80, 180],
+      speed: 2.1, aggro: 5, attackCooldown: 2.1,
+    },
+    spawn: {
+      type: 'drake', x: 44, y: 30,
+      respawnMs: DRAKE_RESPAWN_MS, schedule: 'dragon30m',
+    },
+  },
 };
 
 const FIELD_SPAWNS = [
@@ -179,7 +197,10 @@ function validateZoneInit(zone, data) {
       attackCooldown: clamp(finite(raw.attackCooldown, 1.7), 0.5, 10),
     };
   }
-  if (zone === 'dg5') defs.drake = { ...DRAKE_DEFINITION };
+  const canonicalBoss = CANONICAL_ZONE_BOSSES[zone];
+  if (canonicalBoss) {
+    defs[canonicalBoss.spawn.type] = { ...canonicalBoss.definition };
+  }
 
   if (!Array.isArray(data.spawns) || !data.spawns.length || data.spawns.length > 64) return null;
   const spawns = [];
@@ -199,10 +220,10 @@ function validateZoneInit(zone, data) {
       schedule: isDrake ? 'dragon30m' : '',
     });
   }
-  if (zone === 'dg5') {
-    const drakeIndex = spawns.findIndex(spawn => spawn.type === 'drake');
-    if (drakeIndex >= 0) spawns[drakeIndex] = { ...DRAKE_SPAWN };
-    else spawns.push({ ...DRAKE_SPAWN });
+  if (canonicalBoss) {
+    const bossIndex = spawns.findIndex(spawn => spawn.type === canonicalBoss.spawn.type);
+    if (bossIndex >= 0) spawns[bossIndex] = { ...canonicalBoss.spawn };
+    else spawns.push({ ...canonicalBoss.spawn });
   }
 
   const zoneData = { zone, walls, defs, spawns };
@@ -240,7 +261,9 @@ function healthResponse() {
 
 const roomNameForZone = zone => zone === 'field'
   ? 'field-v3'
-  : zone === 'dg5' ? 'dg5-v5' : `${zone}-v1`;
+  : zone === 'cave3' ? 'cave3-v2'
+  : zone === 'muen3' ? 'muen3-v2'
+  : zone === 'dg5' ? 'dg5-v6' : `${zone}-v1`;
 
 async function authenticate(request, env) {
   const protocols = parseProtocols(request);
@@ -268,11 +291,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
-      if (url.searchParams.get('zone') === 'dg5') {
-        const roomId = env.WORLD_ROOMS.idFromName(roomNameForZone('dg5'));
+      const healthZone = cleanText(url.searchParams.get('zone'), 16);
+      if (CANONICAL_ZONE_BOSSES[healthZone]) {
+        const roomId = env.WORLD_ROOMS.idFromName(roomNameForZone(healthZone));
         const headers = new Headers({
           'x-enma-health-inspect': '1',
-          'x-enma-zone': 'dg5',
+          'x-enma-zone': healthZone,
         });
         return env.WORLD_ROOMS.get(roomId).fetch(new Request(request, { headers }));
       }
@@ -407,27 +431,34 @@ export class WorldRoom {
     await this.ready;
     const sockets = this.state.getWebSockets();
     if (request.headers.get('x-enma-health-inspect') === '1') {
+      if (!this.zone) this.zone = cleanText(request.headers.get('x-enma-zone'), 16);
       const now = Date.now();
       if (this.reconcileRespawns(now, sockets)) await this.persist(now, true);
-      const drake = this.mobs.find(monster => monster.type === 'drake');
+      const bossSpec = CANONICAL_ZONE_BOSSES[this.zone];
+      const boss = bossSpec
+        ? this.mobs.find(monster => monster.type === bossSpec.spawn.type)
+        : null;
+      const bossState = boss ? {
+        type: boss.type,
+        alive: !boss.dead,
+        hp: boss.hp,
+        maxHp: boss.maxHp,
+        x: Math.round(boss.x * 100) / 100,
+        y: Math.round(boss.y * 100) / 100,
+        respawnSeconds: boss.dead
+          ? Math.ceil(Math.max(0, boss.respawnAt - now) / 1_000)
+          : 0,
+        killedAt: boss.dead
+          ? Math.max(0, boss.respawnAt - (boss.respawnMs || BOSS_RESPAWN_MS))
+          : 0,
+      } : null;
       return Response.json({
         ok: true,
-        zone: this.zone || 'dg5',
+        zone: this.zone,
         initialized: this.simReady(),
         players: sockets.length,
-        drake: drake ? {
-          alive: !drake.dead,
-          hp: drake.hp,
-          maxHp: drake.maxHp,
-          x: Math.round(drake.x * 100) / 100,
-          y: Math.round(drake.y * 100) / 100,
-          respawnSeconds: drake.dead
-            ? Math.ceil(Math.max(0, drake.respawnAt - now) / 1_000)
-            : 0,
-          killedAt: drake.dead
-            ? Math.max(0, drake.respawnAt - (drake.respawnMs || DRAKE_RESPAWN_MS))
-            : 0,
-        } : null,
+        boss: bossState,
+        drake: boss?.type === 'drake' ? bossState : null,
       }, {
         headers: {
           'Access-Control-Allow-Origin': '*',

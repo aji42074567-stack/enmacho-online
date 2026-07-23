@@ -2234,6 +2234,7 @@ const player={
 const remotePlayers=new Map();
 const sharedWorld={connected:false,zone:'',lastSnapshotAt:0};
 const SHARED_ZONES=new Set(['field','cave','cave2','cave3','dg1','dg2','dg3','dg4','dg5','muen1','muen2','muen3']);
+const SHARED_BOSS_TYPES=new Set(['oni_king','gashao','drake']);
 const worldByZone=z=>({field:FIELD,rinne:RINNE,
   // 旧版クライアントの地域名は、同じ連続大陸として受ける。
   rinne_coast:RINNE,rinne_wilds:RINNE,cave:CAVE,cave2:CAVE2,cave3:CAVE3,
@@ -8921,7 +8922,9 @@ window.EnmaGameBridge={
     sharedWorld.lastSnapshotAt=performance.now();
     const byId=new Map(w.mobs.map(mob=>[mob.id,mob]));
     for(const raw of Array.isArray(monsters)?monsters:[]){
-      const mob=byId.get(String(raw?.id||''));
+      let mob=byId.get(String(raw?.id||''));
+      if((!mob||raw.type!==mob.type)&&authoritative&&SHARED_BOSS_TYPES.has(raw.type))
+        mob=w.mobs.find(candidate=>candidate.type===raw.type);
       if(!mob||raw.type!==mob.type)continue;
       const x=Number(raw.x),y=Number(raw.y),hp=Number(raw.hp);
       if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(hp))continue;
@@ -9322,6 +9325,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260723e"></script>
+<script type="module" src="online/account.js?v=20260723f"></script>
 </body>
 </html>
