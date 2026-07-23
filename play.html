@@ -325,6 +325,16 @@
     #teamMembers{display:none}
     #teamBar{padding:3px 6px}
   }
+  /* 入力中(キーボード表示中)はチャット履歴を圧縮して入力欄を優先する */
+  :root.kbOpen #chatLog{height:56px}
+  :root.kbOpen #chatFloat{display:none}
+  /* 横画面(縦が狭い)はチャット全体をさらにコンパクトに */
+  @media (max-height:520px){
+    #chatLog{height:64px}
+    #chatWrap{bottom:max(60px,calc(env(safe-area-inset-bottom) + 54px))}
+    #chatFloat{max-width:min(260px,40vw)}
+    :root.kbOpen #chatLog{height:0;padding:0;overflow:hidden}
+  }
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
     letter-spacing:.1em;padding:0 13px;cursor:pointer;touch-action:manipulation}
@@ -9440,12 +9450,26 @@ if(window.visualViewport){
   const vv=window.visualViewport;
   const adjustForKeyboard=()=>{
     const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+    const open=kb>40;
+    // 入力中はチャット履歴を自動で圧縮(kbOpenクラス)。横画面でも入力欄が収まる
+    document.documentElement.classList.toggle('kbOpen',open);
     const wrap=document.getElementById('chatWrap');
-    if(wrap)wrap.style.transform=kb>40?`translateY(-${kb}px)`:'';
-    if(kb>40)window.scrollTo(0,0);
+    if(wrap){
+      wrap.style.transform='';
+      if(open){
+        // 入力欄がキーボードの真上に来る分だけ持ち上げる(上端は突き抜けない)
+        const r=wrap.getBoundingClientRect();
+        const need=Math.max(0,r.bottom-(vv.height+vv.offsetTop-8));
+        const lift=Math.min(need,Math.max(0,r.top-8));
+        if(lift>0)wrap.style.transform=`translateY(-${lift}px)`;
+      }
+    }
+    if(open)window.scrollTo(0,0);
   };
   vv.addEventListener('resize',adjustForKeyboard);
   vv.addEventListener('scroll',adjustForKeyboard);
+  // キーボードが閉じた通知が来ない端末があるため、フォーカスが外れたら必ず戻す
+  document.addEventListener('focusout',()=>setTimeout(adjustForKeyboard,120));
 }
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
