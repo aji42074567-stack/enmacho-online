@@ -6829,13 +6829,16 @@ function drawStairs(sx,sy,down){
   if(img){
     const w=down?108:104;
     const h=w*img.height/img.width;
-    const glowY=-h*0.36;
+    // 画像内の菱形(石段の穴)の中心をマス中心(sy)に合わせる。
+    // 以前は石段の最下端をsyに接地させていたが、菱形が縦に長く中心から
+    // 大きく上へずれてしまい、手前のマスに立つキャラを覆って見えるバグの原因だった。
+    const anchor=down?0.487:0.466;
+    const glowY=0;
     const g3=ctx.createRadialGradient(0,glowY,2,0,glowY,48);
     g3.addColorStop(0,`rgba(${col},${0.10+p2*0.08})`);
     g3.addColorStop(1,`rgba(${col},0)`);
-    ctx.fillStyle=g3;ctx.fillRect(-56,-h,112,h+20);
-    // 透過画像内の石段の最下端をマス中央へ接地させる。
-    ctx.drawImage(img,-w/2,-h*0.78,w,h);
+    ctx.fillStyle=g3;ctx.fillRect(-56,-h*0.62,112,h*1.24);
+    ctx.drawImage(img,-w/2,-h*anchor,w,h);
     ctx.restore();
     return;
   }
