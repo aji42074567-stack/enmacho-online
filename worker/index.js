@@ -7,7 +7,7 @@ const DRAKE_RESPAWN_MS = 30 * 60_000;
 const RESPAWN_NEARBY_RADIUS = 5;
 const RESPAWN_RETRY_MS = 5_000;
 const RESPAWN_FORCE_MS = 90_000;
-const WORLD_VERSION = 4;
+const WORLD_VERSION = 5;
 const PLAYER_LIMIT = 80;
 const ZONE_SIZE = 72;
 const FIELD_SIZE = 120;
@@ -43,6 +43,22 @@ const FIELD_DEFINITIONS = {
   skeleton: {
     name: 'ガシャドクロ', hp: 150, damage: [14, 22], speed: 1.6, aggro: 4, attackCooldown: 1.8,
   },
+};
+
+const DRAKE_DEFINITION = {
+  name: 'ゴウリュウ',
+  hp: 13_600,
+  damage: [80, 180],
+  speed: 2.1,
+  aggro: 5,
+  attackCooldown: 2.1,
+};
+const DRAKE_SPAWN = {
+  type: 'drake',
+  x: 44,
+  y: 30,
+  respawnMs: DRAKE_RESPAWN_MS,
+  schedule: 'dragon30m',
 };
 
 const FIELD_SPAWNS = [
@@ -163,6 +179,7 @@ function validateZoneInit(zone, data) {
       attackCooldown: clamp(finite(raw.attackCooldown, 1.7), 0.5, 10),
     };
   }
+  if (zone === 'dg5') defs.drake = { ...DRAKE_DEFINITION };
 
   if (!Array.isArray(data.spawns) || !data.spawns.length || data.spawns.length > 64) return null;
   const spawns = [];
@@ -181,6 +198,11 @@ function validateZoneInit(zone, data) {
         : clamp(Math.trunc(finite(raw.respawnMs, RESPAWN_MS)), 5_000, 3_600_000),
       schedule: isDrake ? 'dragon30m' : '',
     });
+  }
+  if (zone === 'dg5') {
+    const drakeIndex = spawns.findIndex(spawn => spawn.type === 'drake');
+    if (drakeIndex >= 0) spawns[drakeIndex] = { ...DRAKE_SPAWN };
+    else spawns.push({ ...DRAKE_SPAWN });
   }
 
   const zoneData = { zone, walls, defs, spawns };
@@ -218,7 +240,7 @@ function healthResponse() {
 
 const roomNameForZone = zone => zone === 'field'
   ? 'field-v3'
-  : zone === 'dg5' ? 'dg5-v4' : `${zone}-v1`;
+  : zone === 'dg5' ? 'dg5-v5' : `${zone}-v1`;
 
 async function authenticate(request, env) {
   const protocols = parseProtocols(request);
