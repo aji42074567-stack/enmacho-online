@@ -205,9 +205,9 @@ function renderAnalytics() {
   const searchTotals = search?.totals || {};
   const metrics = [
     ['現在の利用者', ga ? numberText(ga.realtimeUsers) : '—', '過去30分', 'live-kpi'],
-    ['利用者', ga ? numberText(gaTotals.activeUsers) : '—', '人'],
-    ['セッション', ga ? numberText(gaTotals.sessions) : '—', '回'],
-    ['ページ表示', ga ? numberText(gaTotals.screenPageViews) : '—', '回'],
+    ['利用者', ga ? numberText(gaTotals.activeUsers ?? 0) : '—', '人'],
+    ['セッション', ga ? numberText(gaTotals.sessions ?? 0) : '—', '回'],
+    ['ページ表示', ga ? numberText(gaTotals.screenPageViews ?? 0) : '—', '回'],
     ['検索クリック', search ? numberText(searchTotals.clicks) : '—', '回'],
     ['検索で表示', search ? numberText(searchTotals.impressions) : '—', '回'],
     ['検索CTR', search ? percentText(searchTotals.ctr) : '—', 'クリック率'],
