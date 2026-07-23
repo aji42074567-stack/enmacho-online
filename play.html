@@ -2898,7 +2898,7 @@ function grantMobReward(m,firstAttackerId){
   const isFA=!firstAttackerId||firstAttackerId===myUserId();
   const xp=isFA?m.def.xp:Math.round(m.def.xp*0.5);
   gainXp(xp);
-  log(`${m.name}を成仏させた (+${xp} 徳${isFA?'':'・FA無し'} / +${gold} モン)`);
+  log(`${m.name}を成仏させた (+${xp} 徳 / +${gold} モン)`);
   // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
   const lootTo=()=>{
     if(!party.id)return null;
@@ -4536,7 +4536,7 @@ function update(dt){
     }
     // チーム仲間への追従: リーダーが離れすぎたら、戦闘中でも追従を最優先する
     // (敵に構ってリーダーに置いていかれるのを防ぐ)。近ければ数歩後ろで通常AUTOと両立。
-    const FOLLOW_LEASH=4,FOLLOW_CATCHUP=2.6,FOLLOW_PATH_ITER=30000;
+    const FOLLOW_LEASH=4,FOLLOW_CATCHUP=2.6,FOLLOW_PATH_ITER=6000,FOLLOW_FAR_DIST=20;
     let forcedFollow=false,followTarget=null;
     if(followUserId&&!player.dead){
       if(!partyHas(followUserId))followUserId='';
@@ -4572,11 +4572,14 @@ function update(dt){
         player.followRepath=(player.followRepath||0)-dt;
         if(player.followRepath<=0){
           // 通常の経路探索(4000反復)は遠距離だと打ち切られ「諦める」ように見えるため、
-          // 追従だけは反復上限を大きく取り、どれだけ離れていても経路を見つけにいく
+          // 追従だけは反復上限を少し大きく取る。ただし上げすぎると
+          // 重い探索でメインスレッドが詰まり、通信のハートビートが遅れて
+          // 「離れすぎるとチームメンバーが消える」原因になるため6000に抑える。
           const p=findPath(player.x,player.y,followTarget.x,followTarget.y,FOLLOW_PATH_ITER);
           player.path=p;
-          // 経路が見つからない(一時的に到達不能)時は、重い全域探索を連発しないよう間隔を空ける
-          player.followRepath=p.length?0.45:3;
+          // 遠距離ほど探索間隔を空け、重い処理の頻度そのものを下げる。
+          // 経路が見つからない(一時的に到達不能)時はさらに間隔を空けて連発を防ぐ
+          player.followRepath=p.length?(fd>FOLLOW_FAR_DIST?1.2:0.45):5;
         }
       }else if(fd<1.8&&player.path.length){
         player.path=[];   // 数歩後ろに到着
@@ -9470,8 +9473,8 @@ window.EnmaGameBridge={
     const isFA=msg.firstAttackerId&&msg.firstAttackerId===myUserId();
     const xp=isFA?msg.xp:Math.round(msg.xp*0.5);
     gainXp(xp);
-    addFloat(player.x,player.y-0.9,`+${xp} 徳(チーム${isFA?'':'・FA無し'})`,'#d9c07a');
-    log(`${msg.from?.displayName||'仲間'} の討伐分 +${xp} 徳（チーム${isFA?'':'・FA無し'}）`,'gain');
+    addFloat(player.x,player.y-0.9,`+${xp} 徳(チーム)`,'#d9c07a');
+    log(`${msg.from?.displayName||'仲間'} の討伐分 +${xp} 徳（チーム）`,'gain');
     save();
   },
   receivePartyHeal(msg){
