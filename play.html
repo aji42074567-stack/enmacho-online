@@ -4374,7 +4374,17 @@ function moveAlong(e,dt,speed){
       e.x=n.x;e.y=n.y;e.path.shift();continue;
     }
     const step=Math.min(d,remaining);
-    e.x+=dx/d*step;e.y+=dy/d*step;
+    const nx=e.x+dx/d*step,ny=e.y+dy/d*step;
+    // 他プレイヤーの体には踏み込めない(壁と同じく横滑りで避ける)
+    if(bumpsOtherPlayer(e,nx,ny)){
+      if(Math.abs(dx)>0.01&&!bumpsOtherPlayer(e,nx,e.y)&&!isB(Math.round(nx),Math.round(e.y))){
+        e.x=nx;moved+=step;
+      }else if(Math.abs(dy)>0.01&&!bumpsOtherPlayer(e,e.x,ny)&&!isB(Math.round(e.x),Math.round(ny))){
+        e.y=ny;moved+=step;
+      }
+      break;
+    }
+    e.x=nx;e.y=ny;
     moved+=step;remaining-=step;
     if(Math.abs(dx)>0.05)e.face=dx>=0?1:-1;
     if(step>=d-0.0001){
@@ -4385,6 +4395,17 @@ function moveAlong(e,dt,speed){
     e.walkT=(e.walkT||0)+moved;  // 実際に進んだ距離に歩行コマを同期
     e.moving=true;
   }
+}
+// 自分が他プレイヤーの体(半径0.42)へ入り込もうとしているか。
+// すでに重なっている場合(ラグ等)は「離れる向きの移動」は許可して脱出できるようにする
+function bumpsOtherPlayer(e,nx,ny){
+  if(e!==player)return false;
+  for(const r of remotePlayers.values()){
+    if(r.zone!==zone||r.dead)continue;
+    const nd=Math.hypot(nx-r.x,ny-r.y);
+    if(nd<0.42&&nd<Math.hypot(e.x-r.x,e.y-r.y))return true;
+  }
+  return false;
 }
 function updateRemotePlayers(dt){
   const now=performance.now();
@@ -4542,9 +4563,9 @@ function update(dt){
         player.gateTarget=null;player.moveHold=false;
         const step=speedNow()*Math.min(1,vpad.mag)*dt;
         const nx=player.x+wx/len*step,ny=player.y+wy/len*step;
-        if(!isB(Math.round(nx),Math.round(ny))){player.x=nx;player.y=ny;}
-        else if(!isB(Math.round(nx),Math.round(player.y)))player.x=nx;
-        else if(!isB(Math.round(player.x),Math.round(ny)))player.y=ny;
+        if(!isB(Math.round(nx),Math.round(ny))&&!bumpsOtherPlayer(player,nx,ny)){player.x=nx;player.y=ny;}
+        else if(!isB(Math.round(nx),Math.round(player.y))&&!bumpsOtherPlayer(player,nx,player.y))player.x=nx;
+        else if(!isB(Math.round(player.x),Math.round(ny))&&!bumpsOtherPlayer(player,player.x,ny))player.y=ny;
         player.moving=true;
         player.walkT=(player.walkT||0)+step;
         player.dir=Math.abs(vpad.dx)>Math.abs(vpad.dy)
