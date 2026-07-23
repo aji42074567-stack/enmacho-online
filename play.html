@@ -1494,7 +1494,7 @@ const rnd=(a,b)=>a+Math.random()*(b-a);
 const rndi=(a,b)=>Math.floor(rnd(a,b+1));
 const posMod=(value,divisor)=>((value%divisor)+divisor)%divisor;
 function worldClockState(now=Date.now()){
-  // 日本時間の0・4・8・12・16・20時に周期をそろえ、全端末で同じ空を共有する。
+  // JSTの0・4・8・12・16・20時に周期をそろえ、全端末で同じ空を共有する。
   const elapsed=posMod(now+JST_OFFSET_MS,WORLD_CYCLE_MS);
   const day=elapsed<WORLD_DAY_MS;
   let nightBlend=day?0:1,phase='昼';
@@ -1677,7 +1677,7 @@ CAVE_LINKS.push(
   {from:'muen3',at:{x:12.5,y:30},to:'muen2',entry:{x:47.5,y:34},kind:'stairup'},
 );
 /* ---- 閻魔庁(地上3階) ---- */
-// 四国外周を正確にしたことで旧配置の北側が海へ掛かったため、町全体を南へ移す。
+// 島の外周を正確にしたことで旧配置の北側が海へ掛かったため、町全体を南へ移す。
 // xとyを同量ずらすと、等角投影上では左右位置を保ったまま画面下へ移動する。
 const TOWN_SHIFT=8;
 const townX=x=>x+TOWN_SHIFT;
@@ -1702,9 +1702,9 @@ const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,m
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
-// 添付資料の赤い四国を北が上になるようピクセル境界から直接トレースした外周。
+// 添付資料の赤い島を北が上になるようピクセル境界から直接トレースした外周。
 // u=(x-y)/2 が東西、v=(x+y)/2 が南北。県境線を除いた本島外周を54点へ簡略化し、
-// 佐田岬・室戸岬・足摺岬、土佐湾と瀬戸内側の入り組みを比率ごと保つ。
+// 西の細い岬、南東・南西の岬、南の大湾と北岸の入り組みを比率ごと保つ。
 const SHIKOKU_OUTLINE=[
   [8.4,22.0],[12.9,23.1],[19.6,22.6],[22.4,27.0],[27.4,29.3],
   [32.5,29.3],[32.5,36.0],[35.8,40.5],[34.7,43.8],[36.4,45.0],
@@ -1724,7 +1724,7 @@ function segmentDistance(px,py,ax,ay,bx,by){
   const t=clamp(((px-ax)*dx+(py-ay)*dy)/len2,0,1);
   return Math.hypot(px-(ax+dx*t),py-(ay+dy*t));
 }
-function islandF(x,y){   // <0=陸 0..2.2=砂浜 >2.2=海(四国の海岸線)
+function islandF(x,y){   // <0=陸 0..2.2=砂浜 >2.2=海(島の海岸線)
   const u=(x-y)/2,v=(x+y)/2;
   let inside=false,minD=Infinity;
   for(let i=0;i<SHIKOKU_OUTLINE.length;i++){
@@ -1735,7 +1735,7 @@ function islandF(x,y){   // <0=陸 0..2.2=砂浜 >2.2=海(四国の海岸線)
   return (inside?-1:1)*minD*Math.SQRT2;
 }
 const ridgeDistance=(x,y,a,b)=>segmentDistance((x-y)/2,(x+y)/2,a[0],a[1],b[0],b[1]);
-// 四国山地の主稜線と石鎚・剣山系を模した標高値(0=平地、1=最高峰帯)。
+// 島の主稜線と中央山系を模した標高値(0=平地、1=最高峰帯)。
 function reliefF(x,y){
   if(islandF(x,y)>0)return 0;
   const u=(x-y)/2,v=(x+y)/2;
@@ -1757,7 +1757,7 @@ function elevF(x,y){
 const isB=(x,y)=>x<0||y<0||x>=mapSize||y>=mapSize||blocked[y*mapSize+x];
 const SPAWN=townPoint(32,50);
 const BOSS_HOME={x:DCAVE_DOOR.x,y:DCAVE_DOOR.y};
-// 宿場町は徳島市南西部〜佐那河内村に当たる徳島平野西縁。
+// 宿場町は島東部の平野西縁に置く。
 const TOWN={x0:townX(21),y0:townY(39),x1:townX(48),y1:townY(60)};
 
 (function genMap(){
@@ -1781,7 +1781,7 @@ const TOWN={x0:townX(21),y0:townY(39),x1:townX(48),y1:townY(60)};
     if(x>=townX(31)&&x<=townX(34)&&y>=townY(40)&&y<=townY(47))tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁の東を回る北門通り
     if(y>=townY(45)&&y<=townY(47)&&x>=townX(25)&&x<=townX(34))tileKind[y*FIELD_SIZE+x]=2;   // 閻魔庁前の参道を左へ拡幅
   }
-  // 四国輪郭: 当たり判定と描画は同じ islandF を使う。
+  // 島の輪郭: 当たり判定と描画は同じ islandF を使う。
   for(let y=0;y<FIELD_SIZE;y++)for(let x=0;x<FIELD_SIZE;x++){
     const f=islandF(x,y);
     const de=Math.min(x,y,FIELD_SIZE-1-x,FIELD_SIZE-1-y);
@@ -1994,15 +1994,15 @@ const JUDGE_COMMENTS=[
 ];
 let elderIdx=0;
 
-// 実際の四国山地の高度差を尺度化した主要山塊。新規ダンジョン用の空白も残す。
+// 島の高度差を尺度化した主要山塊。新規ダンジョン用の空白も残す。
 const MOUNTAIN_SITES=[
-  {x:22,y:84,v:2,s:.34,name:'石鎚山系',meters:1982},
-  {x:30,y:70,v:3,s:.32,name:'剣山系',meters:1955},
-  {x:38,y:76,v:1,s:.28,name:'三嶺山系',meters:1894},
+  {x:22,y:84,v:2,s:.34,name:'西峰山系',meters:1982},
+  {x:30,y:70,v:3,s:.32,name:'中央山系',meters:1955},
+  {x:38,y:76,v:1,s:.28,name:'南峰山系',meters:1894},
   {x:18,y:98,v:2,s:.30,name:'西南山地',meters:1456},
   {x:17,y:76,v:1,s:.26,name:'西部山地',meters:1210},
   {x:10,y:56,v:0,s:.24,name:'北部丘陵',meters:884},
-  {x:49,y:88,v:0,s:.25,name:'高知東部山地',meters:1120},
+  {x:49,y:88,v:0,s:.25,name:'南東山地',meters:1120},
 ];
 (function genProps(){
   const clear=(x,y)=>(x>=TOWN.x0-1&&x<=TOWN.x1+1&&y>=TOWN.y0-1&&y<=TOWN.y1+1)||Math.hypot(x-BOSS_HOME.x,y-BOSS_HOME.y)<5||Math.hypot(x-CAVE_DOOR.x,y-CAVE_DOOR.y)<6||Math.hypot(x-MUEN_DOOR.x,y-MUEN_DOOR.y)<5||(x>=43&&x<=56&&y>=17&&y<=27)||MOUNTAIN_SITES.some(p=>Math.hypot(x-p.x,y-p.y)<4.4);
@@ -2094,7 +2094,7 @@ const PIER_DECK_LENGTH=7,PIER_DECK_HALF_WIDTH=0,PIER_SHORE_Y=20;
       props.push({x:x+h(x,y)*0.6,y:y+h(y,x)*0.6,kind:'sundry',v:1+Math.floor(h(x*5,y*7)*3.99),s:0.8+h(x,y)*0.5});
     }
   }
-  // 桟橋: 徳島東岸に当たる浜で、岸がf≈1になる場所へ。
+  // 桟橋: 島の東岸で、岸がf≈1になる場所へ。
   for(let x=40;x<FIELD_SIZE-PIER_DECK_LENGTH-2;x++){
     if(islandF(x,PIER_SHORE_Y)>1.0){
       PIER={x:x-0.5,y:PIER_SHORE_Y};
@@ -4113,7 +4113,7 @@ function openRinneGuide(){
   setTalkPortrait('npc_soul_ren');
   $('talkTitle').textContent='渡し守 レン';
   $('talkSub').textContent='輪廻航路・帰り舟の案内人';
-  $('talkText').textContent='「近畿の地形はまだ形を整えている最中だ。賽の森へ戻る舟なら、すぐ出せる。渡し守の六文銭は通行の証だから、帰りもなくならないよ」';
+  $('talkText').textContent='「この大陸はまだ形を整えている最中だ。賽の森へ戻る舟なら、すぐ出せる。渡し守の六文銭は通行の証だから、帰りもなくならないよ」';
   setTalkAction('賽の森へ戻る',()=>{
     $('talk').classList.add('hidden');
     setTalkAction();
@@ -4767,7 +4767,7 @@ function renderGround(){
       :`rgba(5,18,11,0.065)`;
     g.beginPath();g.ellipse(cx,cy,rx,ry,(hash2(x*29,y*31)-.5)*.35,0,6.29);g.fill();
   }
-  // 四国山地の標高色も連続した大きな斑で重ね、格子状の境界を残さない。
+  // 中央山地の標高色も連続した大きな斑で重ね、格子状の境界を残さない。
   for(let y=2;y<FIELD_SIZE-2;y+=2)for(let x=2;x<FIELD_SIZE-2;x+=2){
     if(tkF[y*FIELD_SIZE+x]!==0||islandF(x,y)>-1.1)continue;
     const r=reliefF(x,y);if(r<.12)continue;
@@ -5229,8 +5229,8 @@ function rinneRegionAt(x,y){
   if(u>43&&v>150)return'eastcoast';
   return v>218?'coast':'wilds';
 }
-// 添付資料でピンクに塗られた近畿7府県の外周を、北が上の一筆書きで定義する。
-// 丹後半島・大阪湾・伊勢湾・志摩半島・紀伊半島の凹凸を地域外周へ直接刻む。
+// 添付資料でピンクに塗られた大陸外周を、北が上の一筆書きで定義する。
+// 北の半島、西と東の湾、南東と南の半島の凹凸を地域外周へ直接刻む。
 const RINNE_KINKI_OUTLINE=[
   [-74,118],[-70,106],[-63,96],[-54,90],[-48,78],[-39,73],[-34,61],
   [-25,50],[-15,48],[-8,58],[-9,70],[-16,80],[-8,88],[-1,82],
@@ -5243,12 +5243,12 @@ const RINNE_KINKI_OUTLINE=[
   [-64,199],[-73,194],[-76,183],[-71,172],[-75,160],[-81,148],
   [-79,135],[-75,126],
 ];
-// 兵庫県の淡路島。大阪湾・紀伊水道を埋めず、本土とは必ず海で分離する。
+// 西の離島。湾と海峡を埋めず、本土とは必ず海で分離する。
 const RINNE_AWAJI_OUTLINE=[
   [-54,203],[-47,201],[-40,207],[-35,218],[-36,231],[-42,242],
   [-49,247],[-55,239],[-58,226],[-57,212],
 ];
-// 琵琶湖は京都の東、近畿の北東寄り。北部を広く、瀬田川側の南端を細くする。
+// 内陸湖は大陸の北東寄り。北部を広く、南端を細くする。
 const RINNE_BIWA_OUTLINE=[
   [20,103],[27,102],[32,109],[34,121],[34,134],[37,145],[35,157],
   [31,168],[25,179],[20,172],[18,161],[15,149],[16,135],[15,121],[17,110],
@@ -5269,16 +5269,16 @@ function rinneWaterKindAt(u,v){
   return land?(biwa?8:0):4;
 }
 function buildRinneContinent(){
-  // 近畿7府県の形だけを1枚の320×320マップに置く。街・街道は地形確定後に再配置する。
+  // 大陸外周だけを1枚の320×320マップに置く。街・街道は地形確定後に再配置する。
   const kinki=newRinneWorld(),size=RINNE_SIZE;
 
-  // 外周の外側を海、内側の琵琶湖だけを湖として確定する。
+  // 外周の外側を海、内側の大湖だけを湖として確定する。
   for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
     const {u,v}=rinneUVFromGrid(x,y),index=y*size+x;
     const water=rinneWaterKindAt(u,v);
     if(water){kinki.tileKind[index]=water;kinki.blocked[index]=1;}
   }
-  // 海と接する陸だけを貝砂にする。琵琶湖畔は草地・岩場のまま残す。
+  // 海と接する陸だけを貝砂にする。内陸湖畔は草地・岩場のまま残す。
   const beachRadius=Math.max(2,Math.round(rinneCoord(2.2)));
   const beachCells=[];
   for(let y=beachRadius;y<size-beachRadius;y++)for(let x=beachRadius;x<size-beachRadius;x++){
@@ -5300,7 +5300,7 @@ function buildRinneContinent(){
     const h=rinneHash(x,y,41);
     if(h>.94)kinki.props.push({x:x+.3,y:y+.2,kind:'rinne_pampas',s:.65+rinneHash(x,y,45)*.48});
   }
-  // 琵琶湖岸と実際の海岸だけを岩で縁取り、地形の凹凸を読みやすくする。
+  // 内陸湖岸と海岸だけを岩で縁取り、地形の凹凸を読みやすくする。
   for(const [u,v,coastal] of [
     [16,112,false],[14,135,false],[17,158,false],[31,168,false],[38,145,false],[34,116,false],
     [-34,61,true],[-69,108,true],[-64,198,true],[-43,212,true],
@@ -7344,10 +7344,10 @@ function hud(){
     el.goal.textContent=tracking.length>1?`受注中${tracking.length}件｜${progress}`:progress;
   }else{
     const rinneRegion=zone==='rinne'?rinneRegionAt(player.x,player.y):'';
-    el.goal.textContent=rinneRegion==='coast'?'紀伊半島の海岸線を踏査中'
-      :rinneRegion==='northcoast'?'丹後半島と日本海岸を踏査中'
-      :rinneRegion==='eastcoast'?'伊勢湾と志摩半島を踏査中'
-      :zone==='rinne'?'近畿地方の外周と琵琶湖を踏査中'
+    el.goal.textContent=rinneRegion==='coast'?'南境の海岸線を踏査中'
+      :rinneRegion==='northcoast'?'北境の海岸線を踏査中'
+      :rinneRegion==='eastcoast'?'東境の入り江を踏査中'
+      :zone==='rinne'?'輪廻大陸の外周と内陸湖を踏査中'
       :player.ferrymanCoin?'渡し守の六文銭を携え、桟橋の渡し船へ'
       :player.story.dragonCleared?'クエストを受け、カズーの因果話を聞こう'
       :player.quests.trial===0?'まずはオキナの話を聞こう'
@@ -7759,7 +7759,7 @@ $('chatSend').addEventListener('pointerdown',ev=>{
 $('chatSend').addEventListener('click',sendChat);
 $('chatIn').addEventListener('keydown',ev=>{
   ev.stopPropagation();  // 入力中にE/R/F等のスキルが暴発しないように
-  if(ev.isComposing||ev.keyCode===229)return;  // 日本語変換確定のEnterは無視
+  if(ev.isComposing||ev.keyCode===229)return;  // IME変換確定のEnterは無視
   if(ev.key==='Enter'){ev.preventDefault();sendChat();}
   else if(ev.key==='Escape')closeChat();
 });
@@ -8223,33 +8223,21 @@ function renderWorldMap(){
   const point=(x,y)=>worldMapPoint(x,y,size,outdoor,left,top,side);
 
   if(zone==='rinne'){
-    drawWorldMapText(g,'日本海',left+side*.46,top+side*.14,'#a9c8d5');
-    drawWorldMapText(g,'琵琶湖',left+side*.58,top+side*.42,'#c1dbe5');
-    drawWorldMapText(g,'瀬戸内海',left+side*.27,top+side*.61,'#a9c8d5');
-    drawWorldMapText(g,'大阪湾',left+side*.39,top+side*.65,'#a9c8d5');
-    drawWorldMapText(g,'伊勢湾',left+side*.70,top+side*.57,'#a9c8d5');
-    drawWorldMapText(g,'淡路島',left+side*.35,top+side*.70,'#d8cfad');
-    drawWorldMapText(g,'紀伊半島',left+side*.515,top+side*.785,'#d8cfad');
     drawWorldMapLandmark(g,point(RINNE_COAST_ENTRY.x,RINNE_COAST_ENTRY.y),'南岸船着場');
     const region=rinneRegionAt(player.x,player.y);
-    const regionLabel=region==='northcoast'?'丹後半島・日本海岸'
-      :region==='eastcoast'?'伊勢湾・志摩半島'
-      :region==='coast'?'紀伊半島・南岸':'近畿内陸';
-    $('worldMapRegion').textContent=`輪廻大陸　／　近畿地方・${regionLabel}`;
-    $('worldMapNote').textContent='北を上に表示。近畿7府県の外周、淡路島、海岸線と琵琶湖の位置を優先して制作しています。';
+    const regionLabel=region==='northcoast'?'北境海岸'
+      :region==='eastcoast'?'東境海岸'
+      :region==='coast'?'南境海岸':'内陸部';
+    $('worldMapRegion').textContent=`輪廻大陸　／　${regionLabel}`;
+    $('worldMapNote').textContent='北を上に表示。大陸の外周、島々、海岸線と内陸湖を記しています。';
   }else if(zone==='field'){
-    drawWorldMapText(g,'瀬戸内海',left+side*.50,top+side*.13,'#a9c8d5');
-    drawWorldMapText(g,'太平洋',left+side*.50,top+side*.91,'#a9c8d5');
-    drawWorldMapText(g,'佐田岬',left+side*.12,top+side*.55,'#d8cfad');
-    drawWorldMapText(g,'室戸岬',left+side*.72,top+side*.79,'#d8cfad');
-    drawWorldMapText(g,'足摺岬',left+side*.31,top+side*.84,'#d8cfad');
     drawWorldMapLandmark(g,point(SPAWN.x,SPAWN.y),'宿場町');
     drawWorldMapLandmark(g,point(CAVE_DOOR.x,CAVE_DOOR.y),'試練の洞窟');
     drawWorldMapLandmark(g,point(MUEN_DOOR.x,MUEN_DOOR.y),'無縁塚');
     drawWorldMapLandmark(g,point(DCAVE_DOOR.x,DCAVE_DOOR.y),'竜の洞窟');
     if(PIER)drawWorldMapLandmark(g,point(PIER.x,PIER.y),'船着場');
-    $('worldMapRegion').textContent='賽の森　／　四国全域';
-    $('worldMapNote').textContent='北を上に表示。四国本島の外周、三つの岬、四国山地と主要施設を記しています。';
+    $('worldMapRegion').textContent='賽の森　／　全域';
+    $('worldMapNote').textContent='北を上に表示。島の外周、山地と主要施設を記しています。';
   }else{
     const links=ZONE_LINKS.filter(link=>link.from===zone);
     for(const link of links)drawWorldMapLandmark(g,point(link.at.x,link.at.y),link.label||'階段');
@@ -8262,9 +8250,9 @@ function renderWorldMap(){
 function miniMapLocationLabel(){
   if(zone==='rinne'){
     const region=rinneRegionAt(player.x,player.y);
-    return region==='northcoast'?'丹後半島・日本海岸'
-      :region==='eastcoast'?'伊勢湾・志摩半島'
-      :region==='coast'?'紀伊半島・南岸':'近畿内陸';
+    return region==='northcoast'?'北境海岸'
+      :region==='eastcoast'?'東境海岸'
+      :region==='coast'?'南境海岸':'内陸部';
   }
   if(zone==='field'){
     const sites=[
@@ -8274,11 +8262,11 @@ function miniMapLocationLabel(){
     ];
     for(const [site,label,radius] of sites)if(Math.hypot(player.x-site.x,player.y-site.y)<radius)return label;
     const u=(player.x-player.y)/2,v=(player.x+player.y)/2;
-    return v<32?'香川・瀬戸内海岸'
-      :v>78&&u>0?'室戸岬・高知東部'
-      :v>78&&u<-10?'足摺岬・高知西部'
-      :u>10?'徳島東部':u<-34?'愛媛・佐田岬'
-      :v>60?'高知・太平洋岸':'四国山地';
+    return v<32?'北の海岸'
+      :v>78&&u>0?'南東沿岸'
+      :v>78&&u<-10?'南西沿岸'
+      :u>10?'東部平原':u<-34?'西の岬'
+      :v>60?'南部沿岸':'中央山地';
   }
   return zoneLabel(zone);
 }
