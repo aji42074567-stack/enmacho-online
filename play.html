@@ -203,6 +203,11 @@
     border-radius:4px;color:#edd6ff;font-size:11px;letter-spacing:.03em;
     box-shadow:0 0 12px rgba(167,96,220,.25)}
   .chatMsg.drop::before{content:'✦ ';color:#ffd479}
+  .chatMsg.boss{align-self:center;max-width:96%;text-align:center;
+    background:linear-gradient(180deg,#35201a,#26140f);border:1px solid #c46a45;
+    border-radius:4px;color:#ffe0cf;font-size:11px;letter-spacing:.03em;
+    box-shadow:0 0 12px rgba(216,100,63,.3)}
+  .chatMsg.boss::before{content:'⚔ ';color:#ff9a63}
   .chatMsg.logline{align-self:stretch;max-width:100%;background:none;border:none;
     padding:1px 2px;font-size:11px;line-height:1.6;color:#cfc2a0}
   .chatMsg.logline.sys{color:#8fb2d9}
@@ -212,6 +217,9 @@
   .chatFloatMsg.drop{border-left-color:#ffd97a;color:#ffe9b8;
     box-shadow:0 2px 8px rgba(0,0,0,.45),0 0 12px rgba(201,162,74,.25)}
   .chatFloatMsg.drop::before{content:'✦ ';color:#ffd97a}
+  .chatFloatMsg.boss{border-left-color:#d8643f;color:#ffd9c4;
+    box-shadow:0 2px 8px rgba(0,0,0,.45),0 0 12px rgba(216,100,63,.3)}
+  .chatFloatMsg.boss::before{content:'⚔ ';color:#ff9a63}
 
   /* ---- チームバー(チームタブ上部) ---- */
   #teamBar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
@@ -2887,6 +2895,7 @@ function grantMobReward(m){
   // 討伐の知らせをチームへ(受け取った側が距離・支援状態で徳の分け前を判定)
   if(party.id)netOutbox.push({type:'party_kill',partyId:party.id,
     xp:m.def.xp,mobName:m.name,x:m.x,y:m.y,zone});
+  if(m.def.boss)announceBossDefeat(m.name);  // 鬼王/骨王/竜の討伐は毎回、全体へ告知(討伐から日時が空いても誰が倒したか分かるように)
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
     if(player.story.gashaoCleared)
@@ -7601,7 +7610,7 @@ const chatLogDomLimit=()=>MOBILE_RENDER?60:150;
 function chatMsgNode(m){
   const d=document.createElement('div');
   if(m.channel==='sys'){d.className='chatMsg sysmsg';d.textContent=m.text;return d;}
-  if(m.kind==='drop'){d.className='chatMsg drop';d.textContent=m.text;return d;}
+  if(m.kind==='drop'||m.kind==='boss'){d.className=`chatMsg ${m.kind}`;d.textContent=m.text;return d;}
   d.className=`chatMsg ${m.channel}${m.self?' self':''}`;
   const b=document.createElement('b');
   b.textContent=m.self?`${m.name}（自分）`:`${m.name}  徳位${m.level||1}`;
@@ -7653,10 +7662,10 @@ function updateChatBadge(){
 }
 function spawnChatFloat(m){
   const d=document.createElement('div');
-  d.className='chatFloatMsg'+(m.kind==='drop'?' drop':'');
+  d.className='chatFloatMsg'+(m.kind==='drop'||m.kind==='boss'?` ${m.kind}`:'');
   d.style.setProperty('--chatc',(CHAT_CHANNELS[m.channel]||CHAT_CHANNELS.general).color);
-  if(m.kind!=='drop'){
-    // ドロップ告知は本文に名前が含まれるので名札を付けない
+  if(m.kind!=='drop'&&m.kind!=='boss'){
+    // ドロップ告知・ボス討伐告知は本文に名前が含まれるので名札を付けない
     const b=document.createElement('b');b.textContent=m.name;
     d.appendChild(b);
   }
@@ -7667,7 +7676,7 @@ function spawnChatFloat(m){
   setTimeout(()=>d.remove(),8200);
 }
 function setChatBubble(m){
-  if(m.kind==='drop')return;  // 告知は頭上に出さない
+  if(m.kind==='drop'||m.kind==='boss')return;  // 告知は頭上に出さない
   const fx={text:m.text,channel:m.channel,until:performance.now()+6500};
   if(m.self){player.chatFx=fx;return;}
   const e=remotePlayers.get(m.userId||'');
@@ -7766,6 +7775,14 @@ function announceRareDrop(mobName,itemName){
     text:`${player.name||'ナナシ'} が ${mobName} から ${itemName} を手に入れた！`,
     ts:Date.now()});
   chat.outbox.push({channel:'drop',mobName,itemName});
+}
+function announceBossDefeat(mobName){
+  // ボス討伐を全体へ告知(自分の画面には即時表示、他プレイヤーへは全体チャンネル経由)
+  addChatMessage({channel:'world',kind:'boss',self:true,
+    name:player.name||'ナナシ',level:player.lv,userId:'',
+    text:`${player.name||'ナナシ'} が ${mobName} を鎮めた`,
+    ts:Date.now()});
+  chat.outbox.push({channel:'boss',mobName});
 }
 $('chatToggle').addEventListener('click',()=>{
   chat.open?closeChat():openChat();
@@ -9127,6 +9144,16 @@ window.EnmaGameBridge={
       text:`${name} が ${mobName} から ${itemName} を手に入れた！`,
       ts:Date.now()});
   },
+  receiveBossNotice(msg){
+    if(!msg||typeof msg!=='object')return;
+    const name=String(msg.displayName||'ナナシ').slice(0,16);
+    const mobName=String(msg.mobName||'').slice(0,24);
+    if(!mobName)return;
+    addChatMessage({channel:'world',kind:'boss',self:false,
+      name,level:Math.max(1,msg.level|0),userId:String(msg.userId||''),
+      text:`${name} が ${mobName} を鎮めた`,
+      ts:Date.now()});
+  },
   playRemoteAttack(raw){
     const id=String(raw?.userId||''),sessionId=String(raw?.sessionId||'');
     const e=remotePlayers.get(id);
@@ -9216,6 +9243,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260723b"></script>
+<script type="module" src="online/account.js?v=20260723c"></script>
 </body>
 </html>

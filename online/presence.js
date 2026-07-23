@@ -186,6 +186,14 @@ function normalizeDropNotice(raw, ownSessionId) {
   return { ...identity, itemName, mobName };
 }
 
+function normalizeBossNotice(raw, ownSessionId) {
+  const identity = chatIdentity(raw, ownSessionId);
+  if (!identity) return null;
+  const mobName = cleanText(raw.mobName, 24);
+  if (!mobName) return null;
+  return { ...identity, mobName };
+}
+
 export function createPresenceController(client, bridge = window.EnmaGameBridge) {
   const sessionId = newSessionId();
   const remotes = new Map();
@@ -390,6 +398,11 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
         if (activeChannel !== worldChannel) return;
         const notice = normalizeDropNotice(payload, sessionId);
         if (notice) bridge?.receiveDropNotice?.(notice);
+      })
+      .on('broadcast', { event: 'boss' }, ({ payload }) => {
+        if (activeChannel !== worldChannel) return;
+        const notice = normalizeBossNotice(payload, sessionId);
+        if (notice) bridge?.receiveBossNotice?.(notice);
       })
       .subscribe(async status => {
         if (activeChannel !== worldChannel) return;
@@ -821,6 +834,18 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           type: 'broadcast',
           event: 'drop',
           payload: { ...identityFor(snapshot), itemName, mobName, sentAt: now },
+        }).catch(() => {});
+        continue;
+      }
+      if (item?.channel === 'boss') {
+        // ボス討伐告知も全体チャンネルへ。稀少なので連投制限の対象外
+        if (!worldChannel || !worldSubscribed) continue;
+        const mobName = cleanText(item.mobName, 24);
+        if (!mobName) continue;
+        worldChannel.send({
+          type: 'broadcast',
+          event: 'boss',
+          payload: { ...identityFor(snapshot), mobName, sentAt: now },
         }).catch(() => {});
         continue;
       }
