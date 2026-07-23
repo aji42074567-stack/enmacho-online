@@ -380,6 +380,15 @@ function stageLabel(stage) {
   return '亡者';
 }
 
+// 冥職を授かっていれば「身分」には職名を出す(未授職はこれまでどおり亡者など)
+const MEISHOKU_LABELS = { rasetsu: '羅刹', kagehoshi: '影法師', jugonshi: '呪禁師', gohousou: '護法僧' };
+function identityLabel(profile, localProfile, cloud) {
+  const jobId = cloud?.payload?.meishoku || localProfile.meishoku || '';
+  const job = MEISHOKU_LABELS[jobId];
+  if (job) return `冥職・${job}`;
+  return stageLabel(profile.soul_stage || localProfile.soulStage);
+}
+
 function renderSignedIn() {
   const profile = state.profile || {};
   const localProfile = window.EnmaGameBridge?.getProfile?.() || {};
@@ -399,7 +408,7 @@ function renderSignedIn() {
     </div>
     <div class="account-grid">
       <div><span>魂名</span><b>${esc(profile.display_name || 'ナナシ')}</b></div>
-      <div><span>身分</span><b>${esc(stageLabel(profile.soul_stage || localProfile.soulStage))}</b></div>
+      <div><span>身分</span><b>${esc(identityLabel(profile, localProfile, cloud))}</b></div>
       <div><span>同期中の徳位</span><b id="accountCloudLevel">${esc(cloud?.payload?.lv ?? '同期前')}</b></div>
       <div><span>メール</span><b class="account-email">${esc(state.session?.user?.email || '')}</b></div>
     </div>
