@@ -309,7 +309,8 @@
   #chatIn:disabled{opacity:.5}
   /* スマホはフォーカス時の自動ズームを防ぐため16px必須。
      pointer判定がfineになる端末・ブラウザもあるため、ゲーム本体と同じ幅判定を併用する。 */
-  @media (pointer:coarse),(max-width:700px){#chatIn{font-size:16px}}
+  /* 16pxはズーム防止に必須だが、余白を絞って入力欄(とカーソル)の背を低く保つ */
+  @media (pointer:coarse),(max-width:700px){#chatIn{font-size:16px;padding:3px 8px}}
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
     letter-spacing:.1em;padding:0 13px;cursor:pointer;touch-action:manipulation}
@@ -881,9 +882,14 @@
     #plate .job{margin-right:0;font-size:13px}
     #plate .lv{margin-left:0}
     #log{bottom:150px;font-size:10.5px}
-    #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px))}
-    #chatLog{height:132px}
-    #stage.chatOpen #log{bottom:326px}
+    /* スマホは💬ボタンの右に窓を並べ、縦幅も詰める(画面を塞がない) */
+    #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px));
+      flex-direction:row;align-items:flex-end;gap:6px}
+    #chatToggle{order:0;flex:0 0 auto}
+    #chatBox{order:1;width:min(300px,calc(100vw - 78px))}
+    #chatFloat{order:2;position:absolute;bottom:calc(100% + 8px);left:0}
+    #chatLog{height:96px}
+    #stage.chatOpen #log{bottom:250px}
     #vitals{display:none}
     #skills{gap:5px}
     .skill{width:42px;height:46px}
@@ -6034,8 +6040,10 @@ function drawChatBubbleFx(sx,sy,fx){
   if(remain<=0)return false;
   ctx.save();
   ctx.globalAlpha=Math.min(1,remain/400);  // 消える直前だけすっと薄くなる
-  ctx.font='10px sans-serif';ctx.textAlign='center';
-  const maxW=118,lines=[];
+  // 吹き出しチャットが主役なので、スマホの世界縮小に負けない画面上一定サイズで描く
+  const k=1/worldViewScale();
+  ctx.font=`${12*k}px sans-serif`;ctx.textAlign='center';
+  const maxW=140*k,lines=[];
   let line='',truncated=false;
   for(const ch of fx.text){
     const test=line+ch;
@@ -6046,23 +6054,23 @@ function drawChatBubbleFx(sx,sy,fx){
   }
   if(line)lines.push(line);
   if(truncated)lines[lines.length-1]+='…';
-  const lh=13,w=Math.min(maxW,Math.max(...lines.map(l=>ctx.measureText(l).width)))+16;
-  const h=lines.length*lh+9,bottom=sy-66,top=bottom-h,r=6;
+  const lh=15.5*k,w=Math.min(maxW,Math.max(...lines.map(l=>ctx.measureText(l).width)))+18*k;
+  const h=lines.length*lh+10*k,bottom=sy-66,top=bottom-h,r=6*k;
   ctx.beginPath();
   ctx.moveTo(sx-w/2+r,top);
   ctx.arcTo(sx+w/2,top,sx+w/2,bottom,r);
   ctx.arcTo(sx+w/2,bottom,sx-w/2,bottom,r);
-  ctx.lineTo(sx+6,bottom);
-  ctx.lineTo(sx,bottom+7);  // しっぽ
-  ctx.lineTo(sx-6,bottom);
+  ctx.lineTo(sx+7*k,bottom);
+  ctx.lineTo(sx,bottom+8*k);  // しっぽ
+  ctx.lineTo(sx-7*k,bottom);
   ctx.arcTo(sx-w/2,bottom,sx-w/2,top,r);
   ctx.arcTo(sx-w/2,top,sx+w/2,top,r);
   ctx.closePath();
   ctx.fillStyle='rgba(244,236,216,.94)';ctx.fill();
   ctx.strokeStyle=CHAT_BUBBLE_COLOR[fx.channel]||CHAT_BUBBLE_COLOR.general;
-  ctx.lineWidth=1.5;ctx.stroke();
+  ctx.lineWidth=1.5*k;ctx.stroke();
   ctx.fillStyle='#2a2318';
-  lines.forEach((l,i)=>ctx.fillText(l,sx,top+11.5+i*lh));
+  lines.forEach((l,i)=>ctx.fillText(l,sx,top+13.5*k+i*lh));
   ctx.restore();
   return true;
 }
@@ -6134,21 +6142,25 @@ function drawPlayerCorpse(sx,sy,e){
 // 画面外にいるチーム仲間の方角を、画面端の青い三角+名前で示す(スマホ/PC共通)
 function drawPartyOffscreenArrows(viewScale,SX,SY){
   if(!started||!party.id)return;
-  // UIパネル(上部プレート/クエスト・下部HPバー等)はキャンバスより手前に載るため、
-  // 三角はそれらと被らない帯に出す
-  const mX=24,mTop=96,mBottom=130;
+  // UIパネル(プレート/地図/魂籍/PT表示/HPバー等)はキャンバスより手前に載るため、
+  // 三角は画面端ではなく中央寄りの楕円軌道に出す(UIと重ならない狭い範囲で動く)
+  const cx=W/2,cy=H*0.45;
+  const rx=Math.max(60,Math.min(W*0.32,W/2-80));
+  const ry=Math.max(50,Math.min(H*0.26,cy-115,(H-cy)-165));
+  const chatBoxEl=document.getElementById('chatBox');
+  const chatRect=chatBoxEl&&!chatBoxEl.hidden?chatBoxEl.getBoundingClientRect():null;
   for(const e of remotePlayers.values()){
     if(e.zone!==zone||e.dead||!partyHas(e.userId))continue;
     const wx=SX(e.x,e.y),wy=SY(e.x,e.y)-(zone==='field'?ELEV_PX*elevF(e.x,e.y):0);
     const px=W/2+(wx-W/2)*viewScale,py=H/2+(wy-H/2)*viewScale;
     if(px>=0&&px<=W&&py>=-30&&py<=H)continue;   // 画面内なら不要
-    const cx=W/2,cy=H/2,dx=px-cx,dy=py-cy;
+    const dx=px-cx,dy=py-cy;
     if(!dx&&!dy)continue;
-    // UIを避けた矩形の縁との交点へクランプし、仲間の方向へ向けた三角を描く
-    const tx=dx?(dx>0?(W-mX-cx)/dx:(mX-cx)/dx):Infinity;
-    const ty=dy?(dy>0?(H-mBottom-cy)/dy:(mTop-cy)/dy):Infinity;
-    const t=Math.max(0.0001,Math.min(tx,ty));
-    const ex=cx+dx*t,ey=cy+dy*t,ang=Math.atan2(dy,dx);
+    const ang=Math.atan2(dy,dx);
+    let ex=cx+Math.cos(ang)*rx,ey=cy+Math.sin(ang)*ry;
+    // チャット窓が開いている時はその上へ逃がす
+    if(chatRect&&ex>chatRect.left-24&&ex<chatRect.right+24&&ey>chatRect.top-18)
+      ey=chatRect.top-18;
     ctx.save();
     ctx.translate(ex,ey);ctx.rotate(ang);
     ctx.fillStyle='#8fc4ff';ctx.strokeStyle='rgba(0,0,0,0.85)';ctx.lineWidth=2;
