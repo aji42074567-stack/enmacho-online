@@ -511,6 +511,30 @@ async function fetchAccountData(userId) {
   return { profileResult, preferencesResult, cloudSaveResult, gmItemResult, gmGenderResult, gmDashResult };
 }
 
+let grantedItemRefreshAt = 0;
+let grantedItemRefreshBusy = false;
+async function refreshGrantedItemCounts(force = false) {
+  if (!state.client || !state.session?.user?.id || grantedItemRefreshBusy) return;
+  const now = Date.now();
+  if (!force && now - grantedItemRefreshAt < 15_000) return;
+  grantedItemRefreshAt = now;
+  grantedItemRefreshBusy = true;
+  const userId = state.session.user.id;
+  try {
+    const [meishokuResult, genderResult, dashResult] = await Promise.all([
+      state.client.rpc('gm_meishoku_reset_count'),
+      state.client.rpc('gm_gender_change_count'),
+      state.client.rpc('gm_dash_count'),
+    ]);
+    if (state.session?.user?.id !== userId) return;
+    if (!meishokuResult.error) publishGmMeishokuResetCount(meishokuResult.data);
+    if (!genderResult.error) publishGmGenderChangeCount(genderResult.data);
+    if (!dashResult.error) publishGmDashCount(dashResult.data);
+  } finally {
+    grantedItemRefreshBusy = false;
+  }
+}
+
 async function loadAccountData() {
   const revision = ++accountLoadRevision;
   if (!state.session || !state.client) {
@@ -1050,9 +1074,17 @@ async function initialize(attempt = 0) {
   }
 }
 
-document.addEventListener('enma-account-open', render);
+document.addEventListener('enma-account-open', () => {
+  render();
+  void refreshGrantedItemCounts(true);
+});
 document.addEventListener('enma:local-save', () => scheduleCloudSave(600));
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) scheduleCloudSave(0);
+  else void refreshGrantedItemCounts(true);
 });
+window.addEventListener('focus', () => void refreshGrantedItemCounts());
+window.setInterval(() => {
+  if (!document.hidden) void refreshGrantedItemCounts();
+}, 60_000);
 initialize();
