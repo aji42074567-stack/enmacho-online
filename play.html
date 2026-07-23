@@ -87,6 +87,11 @@
   #miniMapHud[hidden]{display:none}
   #miniMapHud:hover{border-color:#9a7d42}
   #miniMapHud:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  #miniMapMinBtn{position:absolute;top:90px;right:56px;z-index:6;width:24px;height:24px;
+    border:1px solid #6b5730;border-radius:50%;background:rgba(12,10,7,.92);
+    color:#d9c896;font:12px/1 var(--sans);cursor:pointer;padding:0}
+  #miniMapMinBtn[hidden]{display:none}
+  #miniMapMinBtn:hover{border-color:#9a7d42;color:#fff}
   .mini-map-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
     height:20px;padding:0 2px;font-family:var(--serif)}
   #miniMapZone{font-size:11px;letter-spacing:.1em;color:#eadfc8;overflow:hidden;
@@ -989,6 +994,8 @@
     <canvas id="miniMapCanvas" width="280" height="280" aria-hidden="true"></canvas>
     <span class="mini-map-location"><span id="miniMapLocation">現在地を照合中</span></span>
   </button>
+  <button id="miniMapMinBtn" type="button" hidden title="地図を最小化"
+    aria-label="ミニマップを最小化">−</button>
 
   <div id="log" aria-live="polite"></div>
 
@@ -1615,7 +1622,7 @@ const MEISHOKU_READY=new Set(['rasetsu','kagehoshi','jugonshi','gohousou']);   /
 const meishokuReady=job=>MEISHOKU_READY.has(job);
 const meishokuLabel=e=>meishokuDef(e)?.name||'';
 const JUGONSHI_SPRITE_VERSION='20260723-jugon4';
-const KAGEHOSHI_SPRITE_VERSION='20260723-idle2';
+const KAGEHOSHI_SPRITE_VERSION='20260723-idle3';
 const playerSpriteAsset=e=>{
   const gender=e?.gender==='f'?'f':'m';
   const src=MEISHOKU_READY.has(e?.meishoku)
@@ -2165,7 +2172,7 @@ function findPath(fx,fy,tx,ty){
 }
 
 /* ================= プレイヤー ================= */
-const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left',muted:false};
+const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left',muted:false,miniMapMin:false};
 const effVol=k=>settings.muted?0:settings[k];   // ミュート中は音量0として扱う
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
@@ -2371,6 +2378,7 @@ function load(){
     settings.vpadEnabled=cfg.vpadEnabled!==false;
     settings.vpadSide=cfg.vpadSide==='right'?'right':'left';
     settings.muted=cfg.muted===true;
+    settings.miniMapMin=cfg.miniMapMin===true;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     if(d.v>=12)restoreSavedLocation(d.location,d.v);
@@ -8255,9 +8263,13 @@ function miniMapLocationLabel(){
 }
 let miniMapNextDraw=0,miniMapLastZone='';
 function renderMiniMap(force=false){
-  const hudMap=$('miniMapHud');
-  hudMap.hidden=!started;
-  if(!started)return;
+  const hudMap=$('miniMapHud'),minBtn=$('miniMapMinBtn');
+  hudMap.hidden=!started||settings.miniMapMin;
+  minBtn.hidden=!started;
+  minBtn.textContent=settings.miniMapMin?'▢':'−';
+  const minLabel=settings.miniMapMin?'地図を再表示':'地図を最小化';
+  minBtn.title=minLabel;minBtn.setAttribute('aria-label',minLabel);
+  if(!started||settings.miniMapMin)return;
   const now=performance.now();
   if(!force&&zone===miniMapLastZone&&now<miniMapNextDraw)return;
   miniMapNextDraw=now+120;miniMapLastZone=zone;
@@ -8449,6 +8461,12 @@ $('vpadSideSetting').addEventListener('change',ev=>{
   if(started||hasSaveData)save();
 });
 $('sndBtn').addEventListener('click',openSettings);
+$('miniMapMinBtn').addEventListener('click',()=>{
+  settings.miniMapMin=!settings.miniMapMin;
+  renderMiniMap(true);
+  if(started||hasSaveData)save();
+  sfx.click();
+});
 $('muteSetting').addEventListener('change',ev=>{
   settings.muted=ev.target.checked;
   audio();               // 初回操作でも音声系を初期化してから反映
