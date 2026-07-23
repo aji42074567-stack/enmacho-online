@@ -67,13 +67,15 @@
     font-variant-numeric:tabular-nums}
   #worldClock .phase{color:#f0d383}
   #worldClock.night .phase{color:#a9c8ff}
-  #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
+  #sndBtn,#accountBtn,#muteBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:var(--parchment);cursor:pointer;padding:0;line-height:1}
   #sndBtn{top:82px;font-size:19px}
   #accountBtn{top:126px;width:46px;font-family:var(--serif);font-size:11px;
     letter-spacing:.05em}
-  #sndBtn:hover,#accountBtn:hover{border-color:#6b5730}
+  #muteBtn{top:170px;font-size:16px}
+  #muteBtn.muted{opacity:.62;filter:grayscale(.6)}
+  #sndBtn:hover,#accountBtn:hover,#muteBtn:hover{border-color:#6b5730}
   #accountBtn .status-dot{display:inline-block;width:6px;height:6px;margin-right:3px;
     border-radius:50%;background:#645b4b;box-shadow:0 0 0 1px #1a150f}
   #accountBtn.online{border-color:#6f9b65;color:#d6efcf}
@@ -883,6 +885,7 @@
   </div>
 
   <button id="sndBtn" title="設定を開く" aria-label="設定を開く">⚙</button>
+  <button id="muteBtn" title="ミュート切替" aria-label="ミュート切替">🔊</button>
   <button id="accountBtn" title="魂籍を開く" aria-label="魂籍を開く">
     <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
     <span id="onlineCount" hidden aria-hidden="true">1</span>
@@ -2010,7 +2013,8 @@ function findPath(fx,fy,tx,ty){
 }
 
 /* ================= プレイヤー ================= */
-const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left'};
+const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left',muted:false};
+const effVol=k=>settings.muted?0:settings[k];   // ミュート中は音量0として扱う
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
@@ -2210,6 +2214,7 @@ function load(){
     settings.shake=cfg.shake!==false;
     settings.vpadEnabled=cfg.vpadEnabled!==false;
     settings.vpadSide=cfg.vpadSide==='right'?'right':'left';
+    settings.muted=cfg.muted===true;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     return true;
@@ -2318,7 +2323,7 @@ const BGM_MIX_LEVEL=0.42;
 function setupSfxBus(ac){
   if(sfxMaster)return;
   sfxMaster=ac.createGain();
-  sfxMaster.gain.value=settings.sfx/100;
+  sfxMaster.gain.value=effVol('sfx')/100;
   sfxLimiter=ac.createDynamicsCompressor();
   sfxLimiter.threshold.value=-12;
   sfxLimiter.knee.value=10;
@@ -2418,7 +2423,7 @@ const sfx={
 function startBgm(){
   const ac=audio();if(!ac||bgmStarted)return;
   bgmStarted=true;
-  bgmGain=ac.createGain();bgmGain.gain.value=settings.bgm/100*BGM_MIX_LEVEL;
+  bgmGain=ac.createGain();bgmGain.gain.value=effVol('bgm')/100*BGM_MIX_LEVEL;
   bgmGain.connect(ac.destination);
   // 残響(山寺のような響き)
   const delay=ac.createDelay(1);delay.delayTime.value=0.45;
@@ -2449,7 +2454,7 @@ function startBgm(){
   // 琴の音(陰旋法・都節音階)
   const SCALE=[293.66,311.13,392.00,440.00,466.16,587.33,622.25];
   function pluck(){
-    if(settings.bgm>0){
+    if(effVol('bgm')>0){
       const f=SCALE[Math.floor(Math.random()*SCALE.length)]/(Math.random()<0.3?2:1);
       const o=ac.createOscillator(),g=ac.createGain();
       o.type='triangle';o.frequency.value=f;
@@ -2481,7 +2486,7 @@ function loadMusic(){
     musicGain=ac.createGain();
     musicGain.gain.value=0.0001;
     musicGain.connect(ac.destination);
-    musicGain.gain.linearRampToValueAtTime(settings.bgm/100*BGM_MIX_LEVEL,ac.currentTime+3);
+    musicGain.gain.linearRampToValueAtTime(effVol('bgm')/100*BGM_MIX_LEVEL,ac.currentTime+3);
     if(bgmGain)bgmGain.gain.linearRampToValueAtTime(0.0001,ac.currentTime+4);  // 琴の生成BGMは静かに退場
     scheduleTrack(0,ac.currentTime+0.2);
   })
@@ -2503,10 +2508,10 @@ function scheduleTrack(i,when){
 }
 function applyAudioSettings(){
   if(!AC)return;
-  const t=AC.currentTime,v=settings.bgm/100*BGM_MIX_LEVEL;
+  const t=AC.currentTime,v=effVol('bgm')/100*BGM_MIX_LEVEL;
   if(sfxMaster){
     sfxMaster.gain.cancelScheduledValues(t);
-    sfxMaster.gain.setTargetAtTime(settings.sfx/100,t,0.025);
+    sfxMaster.gain.setTargetAtTime(effVol('sfx')/100,t,0.025);
   }
   if(musicGain){
     musicGain.gain.cancelScheduledValues(t);
@@ -5269,7 +5274,7 @@ const bossCutinButtonLabel=playing=>MOBILE_RENDER
 function duckBossCutinBgm(duck){
   if(!AC)return;
   if(!duck){applyAudioSettings();return;}
-  const t=AC.currentTime,v=settings.bgm/100*BGM_MIX_LEVEL;
+  const t=AC.currentTime,v=effVol('bgm')/100*BGM_MIX_LEVEL;
   if(musicGain){musicGain.gain.cancelScheduledValues(t);musicGain.gain.setTargetAtTime(v*.12,t,.12);}
   if(bgmGain){bgmGain.gain.cancelScheduledValues(t);bgmGain.gain.setTargetAtTime(musicReady?0:v*.1,t,.12);}
 }
@@ -5295,7 +5300,7 @@ function playBossCutinVideo(scene,panel){
   const video=$('bossCutinVideo');
   video.classList.remove('hidden');
   video.src=scene.video;video.currentTime=0;
-  video.volume=clamp((settings.sfx*.7+settings.bgm*.3)/100,0,1);
+  video.volume=clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
   video.muted=video.volume<=0;
   video.onplaying=()=>{
     if(!bossCutinActive){video.pause();return;}
@@ -7996,6 +8001,20 @@ $('vpadSideSetting').addEventListener('change',ev=>{
   if(started||hasSaveData)save();
 });
 $('sndBtn').addEventListener('click',openSettings);
+function renderMuteBtn(){
+  const b=$('muteBtn');
+  b.textContent=settings.muted?'🔇':'🔊';
+  b.classList.toggle('muted',settings.muted);
+  b.title=b.ariaLabel=settings.muted?'ミュート解除':'ミュート';
+}
+$('muteBtn').addEventListener('click',()=>{
+  settings.muted=!settings.muted;
+  audio();               // 初回クリックでも音声系を初期化してから反映
+  applyAudioSettings();
+  renderMuteBtn();
+  if(started||hasSaveData)save();
+  if(!settings.muted)sfx.click();   // 解除時だけ音で知らせる
+});
 $('settingsClose').addEventListener('click',closeSettings);
 function openAccount(){
   $('settingsPanel').classList.add('hidden');
@@ -8164,6 +8183,7 @@ hasSaveData=load();
 applyVisualSettings();
 applyVpadSettings();
 renderSettings();
+renderMuteBtn();
 window.EnmaGameBridge={
   exportSave(){
     try{
