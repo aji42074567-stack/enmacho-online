@@ -5763,6 +5763,8 @@ loadSprite('map_muen_entrance','assets/map_muen_entrance.png');
 loadSprite('map_cave_exit','assets/map_cave_exit.png');
 loadSprite('map_stairs_up','assets/map_stairs_up.png');
 loadSprite('map_stairs_down','assets/map_stairs_down.png');
+loadSprite('map_dungeon_torch_body','assets/map_dungeon_torch_body.png');
+loadSprite('map_dungeon_torch_flame','assets/map_dungeon_torch_flame.png');
 loadSprite('map_house_red','assets/map_house_red.png');
 loadSprite('map_house_blue','assets/map_house_blue.png');
 loadSprite('map_shop_green','assets/map_shop_green.png');
@@ -6743,8 +6745,48 @@ function drawMuenEntrance(sx,sy){
   ctx.fillStyle='#d8cfb4';ctx.font='9px sans-serif';ctx.textAlign='center';
   ctx.fillText('無縁塚',sx,sy+38);
 }
-function drawTorch(sx,sy){
+function drawTorch(sx,sy,p){
   ctx.save();ctx.translate(sx,sy);
+  const body=SPRITES.map_dungeon_torch_body;
+  const flame=SPRITES.map_dungeon_torch_flame;
+  if(body&&flame){
+    const phase=(p?.x||0)*1.73+(p?.y||0)*2.39;
+    const sway=Math.sin(time*5.2+phase);
+    const lick=Math.sin(time*11.8+phase*1.7);
+    const flutter=Math.sin(time*17.6+phase*0.7);
+    const flicker=0.5+0.5*Math.sin(time*13.4+phase+Math.sin(time*4.1+phase));
+    const bodyH=74,bodyW=bodyH*body.width/body.height;
+    const flameH=31+sway*1.7+lick*2.3;
+    const flameW=flameH*flame.width/flame.height*(0.94+flutter*0.045);
+    const flameBaseY=-50;
+
+    // 炎と同じ周期で石床に落ちる暖色光を揺らす。
+    const glowR=50+flicker*7;
+    const glow=ctx.createRadialGradient(sway*1.3,-64,1,sway*1.3,-64,glowR);
+    glow.addColorStop(0,`rgba(255,205,105,${0.30+flicker*0.09})`);
+    glow.addColorStop(.28,`rgba(255,128,35,${0.19+flicker*0.07})`);
+    glow.addColorStop(1,'rgba(105,35,8,0)');
+    ctx.fillStyle=glow;ctx.fillRect(-glowR,-64-glowR,glowR*2,glowR*2);
+
+    // 炎を本体より先に描き、火皿の格子が手前へ来るようにする。
+    ctx.save();
+    ctx.translate(sway*1.25+flutter*0.35,flameBaseY);
+    ctx.rotate(sway*0.075+lick*0.018);
+    ctx.globalAlpha=0.91+flicker*0.09;
+    ctx.drawImage(flame,-flameW/2,-flameH,flameW,flameH);
+    ctx.restore();
+    ctx.drawImage(body,-bodyW/2,-bodyH+2,bodyW,bodyH);
+
+    // ときどき火の粉を上げ、炎の動きを小さな画面でも読めるようにする。
+    ctx.fillStyle=`rgba(255,205,95,${0.28+flicker*0.42})`;
+    for(let i=0;i<2;i++){
+      const rise=(time*(13+i*4)+phase*5+i*17)%22;
+      const sparkX=Math.sin(time*(7+i*2)+phase+i)*3.5;
+      ctx.fillRect(sparkX-0.6,-80-rise,1.2,1.2);
+    }
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle='#4a3a26';ctx.lineWidth=3;
   ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-22);ctx.stroke();
   const fl=Math.sin(time*9+sx)*0.5+0.5;
@@ -7147,7 +7189,7 @@ function render(){
       case 'rinne_clutter':drawRinneClutter(sx,sy,it.o);break;
       case 'rinne_lantern':drawRinneLantern(sx,sy);break;
       case 'rinne_pier':drawPierBase(sx,sy);break;
-      case 'torch':drawTorch(sx,sy);break;
+      case 'torch':drawTorch(sx,sy,p);break;
       case 'cavexit':drawCaveExit(sx,sy);break;
       case 'stairdown':drawStairs(sx,sy,true);break;
       case 'stairup':drawStairs(sx,sy,false);break;
