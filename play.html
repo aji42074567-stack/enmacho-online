@@ -1448,6 +1448,7 @@
           <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
           <li class="pc-only"><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
           <li class="touch-only"><b>画面下のボタン</b> … 印・道具・メニュー　／　<b>右上の小地図</b> … 全体地図</li>
+          <li>転職すると汎用の印は消え、<b>E</b>が職の看板スキルになる</li>
         </ul>
         <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
         <button class="btn" id="startBtn">入庁する</button>
@@ -2013,6 +2014,15 @@ const playerSpriteAsset=e=>{
   return src;
 };
 const sealCdMul=()=>meishokuDef(player)?.sealCd||1;   // 呪禁師など印のクールタイム補正
+// 看板スキル(E枠)。転職すると汎用の印(破魔/ヒール/業火)と入れ替わる。数値の正本は docs/chatgame-design.md §1。
+// sealCd・heal等の職補正はこの表には乗せない(表の値が最終値)。R/F枠は印可(徳位28/36)で習得予定
+const JOB_SKILLS={
+  rasetsu:  {name:'鬼哭斬',icon:'🗡',mp:0, cd:8,  desc:'間合いの敵を2.2倍の一太刀で斬る(会心あり)'},
+  kagehoshi:{name:'影針',  icon:'✧', mp:6, cd:0.5,desc:'影の針を投げ打つ(会心が乗る)',color:'#9fb0cf'},
+  jugonshi: {name:'呪雷',  icon:'⚡', mp:10,cd:0.5,desc:'呪の雷で撃つ(破魔の2.0倍威力)',color:'#b98cff'},
+  gohousou: {name:'大回向',icon:'☸', mp:14,cd:4,  desc:'自らを癒やし、4マス内の仲間にも7割の癒やしを配る'},
+};
+const jobSkill=()=>JOB_SKILLS[player.meishoku]||null;
 
 /* ================= マップ生成 ================= */
 let blocked=new Uint8Array(FIELD_SIZE*FIELD_SIZE);
@@ -2605,7 +2615,7 @@ const player={
   onsho:null,                               // 入庁恩賞「勤怠印」{date:JST日付,cycle:1..7}
   fudaShop:null,                            // 旧・交換所の月間実績(月30個上限は2026-07-25撤廃。互換のため保持)
   goyo:null,                                // 今日の御用 {date,accepted,prog,claimed}
-  cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
+  cd:{bolt:0,heal:0,fire:0,potion:0,jobE:0},       // 印・看板スキル・回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
   combatT:0,
   autoMode:false,
@@ -3433,8 +3443,59 @@ function pickSpellTarget(range){
   for(const m of mobs){if(m.dead)continue;const d=dist(player,m);if(d<bd){bd=d;best=m;}}
   return best;
 }
+// 看板スキル(E枠)の発動。転職済みはEキーがこちらに切り替わる(数値は JOB_SKILLS が正本)
+function castJobSkill(){
+  if(player.dead||!started)return;
+  const s=jobSkill();if(!s)return;
+  if(player.cd.jobE>0)return;
+  if(player.meishoku==='gohousou'){castDaieko(s);return;}
+  if(player.mp<s.mp){log('霊力(MP)が足りない','sys');return;}
+  if(player.meishoku==='rasetsu'){
+    let m=player.target&&!player.target.dead&&dist(player,player.target)<=RANGE+0.7?player.target:null;
+    if(!m){let bd=RANGE+0.7;for(const c of mobs){if(c.dead)continue;const d=dist(player,c);if(d<=bd){bd=d;m=c;}}}
+    if(!m){log('間合いに迷える魂がいない','sys');return;}
+    player.cd.jobE=s.cd;player.target=m;
+    player.attackT=0;player.attackDur=0.62;player.swingKind='melee';
+    faceToward(player,m);
+    signalPlayerAction('melee',m);
+    const crit=Math.random()<critRate();
+    damageMob(m,Math.round((atkTotal()*2.2+rnd(0,6))*(crit?1.6:1)),crit);
+    hitstop=0.07;sfx.swing();
+    return;
+  }
+  const t=pickSpellTarget(7);
+  if(!t){log('射程内に迷える魂がいない','sys');return;}
+  player.mp-=s.mp;player.cd.jobE=s.cd;player.target=t;
+  player.swing=0.25;player.swingMax=0.25;player.swingKind='cast';
+  faceToward(player,t);
+  signalPlayerAction('bolt',t);
+  bolts.push({x:player.x,y:player.y-0.5,target:t,kind:'bolt',
+    mul:player.meishoku==='jugonshi'?2.0:1.5,critable:player.meishoku==='kagehoshi',color:s.color});
+  sfx.bolt();
+}
+// 大回向: 自分は全量、詠唱地点から4マス以内の仲間に7割(受信判定は receivePartyHeal の現行4マスを流用)
+function castDaieko(s){
+  const allyNear=party.id&&partyMemberNear(4);
+  if(player.hp>=player.maxHp&&!allyNear){log('HPは満タンだ','sys');return;}
+  if(player.mp<s.mp){log('霊力(MP)が足りない','sys');return;}
+  player.mp-=s.mp;player.cd.jobE=s.cd;
+  player.swing=0.32;player.swingMax=0.32;player.swingKind='cast';
+  signalPlayerAction('heal');
+  const n=Math.round((45+7*player.lv)*1.5);
+  player.hp=Math.min(player.maxHp,player.hp+n);
+  addFloat(player.x,player.y-0.6,'+'+n,'#7fe07f');
+  addActionEffect('heal',player.x,player.y);
+  burst(player.x,player.y,'#7fe07f',12);
+  sfx.heal();
+  if(allyNear){
+    netOutbox.push({type:'party_heal',partyId:party.id,amount:Math.ceil(n*0.7),x:player.x,y:player.y,zone});
+    if(player.partySupportT<=0)log('大回向の支援 — 10秒のあいだ仲間の討伐で徳が全て入る','sys');
+    player.partySupportT=10;
+  }
+}
 function castBolt(){
   if(player.dead||!started)return;
+  if(player.meishoku){castJobSkill();return;}
   const t=pickSpellTarget(7);
   if(player.cd.bolt>0)return;
   if(!t){log('射程内に迷える魂がいない','sys');return;}
@@ -3448,6 +3509,7 @@ function castBolt(){
 }
 function castHeal(){
   if(player.dead||!started)return;
+  if(player.meishoku){log('この枠の技は師範の「印可」で授かる(徳位28)','sys');return;}
   if(player.lv<3){log('印「ヒール」は徳位3で授かる','sys');return;}
   if(player.cd.heal>0)return;
   if(player.mp<12){log('霊力(MP)が足りない','sys');return;}
@@ -3480,6 +3542,7 @@ function partyMemberNear(range){
 }
 function castFire(){
   if(player.dead||!started)return;
+  if(player.meishoku){log('この枠の技は師範の「印可」で授かる(徳位36)','sys');return;}
   if(player.lv<6){log('印「業火」は徳位6で授かる','sys');return;}
   if(player.cd.fire>0)return;
   const t=pickSpellTarget(7);
@@ -4388,7 +4451,7 @@ async function useGmMeishokuReset(){
     gmMeishokuResetCount=await window.EnmaAccountBridge.consumeGmMeishokuReset();
     if(current.starter&&player.eq.weapon===current.starter)player.eq.weapon='dagger';
     player.meishoku='';player.meishokuLv=0;
-    recalcMax();save();hud();
+    recalcMax();refreshSkillButtons();save();hud();
     $('equip').classList.add('hidden');
     openMeishokuSelect();
     log(`冥職やり直しの札を使い、冥職「${current.name}」の刻印を解いた`,'gain');
@@ -4934,6 +4997,12 @@ $('meishokuConfirm').addEventListener('click',()=>{
   $('meishokuSelect').classList.add('hidden');
   banner={txt:`冥職　${job.name}`,age:0};
   log(`魂に冥職「${job.name}」が刻まれ、「${ITEMS[job.starter]?.name||'得物'}」を授かった`,'gain');
+  const sk=jobSkill();
+  if(sk){
+    refreshSkillButtons();
+    try{localStorage.setItem('enma_jobskill_notice','1');}catch(e){}
+    log(`看板の技「${sk.name}」を授かった。汎用の印(破魔・ヒール・業火)は魂から離れた`,'gain');
+  }
 });
 $('meishokuClose').addEventListener('click',()=>$('meishokuSelect').classList.add('hidden'));
 for(const b of document.querySelectorAll('[data-shop-mode]'))b.addEventListener('click',()=>{
@@ -5375,14 +5444,18 @@ function update(dt){
             damageMob(m,Math.round(atkTotal()*1.3+rnd(0,8)),false,'fire');
         }
       }else{
-        if(!t.dead)damageMob(t,Math.round(atkTotal()*1.5+rnd(0,6)),false,'bolt');
-        burst(tx,ty,'#7fb0ff',10);
+        if(!t.dead){
+          // 影針(critable)は会心が乗り、呪雷はmul=2.0。素の破魔はmul省略=1.5倍
+          const crit=Boolean(b.critable)&&Math.random()<critRate();
+          damageMob(t,Math.round((atkTotal()*(b.mul||1.5)+rnd(0,6))*(crit?1.6:1)),crit,'bolt');
+        }
+        burst(tx,ty,b.color||'#7fb0ff',10);
       }
     }else{
       const s=11*dt;
       b.x+=dx/d*s;b.y+=dy/d*s;
       sparks.push({x:b.x,y:b.y,vx:rnd(-.3,.3),vy:rnd(-.3,.3),age:0.4,
-        color:b.kind==='fire'?'#ff9a4a':'#7fb0ff'});
+        color:b.kind==='fire'?'#ff9a4a':(b.color||'#7fb0ff')});
     }
   }
   for(let i=bolts.length-1;i>=0;i--)if(bolts[i].done)bolts.splice(i,1);
@@ -8818,19 +8891,20 @@ function hud(){
   if(player.foodDefT>0)bf+=`🍲防+4 ${Math.ceil(player.foodDefT)}秒　`;
   if(player.foodRegenT>0)bf+=`🍵回復 ${Math.ceil(player.foodRegenT)}秒`;
   el.buffs.textContent=bf;
-  el.bolt.classList.toggle('disabled',player.mp<8||player.cd.bolt>0);
-  el.heal.classList.toggle('disabled',player.lv<3||player.mp<12||player.cd.heal>0);
-  el.fire.classList.toggle('disabled',player.lv<6||player.mp<20||player.cd.fire>0);
+  const jsk=jobSkill();   // 転職済みはE=看板スキル、R/Fは印可待ちロック
+  el.bolt.classList.toggle('disabled',jsk?(player.mp<jsk.mp||player.cd.jobE>0):(player.mp<8||player.cd.bolt>0));
+  el.heal.classList.toggle('disabled',Boolean(jsk)||player.lv<3||player.mp<12||player.cd.heal>0);
+  el.fire.classList.toggle('disabled',Boolean(jsk)||player.lv<6||player.mp<20||player.cd.fire>0);
   $('btnPotion').classList.toggle('disabled',quickItem.disabled);
   // 道具が空でもスワイプ切替はできるよう、ボタン自体は無効化しない。
   $('btnPotion').disabled=false;
   const cdShow=(elm,v)=>{elm.classList.toggle('hidden',v<=0);if(v>0)elm.textContent=Math.ceil(v);};
   cdShow(el.cdPotion,quickItem.kind==='heal'?player.cd.potion:0);
-  cdShow(el.cdBolt,player.cd.bolt);
-  cdShow(el.cdHeal,player.lv>=3?player.cd.heal:0);
-  cdShow(el.cdFire,player.lv>=6?player.cd.fire:0);
-  el.lockHeal.classList.toggle('hidden',player.lv>=3);
-  el.lockFire.classList.toggle('hidden',player.lv>=6);
+  cdShow(el.cdBolt,jsk?player.cd.jobE:player.cd.bolt);
+  cdShow(el.cdHeal,!jsk&&player.lv>=3?player.cd.heal:0);
+  cdShow(el.cdFire,!jsk&&player.lv>=6?player.cd.fire:0);
+  el.lockHeal.classList.toggle('hidden',!jsk&&player.lv>=3);
+  el.lockFire.classList.toggle('hidden',!jsk&&player.lv>=6);
 }
 
 /* ================= 入力 ================= */
@@ -10097,6 +10171,23 @@ function showAutoChoice(){
 $('btnBolt').addEventListener('click',castBolt);
 $('btnHeal').addEventListener('click',castHeal);
 $('btnFire').addEventListener('click',castFire);
+// スキルバーのE/R/F表示を職に合わせる(起動時・転職時・職解除時に呼ぶ)
+function refreshSkillButtons(){
+  const s=jobSkill();
+  const set=(id,icon,label,title)=>{const b=$(id);const ic=b.querySelector('.icon');
+    ic.textContent=icon;ic.nextElementSibling.textContent=label;b.title=title;};
+  if(s){
+    set('btnBolt',s.icon,s.name,`${s.name} (E) ${s.mp>0?'MP'+s.mp:'MP不要'} / ${s.desc}`);
+    set('btnHeal','✚','印可','師範の印可で授かる(徳位28)');
+    set('btnFire','🔥','印可','師範の印可で授かる(徳位36)');
+    $('lockHeal').textContent='徳28';$('lockFire').textContent='徳36';
+  }else{
+    set('btnBolt','✦','破魔','破魔の印 (E) MP8');
+    set('btnHeal','✚','ヒール','ヒールの印 (R) MP12 / 徳位3で習得');
+    set('btnFire','🔥','業火','業火の印 (F) MP20 / 徳位6で習得');
+    $('lockHeal').textContent='徳3';$('lockFire').textContent='徳6';
+  }
+}
 const quickItemButton=$('btnPotion');
 let quickSwipeStart=null,quickSwipeHandled=false;
 quickItemButton.addEventListener('pointerdown',ev=>{
@@ -10275,6 +10366,14 @@ $('startBtn').addEventListener('click',()=>{
     log(`おかえり、${[meishokuLabel(player),player.name].filter(Boolean).join(' ')} (徳位${player.lv} / ${player.gold} モン)`,'sys');
     if(migrationStatGrant>0)
       log(`毎徳位の新制度により、魂の資質ポイントを${migrationStatGrant}補填した`,'gain');
+    // 職スキル第1弾への移行告知(転職済みの既存プレイヤーに一度だけ)
+    const sk=jobSkill();
+    if(sk&&localStorage.getItem('enma_jobskill_notice')!=='1'){
+      try{localStorage.setItem('enma_jobskill_notice','1');}catch(e){}
+      banner={txt:`看板の技　${sk.name}`,age:0};
+      log(`職の道が改まり、看板の技「${sk.name}」を授かった。汎用の印(破魔・ヒール・業火)は魂から離れた`,'gain');
+      log('ヒールを失った職の回復は薬が頼りになる。護法僧と組めば薬代も浮く','sys');
+    }
   }else{
     log('地獄庁 第七審査区「賽の森」に着任した','sys');
     log('川辺のオババとオキナに話しかけてみよう','sys');
@@ -10391,6 +10490,7 @@ if(new URLSearchParams(location.search).has('debugmob')){
 }
 switchZone('field',SPAWN.x,SPAWN.y);
 hasSaveData=load();
+refreshSkillButtons();   // セーブ読込後、職に応じたスキルバーへ差し替える
 // 運営ギフト: ?gift=コード 付きで開くと一度だけ授かる。コードはハッシュでしか持たない
 (async()=>{
   try{
@@ -10952,7 +11052,8 @@ function howtoItemsHtml(){
     <li><b>地面をクリック / タップ</b> … 移動</li>
     <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-    <li><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>`;
+    <li><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
+          <li>転職すると汎用の印は消え、<b>E</b>が職の看板スキルになる</li>`;
 }
 $('howtoList').innerHTML=howtoItemsHtml();
 // スマホのキーボード表示で画面全体が上へずれるのを防ぐ:
