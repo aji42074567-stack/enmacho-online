@@ -476,7 +476,7 @@
     max-height:90dvh;overflow:auto;padding:26px 30px 20px;color:#302317;text-align:center;
     background:
       linear-gradient(rgba(216,201,168,.08),rgba(92,67,29,.09)),
-      url(assets/attendance_washi.png?v=20260724b) center/cover;
+      url(assets/attendance_washi.png?v=20260724c) center/cover;
     border:1px solid #8a7141;border-radius:4px;
     box-shadow:0 22px 72px rgba(0,0,0,.78),inset 0 0 30px rgba(76,51,20,.18)}
   .attendance-book::before{content:"";position:absolute;inset:8px;border:1px solid rgba(74,51,24,.38);
@@ -511,9 +511,12 @@
   }
   .attendance-reward{margin:17px 2px 0;padding:12px 10px 10px;
     border-top:1px solid rgba(79,53,24,.48);border-bottom:1px solid rgba(79,53,24,.25)}
-  .attendance-reward span{display:block;margin-bottom:5px;font:700 9px/1 var(--sans);
+  .attendance-reward>span{display:block;margin-bottom:5px;font:700 9px/1 var(--sans);
     letter-spacing:.28em;color:#8b3126}
-  .attendance-reward strong{font:700 clamp(12px,2vw,15px)/1.7 var(--serif);
+  .attendance-reward-items{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px 18px}
+  .attendance-reward-item{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .attendance-reward-item img{display:block;width:54px;height:54px;object-fit:contain;flex:0 0 auto}
+  .attendance-reward-item strong{font:700 clamp(12px,2vw,15px)/1.7 var(--serif);
     letter-spacing:.06em;color:#382719}
   .attendance-hint{margin:11px 0 0;font:9px/1 var(--sans);letter-spacing:.16em;color:#715d40}
   @media(max-width:700px){
@@ -523,6 +526,9 @@
     .attendance-grid{gap:3px}
     .attendance-day{top:4px;font-size:7.5px}
     .attendance-reward{margin-top:13px;padding:9px 5px 8px}
+    .attendance-reward-items{gap:5px 10px}
+    .attendance-reward-item{gap:4px}
+    .attendance-reward-item img{width:42px;height:42px}
   }
   /* ---- 全体地図 ---- */
   .world-map-sheet{position:relative;width:min(920px,calc(100vw - 36px));
@@ -1408,7 +1414,7 @@
       <div class="attendance-grid" id="onshoGrid" aria-label="7日分の勤怠印"></div>
       <div class="attendance-reward">
         <span>本日の品</span>
-        <strong id="onshoReward"></strong>
+        <div class="attendance-reward-items" id="onshoReward"></div>
       </div>
       <p class="attendance-hint">画面をタップして閉じる</p>
     </div>
@@ -8293,14 +8299,18 @@ function onshoGrant(cycle){
     case 1:capped(player.lv>=22?'potionsM':'potions',3,50,player.lv>=22?'甘露水M':'甘露水S');break;
     case 2:player.fuda+=2;lines.push('功徳札+2');break;
     case 3:player.kakera+=2;lines.push('巻物のかけら×2');break;
-    case 4:capped('hastePots',1,20,'韋駄天の水');break;
+    case 4:capped('hastePots',1,20,'韋駄天の霊水');break;
     case 5:player.fuda+=3;lines.push('功徳札+3');break;
     case 6:player.kakera+=3;lines.push('巻物のかけら×3');break;
     case 7:player.dragonBlood++;lines.push('竜の血×1');break;
   }
   return lines;
 }
-const ONSHO_ASSET_VERSION='20260724b';
+const ONSHO_ASSET_VERSION='20260724c';
+const ONSHO_REWARD_ICONS={
+  1:'potion_kanro.png',2:'kudoku_fuda.png',3:'scroll_fragment.png',4:'potion_idaten_spirit.png',
+  5:'kudoku_fuda.png',6:'scroll_fragment.png',7:'dragon_blood.png'
+};
 function closeOnshoPanel(){
   const panel=$('onshoPanel');
   if(panel.classList.contains('hidden'))return;
@@ -8319,7 +8329,18 @@ function showOnshoPanel(cycle,rewards){
     return `<div class="attendance-cell${today?' today':''}${day===7?' day-seven':''}">
       <span class="attendance-day">${day}日目</span>${stamp}</div>`;
   }).join('');
-  $('onshoReward').textContent=rewards.join('　／　');
+  const rewardEl=$('onshoReward');
+  rewardEl.replaceChildren(...rewards.map(name=>{
+    const item=document.createElement('span');
+    item.className='attendance-reward-item';
+    const icon=document.createElement('img');
+    icon.src=`assets/items/${name.startsWith('功徳札')?'kudoku_fuda.png':ONSHO_REWARD_ICONS[cycle]}?v=${ONSHO_ASSET_VERSION}`;
+    icon.alt='';icon.draggable=false;
+    const label=document.createElement('strong');
+    label.textContent=name;
+    item.append(icon,label);
+    return item;
+  }));
   panel.classList.remove('hidden');
   const landing=grid.querySelector('.attendance-cell.today .attendance-stamp');
   if(landing){
@@ -8358,7 +8379,7 @@ function claimOnsho(){
   sfx.coin();
   save();
   // 受領・記録は研修中も従来どおり。演出パネルだけ修了後に表示する。
-  if(tutorialStep>=TUTORIAL_STEPS.length)showOnshoPanel(cycle,['功徳札+1',...lines]);
+  if(tutorialStep>=TUTORIAL_STEPS.length)showOnshoPanel(cycle,lines);
 }
 /* ---- 着任チェックリスト(初回の5段ガイド。retention-plan A-1) ---- */
 const TUTORIAL_STEPS=[
