@@ -1862,7 +1862,7 @@ const HEAL_POTIONS={
   m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:HEAL_POTION_DELAY},
   l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:HEAL_POTION_DELAY},
 };
-const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','crit','gmdash'];
+const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','reisui','crit','gmdash'];
 const defaultQuickItems=tier=>[
   QUICK_ITEM_IDS.includes(`heal_${tier}`)?`heal_${tier}`:'heal_s',
   'haste','crit',
@@ -2478,6 +2478,7 @@ const player={
   lv:1,hp:80,maxHp:80,mp:30,maxMp:30,
   stats:{str:0,con:0,agi:0,int:0,luck:0},statPts:5,
   hasteT:0,critT:0,hastePots:0,critPots:0,
+  reisuiPots:0,                             // 韋駄天の霊水(恩賞限定・60分高速化・上限5)
   gmDashT:0,gmDashPots:0,                   // GM専用「神足の御符」(10分 超高速)
   xp:0,gold:0,potions:3,potionsM:0,potionsL:0,potionTier:'s',dragonBlood:0,
   quickItems:['heal_s','haste','crit'],quickPage:0,
@@ -2581,7 +2582,7 @@ function save(){
       items:player.items,rareCopies:player.rareCopies,reposePts:player.reposePts,eq:player.eq,kills,
       gender:player.gender,name:player.name,
       stats:player.stats,statPts:player.statPts,
-      hastePots:player.hastePots,critPots:player.critPots,
+      hastePots:player.hastePots,critPots:player.critPots,reisuiPots:player.reisuiPots,
       buffs:{haste:Math.max(0,Math.round(player.hasteT)),crit:Math.max(0,Math.round(player.critT)),
         gmDash:Math.max(0,Math.round(player.gmDashT)),foodAtk:Math.max(0,Math.round(player.foodAtkT)),
         foodDef:Math.max(0,Math.round(player.foodDefT)),foodRegen:Math.max(0,Math.round(player.foodRegenT))},
@@ -2642,6 +2643,7 @@ function load(){
         int:d.stats.int|0,luck:d.stats.luck|0};
       player.statPts=d.statPts|0;
       player.hastePots=d.hastePots|0;player.critPots=d.critPots|0;
+      player.reisuiPots=Math.max(0,d.reisuiPots|0);
     }else{
       // 旧セーブ: 初期5pt+10レベルごとの分をまとめて付与
       player.stats={str:0,con:0,agi:0,int:0,luck:0};
@@ -3420,6 +3422,19 @@ function drinkHaste(){
   burst(player.x,player.y,'#9fe0ff',12);
   sfx.potion();save();
 }
+function drinkReisui(){
+  // 恩賞限定の上位版。効果は韋駄天の水と同じ高速化で、持続だけ60分
+  if(player.dead||!started)return;
+  if(player.reisuiPots<=0){log('韋駄天の霊水がない','sys');return;}
+  if(player.hasteT>0){log('すでに韋駄天の加護がある','sys');return;}
+  player.reisuiPots--;player.hasteT=3600;
+  player.swing=0.36;player.swingMax=0.36;player.swingKind='use';
+  signalPlayerAction('haste');
+  addFloat(player.x,player.y-0.6,'韋駄天の霊水！','#9fe0ff');
+  addActionEffect('haste',player.x,player.y);
+  burst(player.x,player.y,'#9fe0ff',12);
+  sfx.potion();save();
+}
 async function useGmDash(){
   if(player.dead||!started)return;
   if(gmDashBusy)return;
@@ -3471,6 +3486,10 @@ function quickItemInfo(id){
   if(id==='haste')return{id,kind:'haste',name:'韋駄天の水',label:'韋駄天',
     icon:'assets/items/potion_idaten.png',count:player.hastePots,
     disabled:player.hastePots<=0||player.hasteT>0,title:'韋駄天の水 (Q) 5分 高速化'};
+  if(id==='reisui')return{id,kind:'reisui',name:'韋駄天の霊水',label:'霊水',
+    icon:'assets/items/potion_idaten.png',count:player.reisuiPots,
+    disabled:player.reisuiPots<=0||player.hasteT>0,
+    title:'韋駄天の霊水 (Q) 60分 高速化(恩賞限定)'};
   if(id==='gmdash')return{id,kind:'gmdash',name:'神足の御符',label:'神足',
     icon:'assets/items/acc_kifuda_gofu.png',count:player.gmDashPots,
     disabled:gmDashBusy||player.gmDashPots<=0||player.gmDashT>0,
@@ -3483,6 +3502,7 @@ function useQuickItem(){
   const q=quickItemInfo(player.quickItems[player.quickPage]);
   if(q.kind==='heal')drinkPotion(q.tier);
   else if(q.kind==='haste')drinkHaste();
+  else if(q.kind==='reisui')drinkReisui();
   else if(q.kind==='gmdash')void useGmDash();
   else drinkCrit();
 }
@@ -4061,7 +4081,8 @@ function renderItemTab(){
     const q=quickItemInfo(id),selected=player.quickItems[player.quickPage]===id;
     const fx=q.kind==='heal'
       ?`HP+${HEAL_POTIONS[q.tier].heal} / 共有ディレイ${HEAL_POTIONS[q.tier].delay}秒`
-      :q.kind==='haste'?'5分 高速化':q.kind==='gmdash'?'10分 超高速 [GM専用]':'5分 会心+25%';
+      :q.kind==='haste'?'5分 高速化':q.kind==='reisui'?'60分 高速化(恩賞4日目の限定品・非売品)'
+      :q.kind==='gmdash'?'10分 超高速 [GM専用]':'5分 会心+25%';
     html+=`<div class="itemrow"><img class="icn" src="${q.icon}" alt="">
       <span class="nm">${q.name} ×${q.count} <span class="fx">${fx}</span></span>
       <button class="buyb ${selected?'on':''}" data-quick-item="${id}"
@@ -8299,7 +8320,7 @@ function onshoGrant(cycle){
     case 1:capped(player.lv>=22?'potionsM':'potions',3,50,player.lv>=22?'甘露水M':'甘露水S');break;
     case 2:player.fuda+=2;lines.push('功徳札+2');break;
     case 3:player.kakera+=2;lines.push('巻物のかけら×2');break;
-    case 4:capped('hastePots',1,20,'韋駄天の霊水');break;
+    case 4:capped('reisuiPots',1,5,'韋駄天の霊水');break;
     case 5:player.fuda+=3;lines.push('功徳札+3');break;
     case 6:player.kakera+=3;lines.push('巻物のかけら×3');break;
     case 7:player.dragonBlood++;lines.push('竜の血×1');break;
