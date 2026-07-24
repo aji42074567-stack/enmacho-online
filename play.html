@@ -815,6 +815,19 @@
   .shop-buy-qty .buyb small{display:block;margin-top:3px;color:var(--gold);
     font-size:9px;font-variant-numeric:tabular-nums}
   .shop-buy-qty .buyb:disabled small{color:inherit}
+  .shop-tabs{display:grid;gap:6px;margin:10px 0}
+  .shop-tabs.primary{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:4px}
+  .shop-tabs.secondary{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:13px}
+  #shopBuyTabs[hidden]{display:none}
+  .shop-tab{padding:8px 6px;border:1px solid var(--panel-edge);border-radius:4px;
+    background:linear-gradient(180deg,#271f13,#17120c);color:var(--dim);
+    font:12px var(--serif);letter-spacing:.12em;cursor:pointer}
+  .shop-tab:hover{border-color:#8a6f3d;color:var(--parchment)}
+  .shop-tab.on{border-color:var(--gold);color:var(--gold);
+    background:linear-gradient(180deg,#45381f,#251c10);box-shadow:0 0 8px rgba(201,162,74,.16)}
+  .shop-sell-note{margin:4px 0 10px;padding:8px 9px;border:1px solid #493820;
+    background:#141009;color:#b9aa88;font:10px/1.65 var(--sans);text-align:left}
+  .shop-empty{padding:20px 8px;color:var(--dim);font:11px/1.8 var(--sans)}
   .goldrow{font-family:var(--sans);font-size:12px;color:var(--dim);margin-top:12px;
     font-variant-numeric:tabular-nums}
   .settings-list{display:flex;flex-direction:column;gap:14px;text-align:left}
@@ -1511,7 +1524,15 @@
     <div class="scroll">
       <div id="shopPortrait" class="portrait" style="background-image:url(assets/npc_obaba.png)"></div>
       <h2>オババの売店</h2>
-      <div class="sub">「銭は貯めるもんじゃない、使うもんだよ」</div>
+      <div class="sub" id="shopSub">「銭は貯めるもんじゃない、使うもんだよ」</div>
+      <div class="shop-tabs primary" role="tablist" aria-label="売店の取引">
+        <button class="shop-tab on" type="button" data-shop-mode="buy" role="tab" aria-selected="true">買う</button>
+        <button class="shop-tab" type="button" data-shop-mode="sell" role="tab" aria-selected="false">売る</button>
+      </div>
+      <div class="shop-tabs secondary" id="shopBuyTabs" role="tablist" aria-label="買う品の種類">
+        <button class="shop-tab on" type="button" data-shop-buy-tab="medicine" role="tab" aria-selected="true">薬</button>
+        <button class="shop-tab" type="button" data-shop-buy-tab="equipment" role="tab" aria-selected="false">装備</button>
+      </div>
       <div id="shopList"></div>
       <div class="goldrow">所持金 <span id="shopGold">0</span> モン</div>
       <button class="btn small" id="shopClose">店を出る</button>
@@ -3640,6 +3661,8 @@ const $=id=>document.getElementById(id);
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 const touchUiMedia=matchMedia('(pointer:coarse),(max-width:700px)');
 const SHOP_BUY_QTYS=[1,5,10];
+const SHOP_SELL_RATE=0.1;
+let shopMode='buy',shopBuyTab='medicine';
 function shopConsumable(id){
   if(id.startsWith('potion-'))return HEAL_POTIONS[id.slice('potion-'.length)]||null;
   if(id==='haste')return {name:'韋駄天の水',field:'hastePots',price:HASTE_PRICE,cap:BUFF_POTION_CAP};
@@ -3656,11 +3679,19 @@ function shopBuyQtyHtml(id,item){
   }).join('');
   return `<div class="shop-buy-qty" role="group" aria-label="${esc(item.name)}の購入数">${buttons}</div>`;
 }
-function renderShop(){
-  const list=$('shopList');
-  const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
+const shopSellPrice=item=>Math.floor(item.price*SHOP_SELL_RATE);
+const shopSection=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
+function shopSellQtyHtml(id,item){
+  const count=Math.max(0,player[item.field]|0),unit=shopSellPrice(item);
+  const buttons=SHOP_BUY_QTYS.map(qty=>{
+    const proceeds=unit*qty,disabled=count<qty;
+    return `<button class="buyb" data-shop-sell="${id}" data-shop-sell-qty="${qty}" ${disabled?'disabled':''}
+      title="${esc(item.name)}を${qty}個・${proceeds}モンで売る"><b>${qty}個</b><small>${proceeds}モン</small></button>`;
+  }).join('');
+  return `<div class="shop-buy-qty" role="group" aria-label="${esc(item.name)}の売却数">${buttons}</div>`;
+}
+function renderShopMedicine(){
   let html='';
-  html+=sec('薬');
   for(const [tier,p] of Object.entries(HEAL_POTIONS)){
     html+=`<div class="itemrow shop-consumable"><img class="icn" src="assets/items/potion_kanro.png" alt="">
       <span class="nm">${p.name} <span class="fx">HP+${p.heal} / 使用後${p.delay}秒 / 所持 ${player[p.field]}/${p.cap}</span></span>
@@ -3677,10 +3708,14 @@ function renderShop(){
     <span class="nm">修羅の酒 <span class="fx">5分 会心率+25% / 所持 ${player.critPots}/${crit.cap}</span></span>
     <span class="pr">1個 ${CRIT_PRICE} モン</span>
     ${shopBuyQtyHtml('crit',crit)}</div>`;
+  return html;
+}
+function renderShopEquipment(){
+  let html='';
   for(const [slot,nm] of SLOTS){
     const ids=SHOP_STOCK.filter(id=>ITEMS[id].slot===slot);
     if(!ids.length)continue;
-    html+=sec(nm);
+    html+=shopSection(nm);
     for(const id of ids){
       const it=ITEMS[id];
       const owned=player.items.includes(id);
@@ -3690,10 +3725,69 @@ function renderShop(){
         <button class="buyb" data-buy="${id}" ${owned||player.gold<it.price?'disabled':''}>${owned?'所持':'買う'}</button></div>`;
     }
   }
-  list.innerHTML=html;
+  return html;
+}
+function renderShopSell(){
+  let html=`<div class="shop-sell-note">買値の10分の1で買い取るよ。レア装備と、値段の付けられない大事な品は買い取れないよ。</div>`;
+  const sellConsumables=[];
+  for(const [tier,p] of Object.entries(HEAL_POTIONS)){
+    if((player[p.field]|0)>0)sellConsumables.push({id:`potion-${tier}`,item:p,
+      icon:'assets/items/potion_kanro.png',fx:`HP+${p.heal} / 所持 ${player[p.field]}`});
+  }
+  const haste=shopConsumable('haste'),crit=shopConsumable('crit');
+  if(player.hastePots>0)sellConsumables.push({id:'haste',item:haste,
+    icon:'assets/items/potion_idaten.png',fx:`5分 高速化 / 所持 ${player.hastePots}`});
+  if(player.critPots>0)sellConsumables.push({id:'crit',item:crit,
+    icon:'assets/items/potion_shura.png',fx:`5分 会心率+25% / 所持 ${player.critPots}`});
+  if(sellConsumables.length){
+    html+=shopSection('道具');
+    for(const row of sellConsumables){
+      const unit=shopSellPrice(row.item);
+      html+=`<div class="itemrow shop-consumable"><img class="icn" src="${row.icon}" alt="">
+        <span class="nm">${esc(row.item.name)} <span class="fx">${row.fx}</span></span>
+        <span class="pr">1個 ${unit} モン</span>${shopSellQtyHtml(row.id,row.item)}</div>`;
+    }
+  }
+  let equipmentCount=0;
+  for(const [slot,nm] of SLOTS){
+    const ids=player.items.filter(id=>{
+      const it=ITEMS[id];
+      return it&&it.slot===slot&&!it.rare&&it.price>0;
+    });
+    if(!ids.length)continue;
+    html+=shopSection(nm);equipmentCount+=ids.length;
+    for(const id of ids){
+      const it=ITEMS[id],equipped=player.eq[slot]===id;
+      const icn=it.icon?`<img class="icn" src="assets/${it.icon}" alt="">`:'<span class="icn slotmark"></span>';
+      html+=`<div class="itemrow">${icn}<span class="nm">${esc(dispName(id))}
+        <span class="fx">${itemFx(it)}${(player.plus[id]|0)>0?' / 強化値も失う':''}</span></span>
+        <span class="pr">${shopSellPrice(it)} モン</span>
+        <button class="buyb" data-shop-sell="${id}" ${equipped?'disabled':''}>${equipped?'装備中':'売る'}</button></div>`;
+    }
+  }
+  if(!sellConsumables.length&&!equipmentCount)html+='<div class="shop-empty">いま買い取れる品はないようだね。</div>';
+  return html;
+}
+function renderShop(){
+  const buying=shopMode==='buy';
+  for(const b of document.querySelectorAll('[data-shop-mode]')){
+    const on=b.dataset.shopMode===shopMode;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));
+  }
+  $('shopBuyTabs').hidden=!buying;
+  for(const b of document.querySelectorAll('[data-shop-buy-tab]')){
+    const on=b.dataset.shopBuyTab===shopBuyTab;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));
+  }
+  $('shopSub').textContent=buying?'「銭は貯めるもんじゃない、使うもんだよ」':'「まだ使える品なら、引き取ってやるよ」';
+  const list=$('shopList');
+  list.innerHTML=buying
+    ?(shopBuyTab==='medicine'?renderShopMedicine():renderShopEquipment())
+    :renderShopSell();
   $('shopGold').textContent=player.gold;
   for(const b of list.querySelectorAll('[data-buy]')){
     b.addEventListener('click',()=>buy(b.getAttribute('data-buy'),Number(b.getAttribute('data-buy-qty'))||1));
+  }
+  for(const b of list.querySelectorAll('[data-shop-sell]')){
+    b.addEventListener('click',()=>sellToShop(b.getAttribute('data-shop-sell'),Number(b.getAttribute('data-shop-sell-qty'))||1));
   }
 }
 /* ---- 鍛冶屋 カナヤマ ---- */
@@ -3823,6 +3917,28 @@ function buy(id,qty=1){
     autoEquipIfBetter(id);
   }
   sfx.coin();save();renderShop();
+}
+function sellToShop(id,qty=1){
+  const consumable=shopConsumable(id);
+  if(consumable){
+    if(!SHOP_BUY_QTYS.includes(qty))return;
+    const count=Math.max(0,player[consumable.field]|0);
+    if(count<qty)return;
+    const proceeds=shopSellPrice(consumable)*qty;
+    player[consumable.field]=count-qty;player.gold+=proceeds;
+    log(`${consumable.name}を${qty}個売った（+${proceeds}モン）`,'gain');
+  }else{
+    const it=ITEMS[id];
+    if(!it||it.rare||it.price<=0||!player.items.includes(id))return;
+    if(player.eq[it.slot]===id){log('装備中の品は売れない。先に外しておくれ','sys');return;}
+    const proceeds=shopSellPrice(it),plus=player.plus[id]|0;
+    const warning=plus>0?`\n強化値+${plus}も失われます。`:'';
+    if(!confirm(`${dispName(id)}を${proceeds}モンで売りますか？${warning}`))return;
+    player.items.splice(player.items.indexOf(id),1);
+    delete player.plus[id];player.gold+=proceeds;
+    log(`${it.name}を売った（+${proceeds}モン）`,'gain');
+  }
+  sfx.coin();save();hud();renderShop();
 }
 
 /* ---- 酒場 千本亭 ---- */
@@ -4710,7 +4826,9 @@ function openNpc(npc){
   if(npc.kind==='ferry'){openFerry();return;}
   if(npc.kind==='rinne_guide'){openRinneGuide();return;}
   if(npc.kind==='jobseal'){openMeishokuSelect(npc.job);return;}
-  if(npc.kind==='merchant'){renderShop();$('shop').classList.remove('hidden');}
+  if(npc.kind==='merchant'){
+    shopMode='buy';shopBuyTab='medicine';renderShop();$('shop').classList.remove('hidden');
+  }
   else if(npc.kind==='smith'){
     if(!player.smithIntro){
       player.smithIntro=true;player.wScrolls++;player.aScrolls++;save();
@@ -4818,6 +4936,12 @@ $('meishokuConfirm').addEventListener('click',()=>{
   log(`魂に冥職「${job.name}」が刻まれ、「${ITEMS[job.starter]?.name||'得物'}」を授かった`,'gain');
 });
 $('meishokuClose').addEventListener('click',()=>$('meishokuSelect').classList.add('hidden'));
+for(const b of document.querySelectorAll('[data-shop-mode]'))b.addEventListener('click',()=>{
+  shopMode=b.dataset.shopMode;sfx.click();renderShop();
+});
+for(const b of document.querySelectorAll('[data-shop-buy-tab]'))b.addEventListener('click',()=>{
+  shopMode='buy';shopBuyTab=b.dataset.shopBuyTab;sfx.click();renderShop();
+});
 $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
 $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
 $('kokanClose').addEventListener('click',()=>$('kokan').classList.add('hidden'));
