@@ -4,6 +4,10 @@ const IDLE_HEARTBEAT_MS = 2000;
 // enma1-3(閻魔庁の建物内部)も含める。漏れると庁内で一般チャット・募集が
 // 「要ログイン」表示になる(2026-07-24に実際に起きた不具合)
 const VALID_ZONE = /^(field|rinne|rinne_coast|rinne_wilds|cave|cave2|cave3|dg[1-5]|muen[1-3]|enma[1-3])$/;
+// ゾーンごとの実マップサイズ(play.htmlのFIELD_SIZE=120/RINNE_SIZE=320/WORLD_SIZE=72と揃える)。
+// rinne_coast/rinne_wildsは輪廻大陸(320)の旧地域名。それ以外(洞窟・竜・無縁塚・庁舎)は72
+const ZONE_MAP_SIZE = { field: 120, rinne: 320, rinne_coast: 320, rinne_wilds: 320 };
+const zoneMapSize = zone => ZONE_MAP_SIZE[zone] || 72;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
 const VALID_MEISHOKU = new Set(['', 'rasetsu', 'kagehoshi', 'jugonshi', 'gohousou']);
 const VALID_ATTACK_KIND = new Set([
@@ -58,13 +62,16 @@ function normalizeRemote(raw, expectedZone, ownUserId, ownSessionId) {
 
   const x = cleanNumber(raw.x, NaN);
   const y = cleanNumber(raw.y, NaN);
-  if (!Number.isFinite(x) || !Number.isFinite(y) || x < -2 || x > 74 || y < -2 || y > 74) {
+  // ゾーンの実マップサイズ+余白2で検証する。旧72マス時代の固定値74のままだと、
+  // 賽の森(120)・輪廻大陸(320)の座標74超のプレイヤーが同期から弾かれて見えなくなる
+  const max = zoneMapSize(zone) + 2;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < -2 || x > max || y < -2 || y > max) {
     return null;
   }
   const rawTargetX = cleanNumber(raw.targetX, x);
   const rawTargetY = cleanNumber(raw.targetY, y);
-  const targetX = rawTargetX >= -2 && rawTargetX <= 74 ? rawTargetX : x;
-  const targetY = rawTargetY >= -2 && rawTargetY <= 74 ? rawTargetY : y;
+  const targetX = rawTargetX >= -2 && rawTargetX <= max ? rawTargetX : x;
+  const targetY = rawTargetY >= -2 && rawTargetY <= max ? rawTargetY : y;
 
   return {
     userId,
