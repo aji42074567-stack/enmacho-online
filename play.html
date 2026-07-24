@@ -2941,7 +2941,7 @@ function completeQuest(q){
   banner={txt:`頼み事「${q.name}」達成！`,age:0};
   log(`クエスト「${q.name}」を果たした (+${q.rw.gold} モン / +${q.rw.xp} 徳)`,'gain');
   sfx.coin();
-  window.enmachoAnalytics?.track('quest_complete',{quest_id:q.id});
+  window.enmachoAnalytics?.track('quest_complete',{quest_id:q.id,party_size:partySize()});
 }
 function questProgress(type,tag){
   let changed=false,floatOffset=0;
@@ -2996,9 +2996,10 @@ function grantMobReward(m,firstAttackerId){
   }
   const gold=rndi(m.def.gold[0],m.def.gold[1]);
   player.gold+=gold;
-  // FA(最初に攻撃した人)以外は徳(経験値)半分。firstAttackerId不明(ソロ討伐等)は従来通り全額
-  const isFA=!firstAttackerId||firstAttackerId===myUserId();
-  const xp=isFA?m.def.xp:Math.round(m.def.xp*0.5);
+  // FA(最初に攻撃した人)以外は徳半分——ただしチーム内は全員全額(chatgame-design §2)。
+  // firstAttackerId不明(ソロ討伐等)は従来通り全額。チーム時は相席の御縁も乗る
+  const faFull=!firstAttackerId||firstAttackerId===myUserId()||isPartyMemberId(firstAttackerId);
+  const xp=Math.round(m.def.xp*(faFull?1:0.5)*goenXpMul());
   gainXp(xp);
   log(`${m.name}を成仏させた (+${xp} 徳 / +${gold} モン)`);
   // チーム中は、そのドロップを「敵の近くにいた仲間の誰か」がランダムで受け取る(総量は同じ)
@@ -3065,7 +3066,7 @@ function grantMobReward(m,firstAttackerId){
   // 討伐の知らせをチームへ(受け取った側が距離・支援状態・FA判定で徳の分け前を決める)
   if(party.id)netOutbox.push({type:'party_kill',partyId:party.id,
     xp:m.def.xp,firstAttackerId:firstAttackerId||myUserId(),
-    mobName:m.name,x:m.x,y:m.y,zone});
+    mobName:m.name,mobType:m.type,x:m.x,y:m.y,zone});
   if(m.def.boss)announceBossDefeat(m.name);  // 鬼王/骨王/竜の討伐は毎回、全体へ告知(討伐から日時が空いても誰が倒したか分かるように)
   if(m.type==='oni_king'&&!player.story.oniKingCleared){
     player.story.oniKingCleared=true;
@@ -3747,7 +3748,7 @@ function renderBoard(){
   else gbtn=`<button class="buyb" disabled>${gst.prog}/${GOYO_N}</button>`;
   let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 今日の御用(日替わりの勤め・功徳札2) ─</span></div>`;
   html+=`<div class="itemrow"><span class="nm">${g.title}${gst.accepted&&!gst.claimed?` <b>${gst.prog}/${GOYO_N}</b>`:''}
-    <span class="fx">${g.text} — 礼: ${gGold}モン+${gXp}徳+功徳札2</span></span>${gbtn}</div>`;
+    <span class="fx">${g.text} — 礼: ${gGold}モン+${gXp}徳+功徳札2(チームで納めると1.3倍)</span></span>${gbtn}</div>`;
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 頼み事 ─</span></div>`;
   const available=QUESTS.filter(q=>!player.qb.done[q.id]&&!questIsActive(q.id));
   html+=`<div class="itemrow"><span class="nm">受注中 ${activeQuests().length}件
@@ -7909,23 +7910,25 @@ function goyoAccept(){
 }
 function goyoProgress(tag){
   const st=player.goyo;
-  if(!st||st.date!==jstDateKey()||!st.accepted||st.claimed||st.prog>=GOYO_N)return;
-  if(!goyoToday().mobs.includes(tag))return;
+  if(!st||st.date!==jstDateKey()||!st.accepted||st.claimed||st.prog>=GOYO_N)return false;
+  if(!goyoToday().mobs.includes(tag))return false;
   st.prog++;
   if(st.prog>=GOYO_N)log('御用の討伐を果たした！ クエスト看板で納めよう','gain');
   else addFloat(player.x,player.y-1.2,`今日の御用 ${st.prog}/${GOYO_N}`,'#9fdcff');
   // 保存は呼び出し元(討伐処理)のsave()に相乗りする
+  return true;
 }
 function goyoClaim(){
   const st=goyoState();
   if(!st.accepted||st.claimed||st.prog<GOYO_N)return;
   st.claimed=true;
   const g=goyoToday(),rw=goyoReward();
-  const gGold=rw.gold,gXp=rw.xp;
+  const team=partySize()>=2;   // チーム状態での納品は報酬1.3倍(功徳札は固定)
+  const gGold=Math.round(rw.gold*(team?1.3:1)),gXp=Math.round(rw.xp*(team?1.3:1));
   player.gold+=gGold;gainXp(gXp);player.fuda+=2;
-  window.enmachoAnalytics?.track('quest_complete',{quest_id:'goyo_'+g.key});
+  window.enmachoAnalytics?.track('quest_complete',{quest_id:'goyo_'+g.key,party_size:partySize()});
   banner={txt:'本日の御用 納め！',age:0};
-  log(`「御用、しかと確かめた。本日の勤め、大儀である。」(+${gGold} モン / +${gXp} 徳 / 功徳札+2)`,'gain');
+  log(`「御用、しかと確かめた。本日の勤め、大儀である。」(+${gGold} モン / +${gXp} 徳 / 功徳札+2${team?' / チーム納め1.3倍':''})`,'gain');
   sfx.coin();save();
 }
 /* ---- 交換所(功徳札の窓口。最小構成=かけら購入+束ね。chapter-gear-design §6) ---- */
@@ -8533,6 +8536,10 @@ updateChatInputState();
 
 /* ================= チーム・フレンド・プレイヤーカード ================= */
 const party={id:null,members:[],leaderId:''};   // leaderId=チームに誘った人(自動的にリーダー)
+const partySize=()=>party.id?Math.max(1,Math.min(4,party.members.length)):1;
+const isPartyMemberId=id=>!!id&&!!party.id&&party.members.some(mem=>mem.self?id===myUserId():mem.userId===id);
+// 相席の御縁(chatgame-design §2): チーム人数に応じて全員XP+10%×(人数-1)、最大+30%
+const goenXpMul=()=>1+0.1*Math.min(3,partySize()-1);
 const PARTY_MAX_MEMBERS=4;   // チーム上限人数(自分を含む)。バランス・UI都合で4人まで
 const partyIsFull=()=>Boolean(party.id)&&party.members.length>=PARTY_MAX_MEMBERS;
 // リロードしてもチームが解散しないよう、このタブの間は覚えておく
@@ -9929,12 +9936,13 @@ window.EnmaGameBridge={
   receivePartyKill(msg){
     if(!party.id||!msg||msg.zone!==zone||player.dead)return;
     if(msg.partyId&&msg.partyId!==party.id)return;  // 別チームの討伐
+    // 御用の討伐カウントは距離を問わずチーム共有(chatgame-design §2)
+    const goyoCounted=msg.mobType?goyoProgress(msg.mobType):false;
     const support=player.partySupportT>0;
     const near=Math.hypot(player.x-msg.x,player.y-msg.y)<=18;  // 近く〜中距離
-    if(!support&&!near)return;  // 遠く離れていて支援もしていなければ入らない
-    // 近く〜支援中なら誰でも分け前は入るが、FA(最初に攻撃した人)以外は半分
-    const isFA=msg.firstAttackerId&&msg.firstAttackerId===myUserId();
-    const xp=isFA?msg.xp:Math.round(msg.xp*0.5);
+    if(!support&&!near){if(goyoCounted)save();return;}  // XPの分け前は近く/支援中のみ
+    // チーム内は全員全額(FA半減はチーム外にのみ適用)+相席の御縁
+    const xp=Math.round(msg.xp*goenXpMul());
     gainXp(xp);
     addFloat(player.x,player.y-0.9,`+${xp} 徳(チーム)`,'#d9c07a');
     log(`${msg.from?.displayName||'仲間'} の討伐分 +${xp} 徳（チーム）`,'gain');
@@ -10152,6 +10160,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260724a"></script>
+<script type="module" src="online/account.js?v=20260724b"></script>
 </body>
 </html>

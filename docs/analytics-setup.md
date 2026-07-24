@@ -42,7 +42,7 @@ TXTレコードは確認後も削除しない。
 | `tutorial_step` | 着任研修（初回チェックリスト）の各段階を達成した時 | `step`（1〜5） |
 | `first_kill` | 初めて敵を成仏させた時（セーブの`story.firstKillDone`で1回のみ） | `mob`（敵の種類ID） |
 | `quest_accept` | クエスト看板で受注した時（今日の御用は`goyo_曜`のID） | `quest_id` |
-| `quest_complete` | クエストを達成・御用を納品した時 | `quest_id` |
+| `quest_complete` | クエストを達成・御用を納品した時 | `quest_id`, `party_size`（達成時のチーム人数） |
 | `level_up` | 徳位が上がった時 | `level` |
 | `player_death` | 死亡した時 | `zone`, `level` |
 | `zone_enter` | ゲーム開始後にゾーンを移動した時（起動時の初期配置は除く） | `zone` |
