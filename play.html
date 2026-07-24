@@ -566,7 +566,7 @@
       repeating-linear-gradient(168deg,transparent 0 28px,rgba(255,255,255,.08) 29px,transparent 31px);
     animation:bossStreakIn .8s ease-out both}
   .boss-cutin-video{position:absolute;inset:10vh 0;z-index:1;width:100%;height:80vh;
-    object-fit:cover;object-position:center;background:#020203;opacity:0;
+    object-fit:contain;object-position:center;background:#020203;opacity:0;
     filter:brightness(.74) saturate(.9) contrast(1.06);transition:opacity .45s ease,filter .8s ease}
   .boss-cutin.video-ready .boss-cutin-video{opacity:1}
   .boss-cutin.video-ended .boss-cutin-video{filter:brightness(.62) saturate(.82) contrast(1.08)}
@@ -1110,22 +1110,46 @@
     .boss-cutin h2{font-size:clamp(28px,10vw,44px)}
     .boss-cutin-epithet{margin-top:10px;font-size:12px}
     .boss-cutin-message{margin-top:14px;font-size:12px;line-height:1.75}
-    .boss-cutin.has-video .boss-cutin-copy{margin:0 20px 15vh}
+    .boss-cutin.has-video .boss-cutin-copy{width:calc(100% - 32px);
+      margin:0 16px max(12vh,calc(env(safe-area-inset-bottom) + 32px))}
     .boss-cutin.has-video .boss-cutin-copy::before{inset:-5vh -22px -4vh -20px;
       background:linear-gradient(0deg,rgba(1,2,4,.92),rgba(1,2,4,.66) 72%,transparent)}
-    .boss-cutin.has-video .boss-cutin-video{object-position:var(--boss-video-position,64% center)}
+    .boss-cutin.has-video .boss-cutin-video{inset:12vh 0 auto;height:auto;aspect-ratio:240/137;
+      object-fit:contain;object-position:center}
     .boss-cutin-art,.boss-cutin[data-boss="drake"] .boss-cutin-art{--boss-art-opacity:.36;
       right:-18vw;bottom:17vh;width:95vw;height:64vh;
       filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
     .boss-cutin-skip{bottom:max(calc(10vh + 8px),env(safe-area-inset-bottom));font-size:9px}
+  }
+  @media (pointer:coarse){
+    .boss-cutin.video-playing .boss-cutin-kicker,
+    .boss-cutin.video-playing h2,
+    .boss-cutin.video-playing .boss-cutin-epithet,
+    .boss-cutin.video-playing .boss-cutin-message span{opacity:1;animation:none;transform:none;filter:none}
   }
   @media (max-height:520px){
     #miniMapHud{top:98px;width:108px}
     .mini-map-location{height:17px;font-size:7px}
     .mini-map-head{height:16px}
   }
+  @media (pointer:coarse) and (orientation:landscape) and (max-height:520px){
+    .boss-cutin{align-items:center}
+    .boss-cutin.has-video .boss-cutin-video{inset:10vh 0;height:80vh;aspect-ratio:auto;
+      object-fit:contain;object-position:center}
+    .boss-cutin.has-video .boss-cutin-copy{width:min(46vw,420px);margin:0 0 0 4vw;padding:0}
+    .boss-cutin.has-video .boss-cutin-copy::before{inset:-6vh -10vw -6vh -4vw;
+      background:linear-gradient(90deg,rgba(1,2,4,.94) 0 58%,rgba(1,2,4,.66) 78%,transparent)}
+    .boss-cutin-kicker{font-size:8px;margin-bottom:7px}
+    .boss-cutin h2{font-size:clamp(24px,5vw,36px)}
+    .boss-cutin-epithet{margin-top:7px;padding:3px 8px;font-size:10px}
+    .boss-cutin-message{margin-top:8px;font-size:10.5px;line-height:1.45}
+  }
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important;transition:none !important}
+    .boss-cutin.video-playing .boss-cutin-kicker,
+    .boss-cutin.video-playing h2,
+    .boss-cutin.video-playing .boss-cutin-epithet,
+    .boss-cutin.video-playing .boss-cutin-message span{opacity:1 !important}
   }
 </style>
 </head>
