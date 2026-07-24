@@ -1,7 +1,9 @@
 const LOOP_INTERVAL_MS = 100;
 const POSITION_INTERVAL_MS = 200;
 const IDLE_HEARTBEAT_MS = 2000;
-const VALID_ZONE = /^(field|rinne|rinne_coast|rinne_wilds|cave|cave2|cave3|dg[1-5]|muen[1-3])$/;
+// enma1-3(閻魔庁の建物内部)も含める。漏れると庁内で一般チャット・募集が
+// 「要ログイン」表示になる(2026-07-24に実際に起きた不具合)
+const VALID_ZONE = /^(field|rinne|rinne_coast|rinne_wilds|cave|cave2|cave3|dg[1-5]|muen[1-3]|enma[1-3])$/;
 const VALID_DIRECTION = new Set(['up', 'down', 'left', 'right']);
 const VALID_MEISHOKU = new Set(['', 'rasetsu', 'kagehoshi', 'jugonshi', 'gohousou']);
 const VALID_ATTACK_KIND = new Set([

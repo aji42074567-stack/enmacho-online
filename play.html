@@ -3917,7 +3917,7 @@ function renderBoard(){
   // 同行者の1タップ募集(chatgame-design §2)。押した人がリーダーになり同区域へ配信される
   if(gst.accepted&&!gst.claimed&&gst.prog<GOYO_N){
     let rbtn;
-    if(!chat.online)rbtn=`<button class="buyb" disabled>要ログイン</button>`;
+    if(!chat.online)rbtn=`<button class="buyb" disabled>${socialState.online?'回線つなぎ中…':'要ログイン'}</button>`;
     else if(recruitState.active)rbtn=`<button class="buyb on" data-goyo-recruit>募集をやめる</button>`;
     else if(party.id&&party.leaderId&&party.leaderId!==myUserId())
       rbtn=`<button class="buyb" disabled>リーダーだけ</button>`;
@@ -8230,7 +8230,7 @@ function renderGoyoPanel(){
   // 下段: 同行者を募る(未募集で、リーダーになれるとき)
   if(!recruitState.active&&gst.accepted&&!gst.claimed&&gst.prog<GOYO_N
     &&!(party.id&&party.leaderId&&party.leaderId!==myUserId())&&!partyIsFull()){
-    if(!chat.online)mk('なかま募集(要ログイン)');
+    if(!chat.online)mk(socialState.online?'なかま募集(回線つなぎ中…)':'なかま募集(要ログイン)');
     else mk('なかまを募集する',startRecruit);
   }
 }
@@ -8781,7 +8781,7 @@ function updateChatInputState(){
   $('chatIn').disabled=!canSend;
   $('chatSend').disabled=!canSend;
   $('chatIn').placeholder=
-    t==='general'?(chat.online?'付近の魂へ話す (Enter)':'話すには魂籍ログインが必要')
+    t==='general'?(chat.online?'付近の魂へ話す (Enter)':socialState.online?'付近の回線をつなぎ直し中…':'話すには魂籍ログインが必要')
     :t==='world'?(chat.worldOnline?'冥府全体へ話す (Enter)':'話すには魂籍ログインが必要')
     :t==='team'?(party.id?(chat.teamOnline?'チームへ話す (Enter)':'チーム回線を接続中…'):'チーム未結成')
     :t==='guild'?(guildState.id?(chat.guildOnline?`講【${guildState.name}】へ話す (Enter)`:'講の回線を接続中…'):'講に未加入')
@@ -8932,7 +8932,8 @@ const genPartyId=()=>globalThis.crypto?.randomUUID
   :`${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,10)}`;
 const ZONE_LABELS={field:'賽の森',rinne:'輪廻大陸',cave:'試練B1',cave2:'試練B2',cave3:'試練B3',
   dg1:'竜B1',dg2:'竜B2',dg3:'竜B3',dg4:'竜B4',dg5:'竜B5',
-  muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3'};
+  muen1:'無縁塚B1',muen2:'無縁塚B2',muen3:'無縁塚B3',
+  enma1:'閻魔庁一階',enma2:'閻魔庁二階',enma3:'閻魔庁三階'};
 const zoneLabel=z=>ZONE_LABELS[z]||'冥府';
 const STAGE_LABELS={deceased:'転生審査中',rebirth_candidate:'転生候補者',reincarnated:'転生者'};
 function playerTitle(ach,level){
@@ -9144,7 +9145,7 @@ $('inviteDecline').addEventListener('click',async()=>{
    共有データ(recruitOffers等)は御用窓口の節で宣言済み ---- */
 function startRecruit(){
   if(recruitState.active)return;
-  if(!chat.online){notifyNet('募集には魂籍ログインが必要です');return;}
+  if(!chat.online){notifyNet(socialState.online?'付近の回線をつなぎ直している。すこし待ってからもう一度':'募集には魂籍ログインが必要です');return;}
   if(goyoDoneToday()||partyIsFull())return;
   if(party.id&&party.leaderId&&party.leaderId!==myUserId())return;
   if(!party.id){party.id=genPartyId();party.leaderId=myUserId();rememberParty();renderTeamUI();}
@@ -10667,6 +10668,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260724d"></script>
+<script type="module" src="online/account.js?v=20260724e"></script>
 </body>
 </html>
