@@ -1531,6 +1531,8 @@ const WORLD_CYCLE_MS=4*60*60*1000;   // 現実4時間で一周（1日6周）
 const WORLD_DAY_MS=3*60*60*1000;     // 昼3時間
 const WORLD_TRANSITION_MS=10*60*1000;
 const JST_OFFSET_MS=9*60*60*1000;
+const jstDateKey=(t=Date.now())=>new Date(t+JST_OFFSET_MS).toISOString().slice(0,10);
+const jstDaysBetween=(a,b)=>Math.round((Date.parse(b)-Date.parse(a))/86400000);
 const SAVE_VERSION=16;
 const SAVE_KEY='aden_save_v1';
 const SAVE_OWNER_KEY='enma_save_owner_v1';
@@ -2308,6 +2310,8 @@ const player={
   plus:{},                                  // 装備の強化値 {装備id:+n}
   wScrolls:0,aScrolls:0,                    // 武器/防具 強化の巻物
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
+  fuda:0,kakera:0,                          // 功徳札/巻物のかけら(交換所で10個=巻物1枚)
+  onsho:null,                               // 入庁恩賞「勤怠印」{date:JST日付,cycle:1..7}
   cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
   combatT:0,
@@ -2388,6 +2392,7 @@ function save(){
         foodDef:Math.max(0,Math.round(player.foodDefT)),foodRegen:Math.max(0,Math.round(player.foodRegenT))},
       quests:player.quests,qb:player.qb,plus:player.plus,
       tutorial:{step:tutorialStep},
+      fuda:player.fuda,kakera:player.kakera,onsho:player.onsho,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
@@ -2456,6 +2461,10 @@ function load(){
     player.quests=(d.quests&&typeof d.quests.trial==='number')?d.quests:{trial:0};
     // v15以前の記録には研修が無い=既プレイヤーなので修了扱いで移行する
     tutorialStep=(d.tutorial&&Number.isInteger(d.tutorial.step))?clamp(d.tutorial.step,0,5):5;
+    player.fuda=Math.max(0,d.fuda|0);
+    player.kakera=Math.max(0,d.kakera|0);
+    player.onsho=(d.onsho&&typeof d.onsho.date==='string'&&Number.isInteger(d.onsho.cycle))
+      ?{date:d.onsho.date,cycle:clamp(d.onsho.cycle,1,7)}:null;
     player.qb=normalizeQuestBoard(d.qb);
     const oldKazuDone=d.v<4&&!!player.qb.done.q_tokkuri;
     const st=d.story&&typeof d.story==='object'?d.story:{};
@@ -3845,6 +3854,14 @@ function renderItemTab(){
   if(player.dragonBlood>0){
     html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">移し打ちの素材(鍛冶屋カナヤマ)・ゴウリュウから7%</span></span></div>`;
+  }
+  if(player.fuda>0){
+    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">札</span>
+      <span class="nm">功徳札 ×${player.fuda} <span class="fx">日課の恩賞。宿場町の交換所で品と換えられる</span></span></div>`;
+  }
+  if(player.kakera>0){
+    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">片</span>
+      <span class="nm">巻物のかけら ×${player.kakera} <span class="fx">10個集めると強化の巻物1枚になる(交換所)</span></span></div>`;
   }
   if(player.ferrymanCoin){
     html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">六</span>
@@ -7776,6 +7793,41 @@ const el={
   buffs:$('buffs'),pt:$('ptN'),
   goal:document.querySelector('#quest .goal')
 };
+/* ---- 入庁恩賞「勤怠印」(daily-reward-design §1。開くだけの日課) ---- */
+function onshoGrant(cycle){
+  const lines=[];
+  // 回復系のみ所持上限(chapter-gear-design §7)。超えたぶんは功徳札1枚に自動で換える
+  const capped=(field,n,cap,name)=>{
+    const cur=player[field]|0,take=Math.max(0,Math.min(n,cap-cur));
+    if(take>0){player[field]=cur+take;lines.push(`${name}×${take}`);}
+    if(take<n){player.fuda++;lines.push('功徳札+1(持ちきれないぶんを換えた)');}
+  };
+  switch(cycle){
+    case 1:capped(player.lv>=22?'potionsM':'potions',3,50,player.lv>=22?'甘露水M':'甘露水S');break;
+    case 2:player.fuda+=2;lines.push('功徳札+2');break;
+    case 3:player.kakera+=2;lines.push('巻物のかけら×2');break;
+    case 4:capped('hastePots',1,20,'韋駄天の水');break;
+    case 5:player.fuda+=3;lines.push('功徳札+3');break;
+    case 6:player.kakera+=3;lines.push('巻物のかけら×3');break;
+    case 7:player.dragonBlood++;lines.push('竜の血×1');break;
+  }
+  return lines;
+}
+function claimOnsho(){
+  const today=jstDateKey();
+  if(player.onsho?.date===today)return;
+  // 連続なら周期を進め、途切れたら1日目に戻るだけ(責めない)
+  const cycle=(player.onsho&&jstDaysBetween(player.onsho.date,today)===1)
+    ?player.onsho.cycle%7+1:1;
+  player.fuda++;
+  const lines=onshoGrant(cycle);
+  player.onsho={date:today,cycle};
+  window.enmachoAnalytics?.track('onsho_claim',{day:cycle});
+  log(`勤怠印(${cycle}日目)を捺した。恩賞: 功徳札+1${lines.length?'、'+lines.join('、'):''}`,'gain');
+  if(cycle===7)log('七日勤め上げの満了印！ 明日からまた1日目じゃ','sys');
+  sfx.coin();
+  save();
+}
 /* ---- 着任チェックリスト(初回の5段ガイド。retention-plan A-1) ---- */
 const TUTORIAL_STEPS=[
   {label:'地面をタップして移動',cond:()=>player.moving||player.path.length>0},
@@ -9168,6 +9220,7 @@ $('startBtn').addEventListener('click',()=>{
     log('川辺のオババとオキナに話しかけてみよう','sys');
     log('メニュー(I)のステータスで魂の資質5ポイントを割り振ろう','gain');
   }
+  claimOnsho();
 });
 const resetDialog=$('resetConfirm');
 let resetOpener=null;
