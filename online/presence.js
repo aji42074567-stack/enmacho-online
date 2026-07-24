@@ -121,18 +121,20 @@ function normalizeInviteReply(raw, ownSessionId) {
   };
 }
 
-// 御用の同行者募集(chatgame-design §2)。ゾーンchで配信され、名前・徳位・冥職・残り枠を運ぶ
+// 御用の同行者募集(chatgame-design §2)。ゾーンchで配信され、名前・徳位・冥職・残り枠・区域を運ぶ
 function normalizeRecruit(raw, ownSessionId) {
   const identity = chatIdentity(raw, ownSessionId);
   if (!identity) return null;
   const partyId = cleanText(raw.partyId, 64);
   if (!VALID_UUID.test(partyId)) return null;
+  const zone = cleanText(raw.zone, 16);
   return {
     ...identity,
     meishoku: VALID_MEISHOKU.has(raw.meishoku) ? raw.meishoku : '',
     partyId,
     slots: Math.max(0, Math.min(3, Math.trunc(cleanNumber(raw.slots, 0)))),
     state: raw.state === 'closed' ? 'closed' : 'open',
+    zone: VALID_ZONE.test(zone) ? zone : '',
   };
 }
 
@@ -1019,6 +1021,7 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           partyId,
           slots: Math.max(0, Math.min(3, Math.trunc(cleanNumber(item.slots, 0)))),
           state: item.state === 'closed' ? 'closed' : 'open',
+          zone: channelZone,
           sentAt: Date.now(),
         } }).catch(() => {});
       } else if (item.type === 'invite_reply' && VALID_INVITE_KIND.has(item.kind)) {

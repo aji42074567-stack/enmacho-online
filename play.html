@@ -137,6 +137,19 @@
   #goyoPanel .gp-close{margin-top:8px;width:100%;padding:6px;border-radius:4px;cursor:pointer;
     font-family:var(--sans);font-size:11px;border:1px solid var(--panel-edge);
     color:var(--dim);background:#141009}
+  #goyoHud .gh-badge{position:absolute;top:-7px;right:-7px;min-width:17px;height:17px;
+    border-radius:9px;background:#b03535;border:1px solid #e8b7b7;color:#fff;
+    font:700 10px/15px var(--sans);padding:0 4px;box-sizing:border-box;text-align:center}
+  #goyoHud .gh-badge[hidden]{display:none}
+  #goyoPanel .gp-sec{margin:10px 0 2px;font-size:10px;color:#c9b489;letter-spacing:.12em}
+  #goyoPanel .gp-note{margin:4px 0;font-size:10.5px;line-height:1.6;color:#bdb190}
+  #goyoPanel .gp-row{display:flex;align-items:center;gap:7px;margin:5px 0}
+  #goyoPanel .gp-row .who{flex:1;font-size:11px;line-height:1.5;color:#e6dcc4;
+    overflow-wrap:anywhere}
+  #goyoPanel .gp-row button{flex:none;padding:6px 9px;border-radius:4px;cursor:pointer;
+    font-family:var(--serif);font-size:11px;letter-spacing:.06em;
+    border:1px solid #8a763b;color:#f8e9c8;background:linear-gradient(180deg,#463c23,#2b2416)}
+  #goyoPanel .gp-row button:disabled{opacity:.55;cursor:default}
   #miniMapHud{position:absolute;top:98px;right:64px;z-index:5;width:220px;
     box-sizing:border-box;padding:6px;background:rgba(15,18,16,.92);
     border:1px solid #66532f;border-radius:5px;color:var(--parchment);cursor:pointer;
@@ -1182,7 +1195,8 @@
   <button id="mapBtn" title="全体地図 (M)" aria-label="全体地図を開く">地図</button>
   <button id="goyoHud" type="button" hidden title="今日の御用"
     aria-label="今日の御用を開く"><span>御用</span><span class="gh-state"
-    id="goyoHudState">!</span></button>
+    id="goyoHudState">!</span><span class="gh-badge" id="goyoHudBadge"
+    hidden>0</span></button>
   <div id="goyoPanel" hidden role="dialog" aria-label="今日の御用">
     <h3 id="goyoPanelTitle"></h3>
     <p id="goyoPanelText"></p>
@@ -8107,17 +8121,42 @@ function goyoClaim(){
   log(`今日の御用をクリア！ +${gGold}モン +${gXp}徳 功徳札+2${team?'(チームで1.3倍)':''}`,'gain');
   sfx.coin();save();
 }
-/* ---- 御用HUD(画面右・地図ボタンの下)。タップでミニパネル開閉(2026-07-24ユーザー要望) ---- */
+/* ---- なかま募集の共有データ(御用窓口の一覧とポップアップで共用。chatgame-design §2 御用窓口) ---- */
+const RECRUIT_REBROADCAST_MS=25000;      // 途中入室・クールダウン明けにも届くよう定期再配信
+const RECRUIT_OFFER_TTL_MS=60000;        // 再配信が絶えた募集は自然消滅
+const RECRUIT_POPUP_COOLDOWN_MS=300000;  // ポップアップは5分に1回まで(窓口の一覧は制限なし)
+const RECRUIT_DECLINE_KEY='enma_recruit_declined';
+const recruitState={active:false,partyId:'',lastSentAt:0};
+const recruitOffers=new Map();           // リーダーuserId -> 募集(受信側で保持)
+let activeRecruitOffer=null,recruitPopTimer=0,lastRecruitPopAt=0;
+const recruitDeclinedToday=()=>{
+  try{return localStorage.getItem(RECRUIT_DECLINE_KEY)===jstDateKey();}catch(e){return false;}
+};
+const goyoDoneToday=()=>{
+  const st=goyoState();
+  return st.claimed||(st.accepted&&st.prog>=GOYO_N);
+};
+const recruitSlots=()=>Math.max(0,PARTY_MAX_MEMBERS-partySize());
+const openRecruitCount=()=>{
+  let n=0;
+  for(const o of recruitOffers.values())if(o.slots>0)n++;
+  return n;
+};
+/* ---- 御用窓口(画面右・地図ボタンの下の「御用」ボタン+3段パネル) ---- */
 let goyoHudKey='';
 function updateGoyoHud(){
-  const st=player.goyo&&player.goyo.date===jstDateKey()?player.goyo:null;
-  const state=!st||!st.accepted?'!':st.claimed?'済':st.prog>=GOYO_N?'受取':`${st.prog}/${GOYO_N}`;
-  const key=`${started}|${state}`;
+  const st=goyoState();
+  const state=!st.accepted?'!':st.claimed?'済':st.prog>=GOYO_N?'受取':`${st.prog}/${GOYO_N}`;
+  const badge=goyoDoneToday()?0:openRecruitCount();  // 未達成の間だけ募集件数バッジ
+  const key=`${started}|${state}|${badge}`;
   if(key===goyoHudKey)return;
   goyoHudKey=key;
   const hudEl=$('goyoHud');
   hudEl.hidden=!started;
   $('goyoHudState').textContent=state;
+  const badgeEl=$('goyoHudBadge');
+  badgeEl.hidden=!badge;
+  badgeEl.textContent=String(badge);
   hudEl.classList.toggle('fresh',state==='!');
   hudEl.classList.toggle('ready',state==='受取');
   hudEl.classList.toggle('done',state==='済');
@@ -8137,15 +8176,60 @@ function renderGoyoPanel(){
     else b.disabled=true;
     host.appendChild(b);
   };
-  if(gst.claimed)mk('今日は達成ずみ。また明日！');
+  const note=t=>{
+    const d=document.createElement('div');
+    d.className='gp-note';
+    d.textContent=t;
+    host.appendChild(d);
+  };
+  // 上段: 今日の進みぐあいと受注・報酬
+  if(gst.claimed)note('今日は達成ずみ。また明日！');
   else if(!gst.accepted)mk('受ける',goyoAccept);
   else if(gst.prog>=GOYO_N)mk('報酬を受けとる',goyoClaim);
-  else mk(`いま ${gst.prog}/${GOYO_N} 体`);
-  if(gst.accepted&&!gst.claimed&&gst.prog<GOYO_N){
+  else note(`いま ${gst.prog}/${GOYO_N} 体`);
+  // 中段: 募集中の一覧(recruit配信が源)。断った後・チームを抜けた後もここからは参加できる
+  const sec=document.createElement('div');
+  sec.className='gp-sec';
+  sec.textContent='─ いま募集しているなかま ─';
+  host.appendChild(sec);
+  if(recruitState.active){
+    const row=document.createElement('div');
+    row.className='gp-row';
+    const who=document.createElement('span');
+    who.className='who';
+    who.textContent=`自分の募集｜${partySize()}/${PARTY_MAX_MEMBERS}人`;
+    const b=document.createElement('button');
+    b.textContent='取り下げ';
+    b.addEventListener('click',()=>{stopRecruit('とりやめ');renderGoyoPanel();updateGoyoHud();});
+    row.append(who,b);
+    host.appendChild(row);
+  }
+  const offers=[...recruitOffers.values()].filter(o=>o.slots>0);
+  const helper=goyoDoneToday();
+  for(const o of offers){
+    const row=document.createElement('div');
+    row.className='gp-row';
+    const who=document.createElement('span');
+    who.className='who';
+    const job=meishokuDef(o)?.name;
+    who.textContent=`${o.displayName}｜徳位${o.level}${job?'・'+job:''}`
+      +`｜${PARTY_MAX_MEMBERS-o.slots}/${PARTY_MAX_MEMBERS}人${o.zone?'｜'+zoneLabel(o.zone):''}`;
+    const b=document.createElement('button');
+    if(party.id){b.textContent='チーム中';b.disabled=true;}
+    else{
+      b.textContent=helper?'手伝いで参加':'参加する';
+      b.addEventListener('click',()=>joinRecruit(o,'panel'));
+    }
+    row.append(who,b);
+    host.appendChild(row);
+  }
+  if(!offers.length&&!recruitState.active)note('いまは誰も募集していない');
+  if(offers.length&&helper&&!party.id)
+    note('本日達成済み(手伝い): 参加はできるが今日の報酬はもうない');
+  // 下段: 同行者を募る(未募集で、リーダーになれるとき)
+  if(!recruitState.active&&gst.accepted&&!gst.claimed&&gst.prog<GOYO_N
+    &&!(party.id&&party.leaderId&&party.leaderId!==myUserId())&&!partyIsFull()){
     if(!chat.online)mk('なかま募集(要ログイン)');
-    else if(recruitState.active)mk('募集をやめる',()=>stopRecruit('とりやめ'));
-    else if(party.id&&party.leaderId&&party.leaderId!==myUserId())mk('募集はリーダーだけ');
-    else if(partyIsFull())mk('チーム満員');
     else mk('なかまを募集する',startRecruit);
   }
 }
@@ -9055,22 +9139,8 @@ $('inviteDecline').addEventListener('click',async()=>{
   sfx.click();
 });
 
-/* ---- 御用の同行者募集: 1タップ募集・1タップ参加(chatgame-design §2) ---- */
-const RECRUIT_REBROADCAST_MS=25000;      // 途中入室・クールダウン明けにも届くよう定期再配信
-const RECRUIT_OFFER_TTL_MS=60000;        // 再配信が絶えた募集は自然消滅
-const RECRUIT_POPUP_COOLDOWN_MS=300000;  // ポップアップは5分に1回まで
-const RECRUIT_DECLINE_KEY='enma_recruit_declined';
-const recruitState={active:false,partyId:'',lastSentAt:0};
-const recruitOffers=new Map();           // リーダーuserId -> 募集(受信側で保持)
-let activeRecruitOffer=null,recruitPopTimer=0,lastRecruitPopAt=0;
-const recruitDeclinedToday=()=>{
-  try{return localStorage.getItem(RECRUIT_DECLINE_KEY)===jstDateKey();}catch(e){return false;}
-};
-const goyoDoneToday=()=>{
-  const st=goyoState();
-  return st.claimed||(st.accepted&&st.prog>=GOYO_N);
-};
-const recruitSlots=()=>Math.max(0,PARTY_MAX_MEMBERS-partySize());
+/* ---- 御用の同行者募集: 1タップ募集・1タップ参加(chatgame-design §2)
+   共有データ(recruitOffers等)は御用窓口の節で宣言済み ---- */
 function startRecruit(){
   if(recruitState.active)return;
   if(!chat.online){notifyNet('募集には魂籍ログインが必要です');return;}
@@ -9091,17 +9161,22 @@ function stopRecruit(reason){
   netOutbox.push({type:'recruit',state:'closed',partyId:recruitState.partyId,slots:0});
   recruitState.partyId='';
   if(reason)notifyNet(`なかま募集をおわった(${reason})`);
+  updateGoyoHud();
+  if(!$('goyoPanel').hidden)renderGoyoPanel();
 }
 function receiveRecruitOffer(offer){
   if(offer.state==='closed'){
     recruitOffers.delete(offer.userId);
     if(activeRecruitOffer&&activeRecruitOffer.partyId===offer.partyId)hideRecruitPop();
-    return;
+  }else if(offer.userId!==myUserId()){
+    // 窓口の一覧用に常時保持する(断った人・達成済みの人もここから参加できる)。
+    // ポップアップを出すかどうかは表示側(maybeShowRecruitPop)だけで抑制する
+    const prev=recruitOffers.get(offer.userId);
+    recruitOffers.set(offer.userId,{...offer,at:Date.now(),shownAt:prev?.shownAt||0});
+    maybeShowRecruitPop();
   }
-  if(offer.userId===myUserId()||offer.slots<1)return;
-  if(settings.recruitOff||party.id||recruitDeclinedToday()||goyoDoneToday())return;
-  recruitOffers.set(offer.userId,{...offer,at:Date.now()});
-  maybeShowRecruitPop();
+  updateGoyoHud();
+  if(!$('goyoPanel').hidden)renderGoyoPanel();
 }
 function maybeShowRecruitPop(){
   if(activeRecruitOffer||!started||player.dead)return;
@@ -9110,12 +9185,14 @@ function maybeShowRecruitPop(){
   // 表示優先度: ①フレンド ②同じ講 ③近い徳位(知り合いの募集が最優先=絆の再利用)
   let best=null,bestBond=-1,bestGap=Infinity;
   for(const o of recruitOffers.values()){
+    if(o.slots<1)continue;
+    if(o.shownAt&&Date.now()-o.shownAt<RECRUIT_POPUP_COOLDOWN_MS)continue;  // 同じ募集の連続表示を防ぐ
     const bond=isFriend(o.userId)?2:inMyGuild(o.userId)?1:0;
     const gap=Math.abs((o.level|0)-player.lv);
     if(bond>bestBond||(bond===bestBond&&gap<bestGap)){best=o;bestBond=bond;bestGap=gap;}
   }
   if(!best)return;
-  recruitOffers.delete(best.userId);
+  best.shownAt=Date.now();
   activeRecruitOffer=best;
   lastRecruitPopAt=Date.now();
   const p=$('recruitText');
@@ -9135,31 +9212,32 @@ function hideRecruitPop(){
   activeRecruitOffer=null;
   $('recruitPop').hidden=true;
 }
-$('recruitJoin').addEventListener('click',()=>{
-  const offer=activeRecruitOffer;
-  if(!offer)return;
+// 1タップ参加(既存招待処理の自動承諾版)。from=popup|panel は計測用
+function joinRecruit(offer,from){
+  if(!offer||offer.userId===myUserId())return;
   if(party.id){hideRecruitPop();return;}
-  // 既存招待処理の自動承諾版: 承諾の往復なしで即チーム加入
   party.id=offer.partyId;party.members=[];party.leaderId=offer.userId;
   rememberParty();
-  if(!goyoState().accepted)goyoAccept();   // 加勢=御用を承って共有カウントに乗る
+  // 未受注なら御用も受けて共有カウントに乗る(達成済みの人はそのまま=手伝い参加・報酬なし)
+  if(!goyoState().accepted)goyoAccept();
   netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
     targetUserId:offer.userId,partyId:offer.partyId});
-  window.enmachoAnalytics?.track('recruit_join',{zone,leader_level:offer.level|0});
+  window.enmachoAnalytics?.track('recruit_join',{zone,leader_level:offer.level|0,from});
   notifyNet(`${offer.displayName} のチームに参加した！ 地図の青い光がリーダーの居場所`);
   notifyNet('AUTOボタン(Tキー)で「リーダー追従」を選ぶと自動でついて行ける');
   hideRecruitPop();
-  recruitOffers.clear();
   chat.tab='team';
   if(chat.open)renderChatTab();else openChat(false);
+  updateGoyoHud();
+  if(!$('goyoPanel').hidden)renderGoyoPanel();
   renderMiniMap(true);
   sfx.click();
-});
+}
+$('recruitJoin').addEventListener('click',()=>joinRecruit(activeRecruitOffer,'popup'));
 $('recruitDecline').addEventListener('click',()=>{
   try{localStorage.setItem(RECRUIT_DECLINE_KEY,jstDateKey());}catch(e){}
-  recruitOffers.clear();
   hideRecruitPop();
-  notifyNet('今日はもう募集のお知らせを出さない(設定でずっとOFFにもできる)');
+  notifyNet('今日はもうポップアップを出さない(右の「御用」ボタンの一覧からはいつでも参加できる)');
   sfx.click();
 });
 setInterval(()=>{
@@ -9175,7 +9253,13 @@ setInterval(()=>{
     }
   }
   const now=Date.now();
-  for(const [id,o] of recruitOffers)if(now-o.at>RECRUIT_OFFER_TTL_MS)recruitOffers.delete(id);
+  let expired=false;
+  for(const [id,o] of recruitOffers)
+    if(now-o.at>RECRUIT_OFFER_TTL_MS){recruitOffers.delete(id);expired=true;}
+  if(expired){
+    updateGoyoHud();
+    if(!$('goyoPanel').hidden)renderGoyoPanel();
+  }
   if(activeRecruitOffer&&party.id)hideRecruitPop();   // 表示中に別経路でチーム入りしたら畳む
   maybeShowRecruitPop();
 },2000);
@@ -9727,8 +9811,7 @@ $('vpadSideSetting').addEventListener('change',ev=>{
   if(started||hasSaveData)save();
 });
 $('recruitOffSetting').addEventListener('change',ev=>{
-  settings.recruitOff=ev.target.checked;
-  if(settings.recruitOff)recruitOffers.clear();
+  settings.recruitOff=ev.target.checked;   // 抑制はポップアップのみ。窓口の一覧はいつでも見られる
   if(started||hasSaveData)save();
   sfx.click();
 });
@@ -10583,6 +10666,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260724c"></script>
+<script type="module" src="online/account.js?v=20260724d"></script>
 </body>
 </html>
