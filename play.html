@@ -109,6 +109,34 @@
   #mapBtn{top:176px;width:46px;font-family:var(--serif);font-size:12px;
     letter-spacing:.08em;color:#ead397}
   #sndBtn:hover,#accountBtn:hover,#mapBtn:hover{border-color:#8a6f3d;color:#fff}
+  #goyoHud{position:absolute;right:12px;top:222px;z-index:6;width:46px;min-height:44px;
+    background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
+    color:#ead397;cursor:pointer;padding:4px 0 5px;line-height:1.25;
+    font-family:var(--serif);font-size:12px;letter-spacing:.08em;
+    display:flex;flex-direction:column;align-items:center;gap:2px}
+  #goyoHud[hidden]{display:none}
+  #goyoHud:hover{border-color:#8a6f3d;color:#fff}
+  #goyoHud .gh-state{font-family:var(--sans);font-size:10px;color:#cfc2a0;letter-spacing:0}
+  #goyoHud.fresh .gh-state{color:var(--gold);font-weight:700}
+  #goyoHud.ready{border-color:var(--gold);box-shadow:0 0 10px rgba(201,162,74,.45)}
+  #goyoHud.ready .gh-state{color:var(--gold);font-weight:700}
+  #goyoHud.done{opacity:.6}
+  #goyoPanel{position:absolute;top:222px;right:64px;z-index:8;
+    width:min(280px,calc(100vw - 90px));box-sizing:border-box;
+    background:linear-gradient(168deg,rgba(24,22,15,.97),rgba(14,12,8,.97));
+    border:1px solid #8a763b;border-radius:8px;padding:12px 13px;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);font-family:var(--sans);animation:chatIn .2s ease-out}
+  #goyoPanel[hidden]{display:none}
+  #goyoPanel h3{margin:0 0 6px;font:13px/1.5 var(--serif);color:#e8c46e;letter-spacing:.06em}
+  #goyoPanel p{margin:0 0 6px;font-size:11px;line-height:1.7;color:#e6dcc4}
+  #goyoPanel .gp-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  #goyoPanel .gp-actions button{padding:8px 6px;border-radius:4px;cursor:pointer;
+    font-family:var(--serif);font-size:12px;letter-spacing:.1em;
+    border:1px solid #8a763b;color:#f8e9c8;background:linear-gradient(180deg,#463c23,#2b2416)}
+  #goyoPanel .gp-actions button:disabled{opacity:.55;cursor:default}
+  #goyoPanel .gp-close{margin-top:8px;width:100%;padding:6px;border-radius:4px;cursor:pointer;
+    font-family:var(--sans);font-size:11px;border:1px solid var(--panel-edge);
+    color:var(--dim);background:#141009}
   #miniMapHud{position:absolute;top:98px;right:64px;z-index:5;width:220px;
     box-sizing:border-box;padding:6px;background:rgba(15,18,16,.92);
     border:1px solid #66532f;border-radius:5px;color:var(--parchment);cursor:pointer;
@@ -1128,6 +1156,16 @@
     <span id="onlineCount" hidden aria-hidden="true">1</span>
   </button>
   <button id="mapBtn" title="全体地図 (M)" aria-label="全体地図を開く">地図</button>
+  <button id="goyoHud" type="button" hidden title="今日の御用"
+    aria-label="今日の御用を開く"><span>御用</span><span class="gh-state"
+    id="goyoHudState">!</span></button>
+  <div id="goyoPanel" hidden role="dialog" aria-label="今日の御用">
+    <h3 id="goyoPanelTitle"></h3>
+    <p id="goyoPanelText"></p>
+    <p id="goyoPanelReward"></p>
+    <div class="gp-actions" id="goyoPanelActions"></div>
+    <button class="gp-close" id="goyoPanelClose">とじる</button>
+  </div>
 
   <button id="miniMapHud" type="button" hidden
     title="現在地を拡大して見る" aria-label="全体地図。押すと拡大表示">
@@ -1207,7 +1245,7 @@
   <div id="recruitPop" hidden>
     <p id="recruitText"></p>
     <div class="invite-actions">
-      <button id="recruitJoin">加勢する</button>
+      <button id="recruitJoin">参加する</button>
       <button id="recruitDecline">今日は断る</button>
     </div>
   </div>
@@ -1572,7 +1610,7 @@
           </select>
         </label>
         <label class="setting-toggle" for="recruitOffSetting">
-          <span>御用の同行者募集を受け取らない</span>
+          <span>御用のなかま募集のお知らせを受け取らない</span>
           <input id="recruitOffSetting" type="checkbox">
         </label>
       </div>
@@ -3837,25 +3875,25 @@ function renderBoard(){
   const gst=goyoState(),g=goyoToday(),grw=goyoReward();
   const gGold=grw.gold,gXp=grw.xp;
   let gbtn;
-  if(gst.claimed)gbtn=`<button class="buyb" disabled>本日納め済</button>`;
-  else if(!gst.accepted)gbtn=`<button class="buyb" data-goyo-take>承る</button>`;
-  else if(gst.prog>=GOYO_N)gbtn=`<button class="buyb on" data-goyo-claim>納める</button>`;
+  if(gst.claimed)gbtn=`<button class="buyb" disabled>達成ずみ</button>`;
+  else if(!gst.accepted)gbtn=`<button class="buyb" data-goyo-take>受ける</button>`;
+  else if(gst.prog>=GOYO_N)gbtn=`<button class="buyb on" data-goyo-claim>報酬を受けとる</button>`;
   else gbtn=`<button class="buyb" disabled>${gst.prog}/${GOYO_N}</button>`;
-  let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 今日の御用(日替わりの勤め・功徳札2) ─</span></div>`;
+  let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 今日の御用(まいにち替わるデイリークエスト) ─</span></div>`;
   html+=`<div class="itemrow"><span class="nm">${g.title}${gst.accepted&&!gst.claimed?` <b>${gst.prog}/${GOYO_N}</b>`:''}
-    <span class="fx">${g.text} — 礼: ${gGold}モン+${gXp}徳+功徳札2(チームで納めると1.3倍)</span></span>${gbtn}</div>`;
+    <span class="fx">${g.text}<br>ほうび: ${gGold}モン + ${gXp}徳 + 功徳札2(チームでクリアすると1.3倍)</span></span>${gbtn}</div>`;
   // 同行者の1タップ募集(chatgame-design §2)。押した人がリーダーになり同区域へ配信される
   if(gst.accepted&&!gst.claimed&&gst.prog<GOYO_N){
     let rbtn;
     if(!chat.online)rbtn=`<button class="buyb" disabled>要ログイン</button>`;
-    else if(recruitState.active)rbtn=`<button class="buyb on" data-goyo-recruit>取り下げる</button>`;
+    else if(recruitState.active)rbtn=`<button class="buyb on" data-goyo-recruit>募集をやめる</button>`;
     else if(party.id&&party.leaderId&&party.leaderId!==myUserId())
-      rbtn=`<button class="buyb" disabled>リーダーのみ</button>`;
+      rbtn=`<button class="buyb" disabled>リーダーだけ</button>`;
     else if(partyIsFull())rbtn=`<button class="buyb" disabled>チーム満員</button>`;
-    else rbtn=`<button class="buyb" data-goyo-recruit>募る</button>`;
-    html+=`<div class="itemrow"><span class="nm">同行者を募る
-      <span class="fx">${recruitState.active?'募集中。同じ区域の同志に届いている(満員・達成で自動終了)'
-        :'同じ区域で御用が残っている同志に「加勢しませんか」と届く'}</span></span>${rbtn}</div>`;
+    else rbtn=`<button class="buyb" data-goyo-recruit>募集する</button>`;
+    html+=`<div class="itemrow"><span class="nm">なかま募集
+      <span class="fx">${recruitState.active?'募集中。近くの人にお知らせが届いている(満員・達成で自動でおわる)'
+        :'近くにいる人に「いっしょにやりませんか」とお知らせが届く'}</span></span>${rbtn}</div>`;
   }
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 頼み事 ─</span></div>`;
   const available=QUESTS.filter(q=>!player.qb.done[q.id]&&!questIsActive(q.id));
@@ -3883,7 +3921,7 @@ function renderBoard(){
   $('boardList').querySelector('[data-goyo-take]')?.addEventListener('click',()=>{goyoAccept();renderBoard();});
   $('boardList').querySelector('[data-goyo-claim]')?.addEventListener('click',()=>{goyoClaim();renderBoard();});
   $('boardList').querySelector('[data-goyo-recruit]')?.addEventListener('click',()=>{
-    if(recruitState.active)stopRecruit('取り下げ');else startRecruit();
+    if(recruitState.active)stopRecruit('とりやめ');else startRecruit();
     renderBoard();
   });
   for(const b of $('boardList').querySelectorAll('[data-qtake]')){
@@ -7985,20 +8023,21 @@ const el={
 /* ---- 今日の御用(曜日固定ローテ・ソロ仕様。docs/goyo-rotation.md) ---- */
 const GOYO_N=10;
 const GOYO_ROTATION={field:[  // 添字=JSTの曜日(0=日〜6=土)。輪廻大陸の表は2章実装時に追加
-  {key:'sun',mobs:['shira_bone'],title:'【御用】無縁塚 骨鎮めの件',
-    text:'「無縁塚のシラホネ十体の供養を命ず。遠路である。道中の魂にも合掌を忘れるな。」'},
-  {key:'mon',mobs:['goblin','goblin_red'],title:'【御用】ガキども騒がしき件',
-    text:'「村の垣根にガキの群れが取り付いておる。十匹、成仏させて参れ。新入りの同行、大いに結構。」'},
-  {key:'tue',mobs:['wolf'],title:'【御用】イヌガミ徘徊の件',
-    text:'「森の道にイヌガミが徘徊し、行き交う魂が難儀しておる。十匹の鎮めを命ず。」'},
-  {key:'wed',mobs:['orc'],title:'【御用】アッキ乱心の件',
-    text:'「森の奥のアッキが徒党を組んでおる。十匹、打ち鎮めよ。深追いは無用。」'},
-  {key:'thu',mobs:['skeleton'],title:'【御用】骨鳴りの件',
-    text:'「ガシャドクロの骨鳴りが夜毎うるさいとの訴えあり。十体、静めて参れ。」'},
-  {key:'fri',mobs:['dark_dog','oni_bone'],title:'【御用】洞窟二層 闇祓いの件',
-    text:'「試練の洞窟二層に闇が濃い。ヤミイヌガミ・オニビドクロ合わせて十、祓うべし。連れ立って行け。」'},
-  {key:'sat',mobs:['gozu'],title:'【御用】ゴズ討伐の件',
-    text:'「洞窟深部のゴズは一人手に余る。仲間を募りて十体を鎮めよ。庁は同行を推奨する。」'},
+  // 文言は平易に(2026-07-24ユーザー要望): タイトル=やること、text=場所とひとことだけ
+  {key:'sun',mobs:['shira_bone'],title:'シラホネを10体たおす',
+    text:'ばしょ: 南西の無縁塚。すこし遠出になるよ'},
+  {key:'mon',mobs:['goblin','goblin_red'],title:'ガキを10匹たおす',
+    text:'ばしょ: 村のまわり。赤いガキもかぞえるよ'},
+  {key:'tue',mobs:['wolf'],title:'イヌガミを10匹たおす',
+    text:'ばしょ: 森の道ぞい'},
+  {key:'wed',mobs:['orc'],title:'アッキを10体たおす',
+    text:'ばしょ: 森の奥'},
+  {key:'thu',mobs:['skeleton'],title:'ガシャドクロを10体たおす',
+    text:'ばしょ: 賽の森の南のほう'},
+  {key:'fri',mobs:['dark_dog','oni_bone'],title:'ヤミイヌガミ・オニビドクロを合計10体たおす',
+    text:'ばしょ: 試練の洞窟B2。なかまと行くのがおすすめ'},
+  {key:'sat',mobs:['gozu'],title:'ゴズを10体たおす',
+    text:'ばしょ: 試練の洞窟の深いところ。ひとりだと大変、なかま募集を使おう'},
 ]};
 const goyoToday=()=>GOYO_ROTATION.field[new Date(Date.now()+JST_OFFSET_MS).getUTCDay()];
 // 報酬は自Lvスケール(2026-07-24改訂): 敵XP目安=16×Lv^1.1(徳位表シートの式)の25体ぶん。モンはその0.2倍
@@ -8017,7 +8056,7 @@ function goyoAccept(){
   st.accepted=true;
   const g=goyoToday();
   window.enmachoAnalytics?.track('quest_accept',{quest_id:'goyo_'+g.key});
-  log(`御用「${g.title.replace('【御用】','')}」を承った`,'sys');
+  log(`今日の御用「${g.title}」を受けた`,'sys');
   sfx.click();save();
 }
 function goyoProgress(tag){
@@ -8025,8 +8064,9 @@ function goyoProgress(tag){
   if(!st||st.date!==jstDateKey()||!st.accepted||st.claimed||st.prog>=GOYO_N)return false;
   if(!goyoToday().mobs.includes(tag))return false;
   st.prog++;
-  if(st.prog>=GOYO_N)log('御用の討伐を果たした！ クエスト看板で納めよう','gain');
+  if(st.prog>=GOYO_N)log('今日の御用 たっせい！ 画面右の「御用」から報酬を受けとろう','gain');
   else addFloat(player.x,player.y-1.2,`今日の御用 ${st.prog}/${GOYO_N}`,'#9fdcff');
+  if(!$('goyoPanel').hidden)renderGoyoPanel();
   // 保存は呼び出し元(討伐処理)のsave()に相乗りする
   return true;
 }
@@ -8039,10 +8079,59 @@ function goyoClaim(){
   const gGold=Math.round(rw.gold*(team?1.3:1)),gXp=Math.round(rw.xp*(team?1.3:1));
   player.gold+=gGold;gainXp(gXp);player.fuda+=2;
   window.enmachoAnalytics?.track('quest_complete',{quest_id:'goyo_'+g.key,party_size:partySize()});
-  banner={txt:'本日の御用 納め！',age:0};
-  log(`「御用、しかと確かめた。本日の勤め、大儀である。」(+${gGold} モン / +${gXp} 徳 / 功徳札+2${team?' / チーム納め1.3倍':''})`,'gain');
+  banner={txt:'今日の御用 クリア！',age:0};
+  log(`今日の御用をクリア！ +${gGold}モン +${gXp}徳 功徳札+2${team?'(チームで1.3倍)':''}`,'gain');
   sfx.coin();save();
 }
+/* ---- 御用HUD(画面右・地図ボタンの下)。タップでミニパネル開閉(2026-07-24ユーザー要望) ---- */
+let goyoHudKey='';
+function updateGoyoHud(){
+  const st=player.goyo&&player.goyo.date===jstDateKey()?player.goyo:null;
+  const state=!st||!st.accepted?'!':st.claimed?'済':st.prog>=GOYO_N?'受取':`${st.prog}/${GOYO_N}`;
+  const key=`${started}|${state}`;
+  if(key===goyoHudKey)return;
+  goyoHudKey=key;
+  const hudEl=$('goyoHud');
+  hudEl.hidden=!started;
+  $('goyoHudState').textContent=state;
+  hudEl.classList.toggle('fresh',state==='!');
+  hudEl.classList.toggle('ready',state==='受取');
+  hudEl.classList.toggle('done',state==='済');
+}
+function renderGoyoPanel(){
+  const gst=goyoState(),g=goyoToday(),rw=goyoReward();
+  $('goyoPanelTitle').textContent=`今日の御用: ${g.title}`;
+  $('goyoPanelText').textContent=g.text;
+  $('goyoPanelReward').textContent=
+    `ほうび: ${rw.gold}モン + ${rw.xp}徳 + 功徳札2(チームでクリアすると1.3倍)`;
+  const host=$('goyoPanelActions');
+  host.textContent='';
+  const mk=(label,fn)=>{
+    const b=document.createElement('button');
+    b.textContent=label;
+    if(fn)b.addEventListener('click',()=>{fn();renderGoyoPanel();updateGoyoHud();});
+    else b.disabled=true;
+    host.appendChild(b);
+  };
+  if(gst.claimed)mk('今日は達成ずみ。また明日！');
+  else if(!gst.accepted)mk('受ける',goyoAccept);
+  else if(gst.prog>=GOYO_N)mk('報酬を受けとる',goyoClaim);
+  else mk(`いま ${gst.prog}/${GOYO_N} 体`);
+  if(gst.accepted&&!gst.claimed&&gst.prog<GOYO_N){
+    if(!chat.online)mk('なかま募集(要ログイン)');
+    else if(recruitState.active)mk('募集をやめる',()=>stopRecruit('とりやめ'));
+    else if(party.id&&party.leaderId&&party.leaderId!==myUserId())mk('募集はリーダーだけ');
+    else if(partyIsFull())mk('チーム満員');
+    else mk('なかまを募集する',startRecruit);
+  }
+}
+$('goyoHud').addEventListener('click',()=>{
+  const p=$('goyoPanel');
+  p.hidden=!p.hidden;
+  if(!p.hidden)renderGoyoPanel();
+  sfx.click();
+});
+$('goyoPanelClose').addEventListener('click',()=>{$('goyoPanel').hidden=true;sfx.click();});
 /* ---- 交換所(功徳札の窓口。最小構成=かけら購入+束ね。chapter-gear-design §6) ---- */
 function kokanMonthState(){
   const month=jstDateKey().slice(0,7);
@@ -8239,6 +8328,7 @@ function hud(){
   $('quickPageBtn').setAttribute('aria-label',
     `アイテムページ${player.quickPage+1}。押すとページ${(player.quickPage+1)%3+1}`);
   el.pt.textContent=player.statPts>0?player.statPts:'';
+  updateGoyoHud();
   if(started&&tutorialStep<TUTORIAL_STEPS.length)checkTutorial();
   const tracking=activeQuests().slice();
   if(player.goyo?.date===jstDateKey()&&player.goyo.accepted&&!player.goyo.claimed)
@@ -8968,7 +9058,7 @@ function startRecruit(){
   recruitState.lastSentAt=Date.now();
   netOutbox.push({type:'recruit',state:'open',partyId:party.id,slots:recruitSlots()});
   window.enmachoAnalytics?.track('recruit_start',{zone,party_size:partySize()});
-  notifyNet('同じ区域に御用の同行者を募った(満員・達成・取り下げで自動終了)');
+  notifyNet('なかま募集をはじめた！ 近くの人にお知らせが届く(満員・達成・とりやめで自動でおわる)');
   sfx.click();
 }
 function stopRecruit(reason){
@@ -8976,7 +9066,7 @@ function stopRecruit(reason){
   recruitState.active=false;
   netOutbox.push({type:'recruit',state:'closed',partyId:recruitState.partyId,slots:0});
   recruitState.partyId='';
-  if(reason)notifyNet(`同行者の募集を締め切った(${reason})`);
+  if(reason)notifyNet(`なかま募集をおわった(${reason})`);
 }
 function receiveRecruitOffer(offer){
   if(offer.state==='closed'){
@@ -9010,7 +9100,7 @@ function maybeShowRecruitPop(){
   const job=meishokuDef(best)?.name;
   b.textContent=`${best.displayName}（徳位${best.level}${job?'・'+job:''}）`;
   p.appendChild(b);
-  p.appendChild(document.createTextNode(' が御用の同行者を募っています'));
+  p.appendChild(document.createTextNode(' が「今日の御用」のなかまを募集しています'));
   $('recruitPop').hidden=false;
   clearTimeout(recruitPopTimer);
   recruitPopTimer=setTimeout(hideRecruitPop,30000);
@@ -9032,8 +9122,8 @@ $('recruitJoin').addEventListener('click',()=>{
   netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
     targetUserId:offer.userId,partyId:offer.partyId});
   window.enmachoAnalytics?.track('recruit_join',{zone,leader_level:offer.level|0});
-  notifyNet(`${offer.displayName} の御用に加勢した！ 地図でリーダーの位置が光っている`);
-  notifyNet('AUTOボタン(T)で「リーダー追従」を選ぶと自動でついて行ける');
+  notifyNet(`${offer.displayName} のチームに参加した！ 地図の青い光がリーダーの居場所`);
+  notifyNet('AUTOボタン(Tキー)で「リーダー追従」を選ぶと自動でついて行ける');
   hideRecruitPop();
   recruitOffers.clear();
   chat.tab='team';
@@ -9045,14 +9135,14 @@ $('recruitDecline').addEventListener('click',()=>{
   try{localStorage.setItem(RECRUIT_DECLINE_KEY,jstDateKey());}catch(e){}
   recruitOffers.clear();
   hideRecruitPop();
-  notifyNet('今日は御用の募集を受け取らない(設定で恒久的にも切れる)');
+  notifyNet('今日はもう募集のお知らせを出さない(設定でずっとOFFにもできる)');
   sfx.click();
 });
 setInterval(()=>{
   if(recruitState.active){
     // 自動終了: 満員(4人)・御用達成・チーム解散/離脱/リーダー交代
     if(partyIsFull())stopRecruit('満員');
-    else if(goyoDoneToday())stopRecruit('御用達成');
+    else if(goyoDoneToday())stopRecruit('達成');
     else if(!party.id||party.id!==recruitState.partyId
       ||(party.leaderId&&party.leaderId!==myUserId()))stopRecruit('');
     else if(Date.now()-recruitState.lastSentAt>=RECRUIT_REBROADCAST_MS){
@@ -9472,6 +9562,11 @@ window.addEventListener('keydown',ev=>{
   if(ev.key==='Escape'&&!$('playerCard').hidden){
     ev.preventDefault();
     closePlayerCard();
+    return;
+  }
+  if(ev.key==='Escape'&&!$('goyoPanel').hidden){
+    ev.preventDefault();
+    $('goyoPanel').hidden=true;
     return;
   }
   if(ev.key==='Escape'&&chat.open){
