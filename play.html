@@ -100,16 +100,14 @@
     font-variant-numeric:tabular-nums}
   #worldClock .phase{color:#f0d383}
   #worldClock.night .phase{color:#a9c8ff}
-  #sndBtn,#accountBtn,#mapBtn{position:absolute;right:12px;width:38px;height:38px;
+  #sndBtn,#accountBtn{position:absolute;right:12px;width:38px;height:38px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:var(--parchment);cursor:pointer;padding:0;line-height:1}
   #sndBtn{top:82px;font-size:19px}
   #accountBtn{top:126px;width:46px;font-family:var(--serif);font-size:11px;
     letter-spacing:.05em}
-  #mapBtn{top:176px;width:46px;font-family:var(--serif);font-size:12px;
-    letter-spacing:.08em;color:#ead397}
-  #sndBtn:hover,#accountBtn:hover,#mapBtn:hover{border-color:#8a6f3d;color:#fff}
-  #goyoHud{position:absolute;right:12px;top:222px;z-index:6;width:46px;min-height:44px;
+  #sndBtn:hover,#accountBtn:hover{border-color:#8a6f3d;color:#fff}
+  #goyoHud{position:absolute;right:12px;top:176px;z-index:6;width:46px;min-height:44px;
     background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;
     color:#ead397;cursor:pointer;padding:4px 0 5px;line-height:1.25;
     font-family:var(--serif);font-size:12px;letter-spacing:.08em;
@@ -121,7 +119,7 @@
   #goyoHud.ready{border-color:var(--gold);box-shadow:0 0 10px rgba(201,162,74,.45)}
   #goyoHud.ready .gh-state{color:var(--gold);font-weight:700}
   #goyoHud.done{opacity:.6}
-  #goyoPanel{position:absolute;top:222px;right:64px;z-index:8;
+  #goyoPanel{position:absolute;top:176px;right:64px;z-index:8;
     width:min(280px,calc(100vw - 90px));box-sizing:border-box;
     background:linear-gradient(168deg,rgba(24,22,15,.97),rgba(14,12,8,.97));
     border:1px solid #8a763b;border-radius:8px;padding:12px 13px;
@@ -458,6 +456,9 @@
     background-position:0 0;background-size:400% 100%;background-repeat:no-repeat;
     image-rendering:pixelated;color:transparent}
   .skill .key{position:absolute;top:2px;left:4px;font-size:9px;color:var(--dim)}
+  .touch-only{display:none !important}
+  .quick-swipe-mark{position:absolute;top:2px;left:4px;color:var(--dim);
+    font:9px/1 var(--sans)}
   .skill .badge{position:absolute;bottom:2px;right:3px;min-width:15px;padding:1px 4px;
     border-radius:9px;background:#c43a2b;border:1px solid rgba(232,176,138,.7);color:#fff;
     font-size:10px;line-height:1.3;text-align:center;font-variant-numeric:tabular-nums}
@@ -1054,15 +1055,50 @@
   .skill .item-icon img{display:block;width:100%;height:100%;object-fit:contain;
     image-rendering:auto;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
   #slotItems{min-height:40px}
-  .quick-page-setup{display:flex;align-items:center;gap:6px;margin-bottom:8px;
-    padding:8px 2px 10px;border-bottom:1px solid #33291a;
-    font-family:var(--sans);font-size:11px;color:var(--dim);text-align:left}
-  .quick-page-setup span{margin-right:auto}
-  .quick-page-choice{width:34px;height:30px;border:1px solid var(--panel-edge);
-    border-radius:3px;background:linear-gradient(180deg,#2b2314,#1c160d);
-    color:var(--parchment);font-family:var(--sans);font-size:12px;cursor:pointer}
-  .quick-page-choice.on{border-color:var(--gold);color:var(--gold);
-    background:linear-gradient(180deg,#3d3220,#241c11)}
+  .quick-register{margin-bottom:12px;padding:11px;border:1px solid #4a3b22;border-radius:6px;
+    background:linear-gradient(160deg,#1b160e,#100d09);text-align:left}
+  .quick-register-head{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
+  .quick-register-head b{color:var(--gold);font:13px var(--serif);letter-spacing:.1em}
+  .quick-register-head span{color:var(--dim);font:10px/1.55 var(--sans)}
+  .quick-slot-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .quick-slot{position:relative;min-width:0;min-height:68px;padding:7px 4px 5px;
+    border:1px solid var(--panel-edge);border-radius:5px;background:#141009;color:var(--parchment);
+    font-family:var(--sans);cursor:pointer}
+  .quick-slot:hover{border-color:#8a6f3d}
+  .quick-slot.on{border-color:var(--gold);background:linear-gradient(180deg,#3d3220,#20180f);
+    box-shadow:0 0 9px rgba(201,162,74,.22)}
+  .quick-slot img{display:block;width:34px;height:34px;margin:0 auto 3px;object-fit:contain;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .quick-slot-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:9.5px;text-align:center}
+  .quick-slot-num{position:absolute;top:4px;left:5px;color:var(--gold);font-size:9px}
+  .quick-slot-count{position:absolute;top:3px;right:4px;min-width:15px;padding:1px 3px;
+    border-radius:8px;background:#382c1b;color:#dfd1ad;font:9px var(--sans);text-align:center}
+  .quick-register-note{margin:8px 0 0;color:#bbaa82;font:9.5px/1.55 var(--sans);text-align:center}
+  .quick-item-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+    margin:0 1px 7px;color:var(--gold);font:11px var(--serif);letter-spacing:.08em;text-align:left}
+  .quick-item-head span{color:var(--dim);font:9px var(--sans);letter-spacing:0}
+  .quick-item-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;
+    margin-bottom:13px}
+  .quick-item-card{position:relative;min-width:0;min-height:91px;padding:9px 5px 7px;
+    border:1px solid #3d3322;border-radius:5px;background:linear-gradient(180deg,#1b1710,#100d09);
+    color:var(--parchment);font-family:var(--sans);cursor:pointer}
+  .quick-item-card:hover{border-color:#8a6f3d}
+  .quick-item-card.on{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(201,162,74,.15)}
+  .quick-item-card img{display:block;width:42px;height:42px;margin:0 auto 4px;object-fit:contain;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.58))}
+  .quick-item-card b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:10px;font-weight:600}
+  .quick-item-card small{display:block;margin-top:2px;color:var(--dim);font-size:8px}
+  .quick-item-card .quick-count{position:absolute;top:5px;right:5px;min-width:18px;padding:2px 4px;
+    border-radius:9px;background:#8f2d24;border:1px solid #c86a55;color:#fff;
+    font:700 9px var(--sans);text-align:center}
+  .quick-item-card .quick-registered{position:absolute;left:5px;top:5px;color:var(--gold);
+    font:8px var(--sans)}
+  .quick-item-empty{margin-bottom:13px;padding:14px 8px;border:1px dashed #423721;
+    color:var(--dim);font:10.5px/1.7 var(--sans);text-align:center}
+  .inventory-subhead{margin:13px 0 2px;padding-bottom:6px;border-bottom:1px solid #3a2e1c;
+    color:#bca875;font:10px var(--serif);letter-spacing:.12em;text-align:left}
   .statline{display:flex;justify-content:space-between;font-family:var(--sans);
     font-size:12.5px;color:#cfc2a0;padding:5px 2px;border-bottom:1px solid #2a2115}
   .statline b{color:var(--parchment);font-variant-numeric:tabular-nums}
@@ -1164,6 +1200,12 @@
       filter:brightness(.38) saturate(.7) drop-shadow(0 0 18px var(--boss-accent))}
     .boss-cutin-skip{bottom:max(calc(10vh + 8px),env(safe-area-inset-bottom));font-size:9px}
   }
+  @media (pointer:coarse),(max-width:700px){
+    .pc-only,.skill .key,#quickPageBtn{display:none !important}
+    .touch-only{display:inline !important}
+    li.touch-only{display:list-item !important}
+    #btnPotion{touch-action:pan-y}
+  }
   @media (pointer:coarse){
     .boss-cutin.video-playing .boss-cutin-kicker,
     .boss-cutin.video-playing h2,
@@ -1222,7 +1264,6 @@
     <span class="status-dot" id="accountDot" aria-hidden="true"></span>魂籍
     <span id="onlineCount" hidden aria-hidden="true">1</span>
   </button>
-  <button id="mapBtn" title="全体地図 (M)" aria-label="全体地図を開く">地図</button>
   <button id="goyoHud" type="button" hidden title="御用"
     aria-label="御用を開く"><span>御用</span><span class="gh-state"
     id="goyoHudState">!</span><span class="gh-badge" id="goyoHudBadge"
@@ -1342,13 +1383,13 @@
         <span class="lock hidden" id="lockFire">徳6</span>
         <span class="cdov hidden" id="cdFire"></span>
       </button>
-      <button class="skill" id="btnPotion" title="選択中の道具 (Q)">
-        <span class="key">Q</span><span class="icon item-icon"><img id="quickItemIcon" src="assets/items/potion_kanro.png" alt=""></span><span id="potLabel">回復S</span>
+      <button class="skill" id="btnPotion" title="選択中の道具">
+        <span class="key">Q</span><span class="touch-only quick-swipe-mark" aria-hidden="true">↔</span><span class="icon item-icon"><img id="quickItemIcon" src="assets/items/potion_kanro.png" alt=""></span><span id="potLabel">回復S</span>
         <span class="badge" id="potN">3</span>
         <span class="cdov hidden" id="cdPotion"></span>
       </button>
-      <button class="skill page-switch" id="quickPageBtn" title="アイテムページを切り替える"
-        aria-label="アイテムページ1。押すと次のページ">
+      <button class="skill page-switch" id="quickPageBtn" title="道具ショートカットを切り替える"
+        aria-label="道具ショートカット1。押すと次へ">
         <span class="icon">▶</span><span>P<b id="quickPageNow">1</b>/3</span>
       </button>
       <button class="skill" id="btnEquip" title="メニュー (I)">
@@ -1392,7 +1433,8 @@
           <li><b>地面をクリック / タップ</b> … 移動</li>
           <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
           <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
-          <li><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
+          <li class="pc-only"><b>E</b> 破魔 / <b>R</b> ヒール / <b>F</b> 業火 / <b>Q</b> 道具 / <b>I</b> メニュー / <b>M</b> 地図</li>
+          <li class="touch-only"><b>画面下のボタン</b> … 印・道具・メニュー　／　<b>右上の小地図</b> … 全体地図</li>
         </ul>
         <div class="goal">— 森の最深部に巣くうゴウリュウを鎮めよ —</div>
         <button class="btn" id="startBtn">入庁する</button>
@@ -1609,7 +1651,7 @@
       <div id="tabItem" class="hidden"><div id="itemList"></div></div>
       <div id="tabStat" class="hidden"><div id="statList"></div></div>
       <div id="tabSocial" class="hidden"><div id="socialList"></div></div>
-      <button class="btn small" id="equipClose">閉じる (I)</button>
+      <button class="btn small" id="equipClose">閉じる <span class="pc-only">(I)</span></button>
     </div>
   </div>
 
@@ -1635,7 +1677,7 @@
           <span><i style="background:#315d70"></i>水域</span>
           <span><i style="background:#d8bd63;border-radius:50%"></i>現在地</span>
         </div>
-        <button class="btn small" id="worldMapClose">閉じる (M)</button>
+        <button class="btn small" id="worldMapClose">閉じる <span class="pc-only">(M)</span></button>
       </div>
       <p class="world-map-note" id="worldMapNote">地図を開いた時点の現在地を示しています。</p>
     </section>
@@ -3517,22 +3559,22 @@ function quickItemInfo(id){
     return{id:`heal_${tier}`,kind:'heal',tier,name:p.name,label:`回復${tier.toUpperCase()}`,
       icon:'assets/items/potion_kanro.png',count:player[p.field],
       disabled:player[p.field]<=0||player.cd.potion>0,
-      title:`${p.name} (Q) HP+${p.heal} / 使用後${p.delay}秒`};
+      title:`${p.name} HP+${p.heal} / 使用後${p.delay}秒`};
   }
   if(id==='haste')return{id,kind:'haste',name:'韋駄天の水',label:'韋駄天',
     icon:'assets/items/potion_idaten.png',count:player.hastePots,
-    disabled:player.hastePots<=0||player.hasteT>0,title:'韋駄天の水 (Q) 5分 高速化'};
+    disabled:player.hastePots<=0||player.hasteT>0,title:'韋駄天の水 5分 高速化'};
   if(id==='reisui')return{id,kind:'reisui',name:'韋駄天の霊水',label:'霊水',
     icon:'assets/items/potion_idaten_spirit.png',count:player.reisuiPots,
     disabled:player.reisuiPots<=0||player.hasteT>0,
-    title:'韋駄天の霊水 (Q) 60分 高速化(恩賞限定)'};
+    title:'韋駄天の霊水 60分 高速化(恩賞限定)'};
   if(id==='gmdash')return{id,kind:'gmdash',name:'神足の御符',label:'神足',
     icon:'assets/items/acc_kifuda_gofu.png',count:player.gmDashPots,
     disabled:gmDashBusy||player.gmDashPots<=0||player.gmDashT>0,
-    title:'神足の御符 (Q) 10分 超高速 [GM]'};
+    title:'神足の御符 10分 超高速 [GM]'};
   return{id:'crit',kind:'crit',name:'修羅の酒',label:'修羅',
     icon:'assets/items/potion_shura.png',count:player.critPots,
-    disabled:player.critPots<=0||player.critT>0,title:'修羅の酒 (Q) 5分 会心+25%'};
+    disabled:player.critPots<=0||player.critT>0,title:'修羅の酒 5分 会心+25%'};
 }
 function useQuickItem(){
   const q=quickItemInfo(player.quickItems[player.quickPage]);
@@ -3548,14 +3590,14 @@ function setQuickItem(id,page=player.quickPage){
   player.quickItems[page]=id;
   const q=quickItemInfo(id);
   if(q.kind==='heal')player.potionTier=q.tier;
-  log(`${q.name}をアイテムページ${page+1}のQに設定した`,'sys');
+  log(`${q.name}をショートカット${page+1}に登録した`,'sys');
   sfx.click();save();hud();
 }
 function setQuickPage(page,announce=false){
   page=((page|0)%3+3)%3;
   if(player.quickPage===page)return;
   player.quickPage=page;
-  if(announce)log(`アイテムページ${page+1}へ切り替えた`,'sys');
+  if(announce)log(`道具ショートカット${page+1}へ切り替えた`,'sys');
   sfx.click();save();hud();
 }
 function cycleQuickPage(){setQuickPage(player.quickPage+1,true);}
@@ -3596,6 +3638,7 @@ function applySharedDamage(result,m){
 /* ================= パネル(店・会話・装備) ================= */
 const $=id=>document.getElementById(id);
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+const touchUiMedia=matchMedia('(pointer:coarse),(max-width:700px)');
 const SHOP_BUY_QTYS=[1,5,10];
 function shopConsumable(id){
   if(id.startsWith('potion-'))return HEAL_POTIONS[id.slice('potion-'.length)]||null;
@@ -4126,22 +4169,42 @@ function renderEquipTab(){
   }
 }
 function renderItemTab(){
-  let html=`<div class="quick-page-setup"><span>Qアイテムの設定先</span>`;
-  for(let i=0;i<3;i++)html+=`<button class="quick-page-choice ${player.quickPage===i?'on':''}"
-    data-quick-page="${i}" aria-label="アイテムページ${i+1}">P${i+1}</button>`;
-  html+='</div>';
-  for(const id of QUICK_ITEM_IDS){
-    if(id==='gmdash'&&player.gmDashPots<=0)continue;  // GM専用: 持っていない魂には見せない
+  let html=`<section class="quick-register">
+    <div class="quick-register-head"><b>道具ショートカット</b>
+      <span>① 入れ替える枠を選ぶ　→　② 手持ちの道具を選ぶ</span></div>
+    <div class="quick-slot-row" role="group" aria-label="登録先のショートカット">`;
+  for(let i=0;i<3;i++){
+    const q=quickItemInfo(player.quickItems[i]);
+    html+=`<button class="quick-slot ${player.quickPage===i?'on':''}" data-quick-page="${i}"
+      aria-pressed="${player.quickPage===i}" aria-label="ショートカット${i+1}、${esc(q.name)}">
+      <span class="quick-slot-num">${i+1}</span><span class="quick-slot-count">${q.count}</span>
+      <img src="${q.icon}" alt=""><span class="quick-slot-name">${esc(q.label)}</span></button>`;
+  }
+  html+=`</div><p class="quick-register-note">
+    <span class="touch-only">登録した3つは、画面下の道具を左右スワイプで切替・タップで使用</span>
+    <span class="pc-only">登録した3つは、画面下のPボタンで切替・Qキーで使用</span>
+    </p></section>
+    <div class="quick-item-head">手持ちから選ぶ <span>ショートカット${player.quickPage+1}へ登録</span></div>`;
+  const availableQuickIds=QUICK_ITEM_IDS.filter(id=>quickItemInfo(id).count>0);
+  if(availableQuickIds.length)html+='<div class="quick-item-grid">';
+  for(const id of availableQuickIds){
     const q=quickItemInfo(id),selected=player.quickItems[player.quickPage]===id;
+    const registered=player.quickItems.map((v,i)=>v===id?i+1:0).filter(Boolean);
     const fx=q.kind==='heal'
       ?`HP+${HEAL_POTIONS[q.tier].heal} / 共有ディレイ${HEAL_POTIONS[q.tier].delay}秒`
       :q.kind==='haste'?'5分 高速化':q.kind==='reisui'?'60分 高速化(恩賞4日目の限定品・非売品)'
       :q.kind==='gmdash'?'10分 超高速 [GM専用]':'5分 会心+25%';
-    html+=`<div class="itemrow"><img class="icn" src="${q.icon}" alt="">
-      <span class="nm">${q.name} ×${q.count} <span class="fx">${fx}</span></span>
-      <button class="buyb ${selected?'on':''}" data-quick-item="${id}"
-        ${selected&&q.disabled?'disabled':''}>${selected?'使う':`P${player.quickPage+1}設定`}</button></div>`;
+    html+=`<button class="quick-item-card ${selected?'on':''}" data-quick-item="${id}"
+      aria-label="${esc(q.name)}をショートカット${player.quickPage+1}へ登録" title="${esc(fx)}">
+      ${registered.length?`<span class="quick-registered">登録 ${registered.join('・')}</span>`:''}
+      <span class="quick-count">×${q.count}</span><img src="${q.icon}" alt="">
+      <b>${esc(q.name)}</b><small>${selected?'この枠に登録中':'タップで登録'}</small></button>`;
   }
+  if(availableQuickIds.length)html+='</div>';
+  else html+='<div class="quick-item-empty">使える道具を持っていません。オババの店で買えます。</div>';
+  const hasOtherItems=player.wScrolls>0||player.aScrolls>0||gmMeishokuResetCount>0
+    ||gmGenderChangeCount>0||player.dragonBlood>0||player.fuda>0||player.kakera>0||player.ferrymanCoin;
+  if(hasOtherItems)html+='<div class="inventory-subhead">素材・大事なもの</div>';
   if(player.wScrolls>0){
     html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
       <span class="nm">武器強化の巻物 ×${player.wScrolls} <span class="fx">鍛冶屋カナヤマで使う</span></span></div>`;
@@ -4165,15 +4228,15 @@ function renderItemTab(){
       <button class="buyb" data-gm-gender-change ${gmGenderChangeBusy?'disabled':''}>${gmGenderChangeBusy?'使用中…':'使う'}</button></div>`;
   }
   if(player.dragonBlood>0){
-    html+=`<div class="itemrow"><span class="icn dragon-blood-icon" aria-hidden="true"></span>
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/dragon_blood.png" alt="">
       <span class="nm">竜の血 ×${player.dragonBlood} <span class="fx">移し打ちの素材(鍛冶屋カナヤマ)・ゴウリュウから7%</span></span></div>`;
   }
   if(player.fuda>0){
-    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">札</span>
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/kudoku_fuda.png" alt="">
       <span class="nm">功徳札 ×${player.fuda} <span class="fx">日課の恩賞。宿場町の交換所で品と換えられる</span></span></div>`;
   }
   if(player.kakera>0){
-    html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">片</span>
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_fragment.png" alt="">
       <span class="nm">巻物のかけら ×${player.kakera} <span class="fx">10個集めると強化の巻物1枚になる(交換所)</span></span></div>`;
   }
   if(player.ferrymanCoin){
@@ -4190,8 +4253,7 @@ function renderItemTab(){
   for(const b of $('itemList').querySelectorAll('[data-quick-item]')){
     b.addEventListener('click',()=>{
       const id=b.getAttribute('data-quick-item');
-      if(player.quickItems[player.quickPage]===id)useQuickItem();
-      else setQuickItem(id);
+      setQuickItem(id);
       renderItemTab();
     });
   }
@@ -8591,11 +8653,14 @@ function hud(){
   el.pot.textContent=quickItem.count;
   el.potLabel.textContent=quickItem.label;
   $('quickItemIcon').src=quickItem.icon;
-  $('btnPotion').title=quickItem.title;
+  $('btnPotion').title=`${quickItem.title}${touchUiMedia.matches?'':' (Q)'}`;
+  $('btnPotion').setAttribute('aria-label',touchUiMedia.matches
+    ?`${quickItem.name}。タップで使用、左右スワイプで道具を切替`
+    :`${quickItem.name}。Qキーまたはクリックで使用`);
   $('quickPageNow').textContent=player.quickPage+1;
-  $('quickPageBtn').title=`アイテムページ${player.quickPage+1} / 3（押すと次へ）`;
+  $('quickPageBtn').title=`道具ショートカット${player.quickPage+1} / 3（押すと次へ）`;
   $('quickPageBtn').setAttribute('aria-label',
-    `アイテムページ${player.quickPage+1}。押すとページ${(player.quickPage+1)%3+1}`);
+    `道具ショートカット${player.quickPage+1}。押すと${(player.quickPage+1)%3+1}へ切替`);
   el.pt.textContent=player.statPts>0?player.statPts:'';
   updateGoyoHud();
   if(started&&tutorialStep<TUTORIAL_STEPS.length)checkTutorial();
@@ -8633,7 +8698,8 @@ function hud(){
   el.heal.classList.toggle('disabled',player.lv<3||player.mp<12||player.cd.heal>0);
   el.fire.classList.toggle('disabled',player.lv<6||player.mp<20||player.cd.fire>0);
   $('btnPotion').classList.toggle('disabled',quickItem.disabled);
-  $('btnPotion').disabled=quickItem.disabled;
+  // 道具が空でもスワイプ切替はできるよう、ボタン自体は無効化しない。
+  $('btnPotion').disabled=false;
   const cdShow=(elm,v)=>{elm.classList.toggle('hidden',v<=0);if(v>0)elm.textContent=Math.ceil(v);};
   cdShow(el.cdPotion,quickItem.kind==='heal'?player.cd.potion:0);
   cdShow(el.cdBolt,player.cd.bolt);
@@ -9789,7 +9855,6 @@ function toggleWorldMap(){
   if($('worldMapPanel').classList.contains('hidden'))openWorldMap();
   else closeWorldMap();
 }
-$('mapBtn').addEventListener('click',openWorldMap);
 $('miniMapHud').addEventListener('click',openWorldMap);
 $('worldMapClose').addEventListener('click',closeWorldMap);
 $('worldMapPanel').addEventListener('pointerdown',ev=>{
@@ -9908,7 +9973,28 @@ function showAutoChoice(){
 $('btnBolt').addEventListener('click',castBolt);
 $('btnHeal').addEventListener('click',castHeal);
 $('btnFire').addEventListener('click',castFire);
-$('btnPotion').addEventListener('click',useQuickItem);
+const quickItemButton=$('btnPotion');
+let quickSwipeStart=null,quickSwipeHandled=false;
+quickItemButton.addEventListener('pointerdown',ev=>{
+  if(ev.pointerType==='mouse')return;
+  quickSwipeStart={id:ev.pointerId,x:ev.clientX,y:ev.clientY};
+  quickItemButton.setPointerCapture?.(ev.pointerId);
+});
+quickItemButton.addEventListener('pointerup',ev=>{
+  if(!quickSwipeStart||quickSwipeStart.id!==ev.pointerId)return;
+  const dx=ev.clientX-quickSwipeStart.x,dy=ev.clientY-quickSwipeStart.y;
+  quickSwipeStart=null;
+  if(Math.abs(dx)<30||Math.abs(dx)<=Math.abs(dy))return;
+  quickSwipeHandled=true;
+  setQuickPage(player.quickPage+(dx<0?1:-1),true);
+  ev.preventDefault();
+  setTimeout(()=>{quickSwipeHandled=false;},0);
+});
+quickItemButton.addEventListener('pointercancel',()=>{quickSwipeStart=null;});
+quickItemButton.addEventListener('click',ev=>{
+  if(quickSwipeHandled){ev.preventDefault();return;}
+  useQuickItem();
+});
 $('quickPageBtn').addEventListener('click',cycleQuickPage);
 $('btnEquip').addEventListener('click',toggleEquip);
 $('btnAuto').addEventListener('click',toggleAuto);
@@ -10733,11 +10819,12 @@ if(hasSaveData){
 $('pick'+(player.gender==='f'?'F':'M')).classList.add('on');
 // 操作説明(タッチ/PC自動切替)。タイトル画面と設定画面の両方で使う(retention-plan A-3)
 function howtoItemsHtml(){
-  return matchMedia('(pointer:coarse)').matches?`
+  return touchUiMedia.matches?`
     <li><b>地面をタップ</b> … 移動(左下のパッドでも歩ける)</li>
     <li><b>迷える魂をタップ</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をタップ</b> … 会話・買い物</li>
-    <li><b>画面下のボタン</b> … 印・道具・メニュー　／　右上の<b>地図</b> … 全体地図</li>`:`
+    <li><b>画面下のボタン</b> … 印・道具・メニュー　／　<b>右上の小地図</b> … 全体地図</li>
+    <li><b>道具を左右スワイプ</b> … 登録した道具を切り替える</li>`:`
     <li><b>地面をクリック / タップ</b> … 移動</li>
     <li><b>迷える魂をクリック</b> … 自動攻撃(成仏)</li>
     <li><b>川辺の二人をクリック</b> … 会話・買い物</li>
