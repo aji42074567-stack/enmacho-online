@@ -1280,6 +1280,15 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="kokan">
+    <div class="scroll">
+      <h2>交換所</h2>
+      <div class="sub">「功徳札をお持ちですね。御役目、ご苦労さまでございます」</div>
+      <div id="kokanList"></div>
+      <button class="btn small" id="kokanClose">窓口を離れる</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="talk">
     <div class="scroll">
       <div id="talkPortrait" class="portrait"></div>
@@ -1932,6 +1941,7 @@ let npcs=[
   {...townPoint(32.2,54.6),kind:'guest',name:'カズー'},     // 酔客の魂(井戸の右・通りの真ん中)
   {...townPoint(34.4,42.2),kind:'board',name:'クエスト'},   // 閻魔庁の東を回る北門通り
   {...townPoint(38.4,42.2),kind:'suggest',name:'意見箱'},   // クエスト掲示板から右へ離した投書箱
+  {...townPoint(41.4,42.2),kind:'kokan',name:'交換所'},     // 北門通りの東端・功徳札の交換窓口
   {...townPoint(43.5,48.5),kind:'repose',name:'供養所'},    // 南東区画・レア装備の焚き上げ所
   {...townPoint(42.3,49.2),kind:'repose_keeper',name:'シズメ'}, // 供養所の案内・供養・交換を担う供養守
 ];
@@ -2312,6 +2322,7 @@ const player={
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
   fuda:0,kakera:0,                          // 功徳札/巻物のかけら(交換所で10個=巻物1枚)
   onsho:null,                               // 入庁恩賞「勤怠印」{date:JST日付,cycle:1..7}
+  fudaShop:null,                            // 交換所の月間実績 {month:'YYYY-MM',kakera:購入数}
   cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
   combatT:0,
@@ -2392,7 +2403,7 @@ function save(){
         foodDef:Math.max(0,Math.round(player.foodDefT)),foodRegen:Math.max(0,Math.round(player.foodRegenT))},
       quests:player.quests,qb:player.qb,plus:player.plus,
       tutorial:{step:tutorialStep},
-      fuda:player.fuda,kakera:player.kakera,onsho:player.onsho,
+      fuda:player.fuda,kakera:player.kakera,onsho:player.onsho,fudaShop:player.fudaShop,
       wScrolls:player.wScrolls,aScrolls:player.aScrolls,
       smithIntro:player.smithIntro,drakeKilledAt:player.drakeKilledAt,
       story:player.story,ferrymanCoin:player.ferrymanCoin,
@@ -2465,6 +2476,8 @@ function load(){
     player.kakera=Math.max(0,d.kakera|0);
     player.onsho=(d.onsho&&typeof d.onsho.date==='string'&&Number.isInteger(d.onsho.cycle))
       ?{date:d.onsho.date,cycle:clamp(d.onsho.cycle,1,7)}:null;
+    player.fudaShop=(d.fudaShop&&typeof d.fudaShop.month==='string')
+      ?{month:d.fudaShop.month,kakera:Math.max(0,d.fudaShop.kakera|0)}:null;
     player.qb=normalizeQuestBoard(d.qb);
     const oldKazuDone=d.v<4&&!!player.qb.done.q_tokkuri;
     const st=d.story&&typeof d.story==='object'?d.story:{};
@@ -4348,6 +4361,7 @@ function openNpc(npc){
   }
   else if(npc.kind==='einer'){renderTavern();$('tavern').classList.remove('hidden');}
   else if(npc.kind==='board'){renderBoard();$('board').classList.remove('hidden');}
+  else if(npc.kind==='kokan'){renderKokan();$('kokan').classList.remove('hidden');}
   else if(npc.kind==='suggest'){renderSuggest();$('suggest').classList.remove('hidden');}
   else if(npc.kind==='repose'||npc.kind==='repose_keeper'){renderRepose();$('repose').classList.remove('hidden');}
   else if(npc.kind==='kessha'){
@@ -4444,6 +4458,7 @@ $('meishokuConfirm').addEventListener('click',()=>{
 $('meishokuClose').addEventListener('click',()=>$('meishokuSelect').classList.add('hidden'));
 $('shopClose').addEventListener('click',()=>$('shop').classList.add('hidden'));
 $('smithClose').addEventListener('click',()=>$('smith').classList.add('hidden'));
+$('kokanClose').addEventListener('click',()=>$('kokan').classList.add('hidden'));
 $('tavernClose').addEventListener('click',()=>$('tavern').classList.add('hidden'));
 $('boardClose').addEventListener('click',()=>$('board').classList.add('hidden'));
 $('suggestClose').addEventListener('click',()=>$('suggest').classList.add('hidden'));
@@ -6933,6 +6948,22 @@ function drawReposeAltar(sx,sy){
   ctx.fillStyle=`rgba(218,240,255,${pulse})`;ctx.font='bold 10px sans-serif';ctx.textAlign='center';
   ctx.fillText('供養所',sx,sy+15);
 }
+function drawKokanBooth(sx,sy){
+  drawShadow(sx,sy+3,18);
+  ctx.save();ctx.translate(sx,sy);
+  // 柱2本+小さな庇+受付台の両替屋風の窓口
+  ctx.fillStyle='#4a3a26';
+  ctx.fillRect(-18,-34,3,36);ctx.fillRect(15,-34,3,36);
+  ctx.fillStyle='#5d4a30';
+  ctx.beginPath();ctx.moveTo(-24,-34);ctx.lineTo(0,-44);ctx.lineTo(24,-34);
+  ctx.lineTo(21,-31);ctx.lineTo(0,-40);ctx.lineTo(-21,-31);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#6d5a38';ctx.fillRect(-13,-30,26,16);   // 窓口
+  ctx.fillStyle='#d8c184';ctx.fillRect(-6,-27,12,9);     // 行灯の明かり
+  ctx.fillStyle='#8a7448';ctx.fillRect(-15,-14,30,6);    // 受付台
+  ctx.restore();
+  ctx.fillStyle='#ffe9a0';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('交換所',sx,sy+14);
+}
 function drawKosatsu(sx,sy){
   const img=SPRITES.map_kosatsu;
   const w=84,h=img?w*img.height/img.width:0;
@@ -7347,6 +7378,7 @@ const NPC_SPRITE={merchant:'npc_obaba',elder:'npc_okina',einer:'npc_einer',smith
 function drawNpc(sx,sy,n){
   if(n.kind==='board'){drawKosatsu(sx,sy);return;}
   if(n.kind==='suggest'){drawSuggestBox(sx,sy);return;}
+  if(n.kind==='kokan'){drawKokanBooth(sx,sy);return;}
   if(n.kind==='repose'){drawReposeAltar(sx,sy);return;}
   const isSoul=n.kind==='soul';
   const img=SPRITES[n.sprite||NPC_SPRITE[n.kind]];
@@ -7793,6 +7825,48 @@ const el={
   buffs:$('buffs'),pt:$('ptN'),
   goal:document.querySelector('#quest .goal')
 };
+/* ---- 交換所(功徳札の窓口。最小構成=かけら購入+束ね。chapter-gear-design §6) ---- */
+function kokanMonthState(){
+  const month=jstDateKey().slice(0,7);
+  if(player.fudaShop?.month!==month)player.fudaShop={month,kakera:0};
+  return player.fudaShop;
+}
+function renderKokan(){
+  const st=kokanMonthState();
+  const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
+  const kakeraLeft=Math.max(0,30-st.kakera);
+  let html=`<div class="itemrow"><span class="nm">功徳札 ×${player.fuda}　／　巻物のかけら ×${player.kakera}</span></div>`;
+  html+=sec('功徳札と交換');
+  html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">片</span>
+    <span class="nm">巻物のかけら 1個 <span class="fx">札2枚・今月あと${kakeraLeft}個</span></span>
+    <button class="buyb" data-kokan="kakera" ${player.fuda<2||kakeraLeft<1?'disabled':''}>換える</button></div>`;
+  html+=sec('かけらを束ねる(10個で巻物1枚)');
+  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
+    <span class="nm">武器強化の巻物 1枚 <span class="fx">かけら10個</span></span>
+    <button class="buyb" data-kokan="wscroll" ${player.kakera<10?'disabled':''}>束ねる</button></div>`;
+  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
+    <span class="nm">防具強化の巻物 1枚 <span class="fx">かけら10個</span></span>
+    <button class="buyb" data-kokan="ascroll" ${player.kakera<10?'disabled':''}>束ねる</button></div>`;
+  html+=`<div class="sub">かけらへの交換は月30個まで(月が替わると回復)。月替わりの見た目装備は仕度中</div>`;
+  $('kokanList').innerHTML=html;
+  for(const b of $('kokanList').querySelectorAll('[data-kokan]'))
+    b.addEventListener('click',()=>kokanExchange(b.getAttribute('data-kokan')));
+}
+function kokanExchange(item){
+  const st=kokanMonthState();
+  if(item==='kakera'){
+    if(player.fuda<2||st.kakera>=30)return;
+    player.fuda-=2;player.kakera++;st.kakera++;
+    log('功徳札2枚を巻物のかけら1個と換えた','gain');
+  }else if(item==='wscroll'||item==='ascroll'){
+    if(player.kakera<10)return;
+    player.kakera-=10;
+    if(item==='wscroll'){player.wScrolls++;log('かけら10個を束ね、武器強化の巻物を得た！','gain');}
+    else{player.aScrolls++;log('かけら10個を束ね、防具強化の巻物を得た！','gain');}
+  }else return;
+  window.enmachoAnalytics?.track('fuda_exchange',{item});
+  sfx.coin();save();renderKokan();
+}
 /* ---- 入庁恩賞「勤怠印」(daily-reward-design §1。開くだけの日課) ---- */
 function onshoGrant(cycle){
   const lines=[];
