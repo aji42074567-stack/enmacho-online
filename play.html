@@ -324,6 +324,17 @@
   #invitePop[hidden]{display:none}
   #invitePop p{margin:0 0 10px;font-size:12px;line-height:1.7;color:#dbe6f5}
   #invitePop p b{color:#8fc4ff}
+  #recruitPop{position:absolute;top:64px;left:50%;transform:translateX(-50%);
+    z-index:8;width:min(300px,calc(100vw - 28px));box-sizing:border-box;
+    background:linear-gradient(168deg,rgba(24,22,15,.97),rgba(14,12,8,.97));
+    border:1px solid #8a763b;border-radius:8px;padding:13px 14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 16px rgba(232,196,110,.15);
+    font-family:var(--sans);animation:chatIn .2s ease-out}
+  #recruitPop[hidden]{display:none}
+  #recruitPop p{margin:0 0 10px;font-size:12px;line-height:1.7;color:#f5ecdb}
+  #recruitPop p b{color:#e8c46e}
+  #recruitPop .invite-actions button{border-color:#8a763b;color:#f8e9c8;
+    background:linear-gradient(180deg,#463c23,#2b2416)}
   .invite-actions{display:flex;gap:8px}
   .invite-actions button{flex:1;padding:8px 4px;border-radius:4px;cursor:pointer;
     font-family:var(--serif);font-size:12px;letter-spacing:.1em;
@@ -1193,6 +1204,14 @@
     </div>
   </div>
 
+  <div id="recruitPop" hidden>
+    <p id="recruitText"></p>
+    <div class="invite-actions">
+      <button id="recruitJoin">加勢する</button>
+      <button id="recruitDecline">今日は断る</button>
+    </div>
+  </div>
+
   <div id="dock">
     <div id="vitals">
       <div class="vital"><b>HP</b><div class="meter" id="hpbar"><i></i></div><span class="num" id="hpnum"></span></div>
@@ -1551,6 +1570,10 @@
             <option value="left">左</option>
             <option value="right">右</option>
           </select>
+        </label>
+        <label class="setting-toggle" for="recruitOffSetting">
+          <span>御用の同行者募集を受け取らない</span>
+          <input id="recruitOffSetting" type="checkbox">
         </label>
       </div>
       <p class="setting-note">ミュートは音量の設定を保ったまま、すべての音をまとめて消します。明るさはゲーム画面だけに適用され、文字や設定画面の読みやすさは維持されます。</p>
@@ -2376,7 +2399,7 @@ function findPath(fx,fy,tx,ty,maxIt=4000){
 }
 
 /* ================= プレイヤー ================= */
-const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left',muted:false,miniMapMin:false};
+const settings={bgm:55,sfx:100,brightness:100,shake:true,vpadEnabled:true,vpadSide:'left',muted:false,miniMapMin:false,recruitOff:false};
 const effVol=k=>settings.muted?0:settings[k];   // ミュート中は音量0として扱う
 const player={
   x:SPAWN.x,y:SPAWN.y,path:[],speed:2.4,
@@ -2632,6 +2655,7 @@ function load(){
     settings.vpadSide=cfg.vpadSide==='right'?'right':'left';
     settings.muted=cfg.muted===true;
     settings.miniMapMin=cfg.miniMapMin===true;
+    settings.recruitOff=cfg.recruitOff===true;
     recalcMax();
     player.hp=player.maxHp;player.mp=player.maxMp;
     if(d.v>=12)restoreSavedLocation(d.location,d.v);
@@ -3820,6 +3844,19 @@ function renderBoard(){
   let html=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 今日の御用(日替わりの勤め・功徳札2) ─</span></div>`;
   html+=`<div class="itemrow"><span class="nm">${g.title}${gst.accepted&&!gst.claimed?` <b>${gst.prog}/${GOYO_N}</b>`:''}
     <span class="fx">${g.text} — 礼: ${gGold}モン+${gXp}徳+功徳札2(チームで納めると1.3倍)</span></span>${gbtn}</div>`;
+  // 同行者の1タップ募集(chatgame-design §2)。押した人がリーダーになり同区域へ配信される
+  if(gst.accepted&&!gst.claimed&&gst.prog<GOYO_N){
+    let rbtn;
+    if(!chat.online)rbtn=`<button class="buyb" disabled>要ログイン</button>`;
+    else if(recruitState.active)rbtn=`<button class="buyb on" data-goyo-recruit>取り下げる</button>`;
+    else if(party.id&&party.leaderId&&party.leaderId!==myUserId())
+      rbtn=`<button class="buyb" disabled>リーダーのみ</button>`;
+    else if(partyIsFull())rbtn=`<button class="buyb" disabled>チーム満員</button>`;
+    else rbtn=`<button class="buyb" data-goyo-recruit>募る</button>`;
+    html+=`<div class="itemrow"><span class="nm">同行者を募る
+      <span class="fx">${recruitState.active?'募集中。同じ区域の同志に届いている(満員・達成で自動終了)'
+        :'同じ区域で御用が残っている同志に「加勢しませんか」と届く'}</span></span>${rbtn}</div>`;
+  }
   html+=`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ 頼み事 ─</span></div>`;
   const available=QUESTS.filter(q=>!player.qb.done[q.id]&&!questIsActive(q.id));
   html+=`<div class="itemrow"><span class="nm">受注中 ${activeQuests().length}件
@@ -3845,6 +3882,10 @@ function renderBoard(){
   });
   $('boardList').querySelector('[data-goyo-take]')?.addEventListener('click',()=>{goyoAccept();renderBoard();});
   $('boardList').querySelector('[data-goyo-claim]')?.addEventListener('click',()=>{goyoClaim();renderBoard();});
+  $('boardList').querySelector('[data-goyo-recruit]')?.addEventListener('click',()=>{
+    if(recruitState.active)stopRecruit('取り下げ');else startRecruit();
+    renderBoard();
+  });
   for(const b of $('boardList').querySelectorAll('[data-qtake]')){
     b.addEventListener('click',()=>{
       const q=acceptQuest(b.getAttribute('data-qtake'));
@@ -8900,6 +8941,131 @@ $('inviteDecline').addEventListener('click',async()=>{
   sfx.click();
 });
 
+/* ---- 御用の同行者募集: 1タップ募集・1タップ参加(chatgame-design §2) ---- */
+const RECRUIT_REBROADCAST_MS=25000;      // 途中入室・クールダウン明けにも届くよう定期再配信
+const RECRUIT_OFFER_TTL_MS=60000;        // 再配信が絶えた募集は自然消滅
+const RECRUIT_POPUP_COOLDOWN_MS=300000;  // ポップアップは5分に1回まで
+const RECRUIT_DECLINE_KEY='enma_recruit_declined';
+const recruitState={active:false,partyId:'',lastSentAt:0};
+const recruitOffers=new Map();           // リーダーuserId -> 募集(受信側で保持)
+let activeRecruitOffer=null,recruitPopTimer=0,lastRecruitPopAt=0;
+const recruitDeclinedToday=()=>{
+  try{return localStorage.getItem(RECRUIT_DECLINE_KEY)===jstDateKey();}catch(e){return false;}
+};
+const goyoDoneToday=()=>{
+  const st=goyoState();
+  return st.claimed||(st.accepted&&st.prog>=GOYO_N);
+};
+const recruitSlots=()=>Math.max(0,PARTY_MAX_MEMBERS-partySize());
+function startRecruit(){
+  if(recruitState.active)return;
+  if(!chat.online){notifyNet('募集には魂籍ログインが必要です');return;}
+  if(goyoDoneToday()||partyIsFull())return;
+  if(party.id&&party.leaderId&&party.leaderId!==myUserId())return;
+  if(!party.id){party.id=genPartyId();party.leaderId=myUserId();rememberParty();renderTeamUI();}
+  recruitState.active=true;
+  recruitState.partyId=party.id;
+  recruitState.lastSentAt=Date.now();
+  netOutbox.push({type:'recruit',state:'open',partyId:party.id,slots:recruitSlots()});
+  window.enmachoAnalytics?.track('recruit_start',{zone,party_size:partySize()});
+  notifyNet('同じ区域に御用の同行者を募った(満員・達成・取り下げで自動終了)');
+  sfx.click();
+}
+function stopRecruit(reason){
+  if(!recruitState.active)return;
+  recruitState.active=false;
+  netOutbox.push({type:'recruit',state:'closed',partyId:recruitState.partyId,slots:0});
+  recruitState.partyId='';
+  if(reason)notifyNet(`同行者の募集を締め切った(${reason})`);
+}
+function receiveRecruitOffer(offer){
+  if(offer.state==='closed'){
+    recruitOffers.delete(offer.userId);
+    if(activeRecruitOffer&&activeRecruitOffer.partyId===offer.partyId)hideRecruitPop();
+    return;
+  }
+  if(offer.userId===myUserId()||offer.slots<1)return;
+  if(settings.recruitOff||party.id||recruitDeclinedToday()||goyoDoneToday())return;
+  recruitOffers.set(offer.userId,{...offer,at:Date.now()});
+  maybeShowRecruitPop();
+}
+function maybeShowRecruitPop(){
+  if(activeRecruitOffer||!started||player.dead)return;
+  if(settings.recruitOff||party.id||recruitDeclinedToday()||goyoDoneToday())return;
+  if(lastRecruitPopAt&&Date.now()-lastRecruitPopAt<RECRUIT_POPUP_COOLDOWN_MS)return;
+  // 表示優先度: ①フレンド ②同じ講 ③近い徳位(知り合いの募集が最優先=絆の再利用)
+  let best=null,bestBond=-1,bestGap=Infinity;
+  for(const o of recruitOffers.values()){
+    const bond=isFriend(o.userId)?2:inMyGuild(o.userId)?1:0;
+    const gap=Math.abs((o.level|0)-player.lv);
+    if(bond>bestBond||(bond===bestBond&&gap<bestGap)){best=o;bestBond=bond;bestGap=gap;}
+  }
+  if(!best)return;
+  recruitOffers.delete(best.userId);
+  activeRecruitOffer=best;
+  lastRecruitPopAt=Date.now();
+  const p=$('recruitText');
+  p.textContent='';
+  const b=document.createElement('b');
+  const job=meishokuDef(best)?.name;
+  b.textContent=`${best.displayName}（徳位${best.level}${job?'・'+job:''}）`;
+  p.appendChild(b);
+  p.appendChild(document.createTextNode(' が御用の同行者を募っています'));
+  $('recruitPop').hidden=false;
+  clearTimeout(recruitPopTimer);
+  recruitPopTimer=setTimeout(hideRecruitPop,30000);
+  sfx.click();
+}
+function hideRecruitPop(){
+  clearTimeout(recruitPopTimer);
+  activeRecruitOffer=null;
+  $('recruitPop').hidden=true;
+}
+$('recruitJoin').addEventListener('click',()=>{
+  const offer=activeRecruitOffer;
+  if(!offer)return;
+  if(party.id){hideRecruitPop();return;}
+  // 既存招待処理の自動承諾版: 承諾の往復なしで即チーム加入
+  party.id=offer.partyId;party.members=[];party.leaderId=offer.userId;
+  rememberParty();
+  if(!goyoState().accepted)goyoAccept();   // 加勢=御用を承って共有カウントに乗る
+  netOutbox.push({type:'invite_reply',kind:'team',accepted:true,
+    targetUserId:offer.userId,partyId:offer.partyId});
+  window.enmachoAnalytics?.track('recruit_join',{zone,leader_level:offer.level|0});
+  notifyNet(`${offer.displayName} の御用に加勢した！ 地図でリーダーの位置が光っている`);
+  notifyNet('AUTOボタン(T)で「リーダー追従」を選ぶと自動でついて行ける');
+  hideRecruitPop();
+  recruitOffers.clear();
+  chat.tab='team';
+  if(chat.open)renderChatTab();else openChat(false);
+  renderMiniMap(true);
+  sfx.click();
+});
+$('recruitDecline').addEventListener('click',()=>{
+  try{localStorage.setItem(RECRUIT_DECLINE_KEY,jstDateKey());}catch(e){}
+  recruitOffers.clear();
+  hideRecruitPop();
+  notifyNet('今日は御用の募集を受け取らない(設定で恒久的にも切れる)');
+  sfx.click();
+});
+setInterval(()=>{
+  if(recruitState.active){
+    // 自動終了: 満員(4人)・御用達成・チーム解散/離脱/リーダー交代
+    if(partyIsFull())stopRecruit('満員');
+    else if(goyoDoneToday())stopRecruit('御用達成');
+    else if(!party.id||party.id!==recruitState.partyId
+      ||(party.leaderId&&party.leaderId!==myUserId()))stopRecruit('');
+    else if(Date.now()-recruitState.lastSentAt>=RECRUIT_REBROADCAST_MS){
+      recruitState.lastSentAt=Date.now();
+      netOutbox.push({type:'recruit',state:'open',partyId:recruitState.partyId,slots:recruitSlots()});
+    }
+  }
+  const now=Date.now();
+  for(const [id,o] of recruitOffers)if(now-o.at>RECRUIT_OFFER_TTL_MS)recruitOffers.delete(id);
+  if(activeRecruitOffer&&party.id)hideRecruitPop();   // 表示中に別経路でチーム入りしたら畳む
+  maybeShowRecruitPop();
+},2000);
+
 /* ---- フレンド ---- */
 function friendAdd(f){
   if(!f||!f.id)return;
@@ -9210,6 +9376,17 @@ function renderMiniMap(force=false){
     const p=point(landmark.x,landmark.y);
     g.beginPath();g.rect(p.x-3,p.y-3,6,6);g.fill();g.stroke();
   }
+  // チームのリーダー位置を光らせる(募集に加勢した直後の合流誘導。chatgame-design §2)
+  if(party.id&&party.leaderId&&party.leaderId!==myUserId()){
+    const leader=remotePlayers.get(party.leaderId);
+    if(leader){
+      const p=point(leader.x,leader.y),tp=2+Math.sin(time*5)*1.2;
+      g.shadowColor='rgba(143,196,255,.95)';g.shadowBlur=10;
+      g.fillStyle='#8fc4ff';g.strokeStyle='#eaf7ff';g.lineWidth=2;
+      g.beginPath();g.arc(p.x,p.y,4+tp,0,Math.PI*2);g.fill();g.stroke();
+      g.shadowBlur=0;
+    }
+  }
   // 着任研修「オキナと話す」の間だけ、オキナの位置に光点(retention-plan A-2)
   if(tutorialStep===2&&zone==='field'){
     const okina=npcs.find(n=>n.kind==='elder');
@@ -9386,6 +9563,7 @@ function renderSettings(){
   $('vpadEnabledSetting').checked=settings.vpadEnabled;
   $('vpadSideSetting').value=settings.vpadSide;
   $('vpadSideSetting').disabled=!settings.vpadEnabled;
+  $('recruitOffSetting').checked=settings.recruitOff;
 }
 function openSettings(){
   renderSettings();
@@ -9428,6 +9606,12 @@ $('vpadSideSetting').addEventListener('change',ev=>{
   settings.vpadSide=ev.target.value==='right'?'right':'left';
   applyVpadSettings();
   if(started||hasSaveData)save();
+});
+$('recruitOffSetting').addEventListener('change',ev=>{
+  settings.recruitOff=ev.target.checked;
+  if(settings.recruitOff)recruitOffers.clear();
+  if(started||hasSaveData)save();
+  sfx.click();
 });
 $('sndBtn').addEventListener('click',openSettings);
 $('miniMapMinBtn').addEventListener('click',()=>{
@@ -10049,6 +10233,10 @@ window.EnmaGameBridge={
     if(!invite||!invite.from)return;
     queueInvite(invite);
   },
+  receiveRecruit(offer){
+    if(!offer||!offer.userId||!offer.partyId)return;
+    receiveRecruitOffer(offer);
+  },
   receivePartyKill(msg){
     if(!party.id||!msg||msg.zone!==zone||player.dead)return;
     if(msg.partyId&&msg.partyId!==party.id)return;  // 別チームの討伐
@@ -10276,6 +10464,6 @@ requestAnimationFrame(frame);
 <!-- ?v= は旧キャッシュ(4時間)を確実に飛ばすための一度きりの目印。以後は_headersが効く -->
 <script src="online/config.js?v=20260721n"></script>
 <script src="online/vendor/supabase.min.js"></script>
-<script type="module" src="online/account.js?v=20260724b"></script>
+<script type="module" src="online/account.js?v=20260724c"></script>
 </body>
 </html>

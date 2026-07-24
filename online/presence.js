@@ -121,6 +121,21 @@ function normalizeInviteReply(raw, ownSessionId) {
   };
 }
 
+// 御用の同行者募集(chatgame-design §2)。ゾーンchで配信され、名前・徳位・冥職・残り枠を運ぶ
+function normalizeRecruit(raw, ownSessionId) {
+  const identity = chatIdentity(raw, ownSessionId);
+  if (!identity) return null;
+  const partyId = cleanText(raw.partyId, 64);
+  if (!VALID_UUID.test(partyId)) return null;
+  return {
+    ...identity,
+    meishoku: VALID_MEISHOKU.has(raw.meishoku) ? raw.meishoku : '',
+    partyId,
+    slots: Math.max(0, Math.min(3, Math.trunc(cleanNumber(raw.slots, 0)))),
+    state: raw.state === 'closed' ? 'closed' : 'open',
+  };
+}
+
 function normalizePartyMember(raw, ownSessionId) {
   if (!raw || typeof raw !== 'object') return null;
   const userId = cleanText(raw.userId, 64);
@@ -749,6 +764,11 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
           bridge?.receivePartyLoot?.({ from, partyId, loot,
             mobName: cleanText(payload.mobName, 24) });
         })
+        .on('broadcast', { event: 'recruit' }, ({ payload }) => {
+          if (activeChannel !== channel) return;
+          const offer = normalizeRecruit(payload, sessionId);
+          if (offer) bridge?.receiveRecruit?.(offer);
+        })
         .on('broadcast', { event: 'attack' }, ({ payload }) => {
           if (activeChannel !== channel) return;
           const action = normalizeRemote(
@@ -989,6 +1009,18 @@ export function createPresenceController(client, bridge = window.EnmaGameBridge)
             loot: cleanText(item.loot, 12),
             mobName: cleanText(item.mobName, 24) } }).catch(() => {});
         }
+      } else if (item.type === 'recruit') {
+        // 御用の同行者募集は同区域(ゾーンch)へ配信する
+        if (!channel || !subscribed || snapshot.zone !== channelZone) continue;
+        const partyId = cleanText(item.partyId, 64);
+        if (!VALID_UUID.test(partyId)) continue;
+        channel.send({ type: 'broadcast', event: 'recruit', payload: {
+          ...identityFor(snapshot),
+          partyId,
+          slots: Math.max(0, Math.min(3, Math.trunc(cleanNumber(item.slots, 0)))),
+          state: item.state === 'closed' ? 'closed' : 'open',
+          sentAt: Date.now(),
+        } }).catch(() => {});
       } else if (item.type === 'invite_reply' && VALID_INVITE_KIND.has(item.kind)) {
         if (!VALID_UUID.test(targetUserId)) continue;
         sendToInbox(targetUserId, 'invite_reply', {
