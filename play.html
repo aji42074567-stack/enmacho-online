@@ -402,8 +402,29 @@
      pointer判定がfineになる端末・ブラウザもあるため、ゲーム本体と同じ幅判定を併用する。 */
   /* 16pxはズーム防止に必須だが、余白を絞って入力欄(とカーソル)の背を低く保つ */
   @media (pointer:coarse),(max-width:700px){
-    /* inputへフォーカスする前に配置を確定し、予測変換中は祖先を一切動かさない */
-    :root.chatTyping #chatWrap{top:max(8px,env(safe-area-inset-top));bottom:auto}
+    /* LINE風入力モード: ゲーム画面は元の寸法で固定し、入力欄だけキーボード直上へ置く */
+    :root.chatTyping #stage{inset:auto;left:0;top:0;width:100%;
+      height:var(--chat-stage-height,100%)}
+    :root.chatTyping #chatWrap{top:auto;left:max(8px,env(safe-area-inset-left));
+      right:max(8px,env(safe-area-inset-right));width:auto;
+      bottom:calc(var(--chat-keyboard-inset,38vh) + 8px);
+      flex-direction:row;align-items:flex-end;gap:6px}
+    :root.chatTyping #chatBox{flex:1;min-width:0;width:auto;background:transparent;
+      border:0;border-radius:0;box-shadow:none;overflow:visible}
+    :root.chatTyping #chatTabs,:root.chatTyping #teamBar,
+    :root.chatTyping #chatLog,:root.chatTyping #chatNotice{display:none!important}
+    :root.chatTyping #chatInputRow{padding:5px;border:1px solid #6b5730;border-radius:22px;
+      background:rgba(16,13,9,.94);box-shadow:0 5px 18px rgba(0,0,0,.55);
+      -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+    :root.chatTyping #chatIn{min-height:40px;box-sizing:border-box;border-radius:18px;
+      background:rgba(8,7,5,.94);padding:7px 12px}
+    :root.chatTyping #chatSend{min-height:40px;border-radius:18px;padding:0 14px}
+    :root.chatTyping #chatToggle{width:44px;height:44px;flex:0 0 44px;border-radius:50%;
+      background:rgba(20,16,11,.94);box-shadow:0 5px 18px rgba(0,0,0,.5)}
+    :root.chatTyping #chatFloat{display:flex;position:absolute;left:50px;
+      bottom:calc(100% + 8px);max-width:min(330px,calc(100vw - 74px));max-height:150px;
+      overflow:hidden;align-items:flex-start}
+    :root.chatTyping #stage.chatOpen #log{bottom:150px}
     #chatIn{font-size:16px;padding:1px 8px}
     #chatInputRow{padding:4px 6px}
     #chatSend{padding:0 10px}
@@ -411,15 +432,11 @@
     #teamMembers{display:none}
     #teamBar{padding:3px 6px}
   }
-  /* 入力中(キーボード表示中)はチャット履歴を圧縮して入力欄を優先する */
-  :root.chatTyping #chatLog{height:56px}
-  :root.chatTyping #chatFloat{display:none}
   /* 横画面(縦が狭い)はチャット全体をさらにコンパクトに */
   @media (max-height:520px){
     #chatLog{height:64px}
     #chatWrap{bottom:max(60px,calc(env(safe-area-inset-bottom) + 54px))}
     #chatFloat{max-width:min(260px,40vw)}
-    :root.chatTyping #chatLog{height:0;padding:0;overflow:hidden}
   }
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
@@ -9184,6 +9201,12 @@ function spawnChatFloat(m){
   while(host.children.length>3)host.removeChild(host.firstChild);
   setTimeout(()=>d.remove(),8200);
 }
+function showRecentChatFloats(){
+  const host=$('chatFloat');
+  host.replaceChildren();
+  const visible=chat.history.filter(m=>m.channel===chat.tab&&m.channel!=='sys').slice(-3);
+  for(const m of visible)spawnChatFloat(m);
+}
 function setChatBubble(m){
   if(m.kind==='drop'||m.kind==='boss')return;  // 告知は頭上に出さない
   const fx={text:m.text,channel:m.channel,until:performance.now()+6500};
@@ -9201,6 +9224,9 @@ function addChatMessage(m){
       while(el.children.length>chatMessageDomLimit())el.removeChild(el.firstChild);
       el.scrollTop=el.scrollHeight;
     }
+    // 入力中は大きな履歴窓を畳んでいるため、新着だけ戦闘画面上の吹き出しへ流す。
+    if(document.documentElement.classList.contains('chatTyping')&&m.channel!=='sys')
+      spawnChatFloat(m);
   }else if(m.channel!=='sys'){
     chat.unread++;updateChatBadge();
     spawnChatFloat(m);
@@ -9213,11 +9239,12 @@ function updateChatInputState(){
     ||(t==='guild'&&!!guildState.id);
   $('chatIn').disabled=!canSend;
   $('chatSend').disabled=!canSend;
+  const enterHint=MOBILE_RENDER?'':' (Enter)';
   $('chatIn').placeholder=
-    t==='general'?(chat.online?'付近の魂へ話す (Enter)':socialState.online?'付近の回線をつなぎ直し中…':'話すには魂籍ログインが必要')
-    :t==='world'?(chat.worldOnline?'冥府全体へ話す (Enter)':'話すには魂籍ログインが必要')
-    :t==='team'?(party.id?(chat.teamOnline?'チームへ話す (Enter)':'チーム回線を接続中…'):'チーム未結成')
-    :t==='guild'?(guildState.id?(chat.guildOnline?`講【${guildState.name}】へ話す (Enter)`:'講の回線を接続中…'):'講に未加入')
+    t==='general'?(chat.online?`付近の魂へ話す${enterHint}`:socialState.online?'付近の回線をつなぎ直し中…':'話すには魂籍ログインが必要')
+    :t==='world'?(chat.worldOnline?`冥府全体へ話す${enterHint}`:'話すには魂籍ログインが必要')
+    :t==='team'?(party.id?(chat.teamOnline?`チームへ話す${enterHint}`:'チーム回線を接続中…'):'チーム未結成')
+    :t==='guild'?(guildState.id?(chat.guildOnline?`講【${guildState.name}】へ話す${enterHint}`:'講の回線を接続中…'):'講に未加入')
     :t==='log'?'戦闘・取得のログ(閲覧のみ)'
     :'フレンド一覧';
 }
@@ -9253,7 +9280,7 @@ function closeChat(){
   $('chatBox').hidden=true;
   $('stage').classList.remove('chatOpen');
   $('chatIn').blur();
-  document.documentElement.classList.remove('chatTyping');
+  endChatTyping();
   if(deferredResize)queueResize();
 }
 function sendChat(){
@@ -9317,16 +9344,59 @@ $('chatSend').addEventListener('pointerdown',ev=>{
 $('chatSend').addEventListener('click',sendChat);
 const chatInput=$('chatIn');
 let chatImeComposing=false,chatImeEndedAt=-Infinity;
-// iOSでは予測候補を選ぶ間にvisualViewportが細かく変わる。
-// pointerdown時点で入力用レイアウトへ切り替え、フォーカス後は位置も寸法も変えない。
+let chatKeyboardBaseHeight=0,chatKeyboardPinned=false,chatKeyboardPinTimer=0;
+const setChatKeyboardInset=px=>document.documentElement.style
+  .setProperty('--chat-keyboard-inset',`${Math.max(0,Math.round(px))}px`);
+function pinChatAboveKeyboard(){
+  if(chatKeyboardPinned||!document.documentElement.classList.contains('chatTyping'))return;
+  clearTimeout(chatKeyboardPinTimer);
+  chatKeyboardPinTimer=setTimeout(()=>{
+    if(chatKeyboardPinned||!document.documentElement.classList.contains('chatTyping'))return;
+    if(chatImeComposing)return;
+    const vv=window.visualViewport;
+    if(!vv)return;
+    const inset=Math.max(0,chatKeyboardBaseHeight-vv.height-vv.offsetTop);
+    if(inset<80)return;
+    setChatKeyboardInset(Math.min(inset,chatKeyboardBaseHeight*.72));
+    // 予測候補バーの出入りでは以後更新しない。入力欄の座標を安定させる。
+    chatKeyboardPinned=true;
+  },110);
+}
+// フォーカス前に入力欄をキーボード予定位置へ逃がすことで、Safariの自動画面スクロールを防ぐ。
 const beginChatTyping=()=>{
-  if(MOBILE_RENDER)document.documentElement.classList.add('chatTyping');
+  if(!MOBILE_RENDER||document.documentElement.classList.contains('chatTyping'))return;
+  const root=document.documentElement,stage=$('stage');
+  chatKeyboardBaseHeight=Math.max(1,stage.getBoundingClientRect().height||window.innerHeight);
+  root.style.setProperty('--chat-stage-height',`${Math.round(chatKeyboardBaseHeight)}px`);
+  const ratio=chatKeyboardBaseHeight<520?.58:.46;
+  setChatKeyboardInset(Math.min(390,chatKeyboardBaseHeight*ratio));
+  chatKeyboardPinned=false;
+  root.classList.add('chatTyping');
+  showRecentChatFloats();
+  pinChatAboveKeyboard();
 };
-chatInput.addEventListener('pointerdown',beginChatTyping,{passive:true});
+function endChatTyping(){
+  clearTimeout(chatKeyboardPinTimer);
+  chatKeyboardPinned=false;chatKeyboardBaseHeight=0;
+  const root=document.documentElement;
+  root.classList.remove('chatTyping');
+  root.style.removeProperty('--chat-keyboard-inset');
+  root.style.removeProperty('--chat-stage-height');
+}
+chatInput.addEventListener('pointerdown',()=>{
+  beginChatTyping();
+  // 配置変更でpointerup位置が外れても、同じユーザー操作内で確実にキーボードを開く。
+  if(document.activeElement!==chatInput){
+    try{chatInput.focus({preventScroll:true});}catch{chatInput.focus();}
+  }
+},{passive:true});
 chatInput.addEventListener('focus',beginChatTyping);
+window.visualViewport?.addEventListener('resize',pinChatAboveKeyboard,{passive:true});
+window.visualViewport?.addEventListener('scroll',pinChatAboveKeyboard,{passive:true});
 chatInput.addEventListener('compositionstart',()=>{chatImeComposing=true;});
 chatInput.addEventListener('compositionend',()=>{
   chatImeComposing=false;chatImeEndedAt=performance.now();
+  pinChatAboveKeyboard();
 });
 chatInput.addEventListener('keydown',ev=>{
   ev.stopPropagation();  // 入力中にE/R/F等のスキルが暴発しないように
