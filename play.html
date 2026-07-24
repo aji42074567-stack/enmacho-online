@@ -127,6 +127,11 @@
     border:1px solid #8a763b;border-radius:8px;padding:12px 13px;
     box-shadow:0 10px 30px rgba(0,0,0,.6);font-family:var(--sans);animation:chatIn .2s ease-out}
   #goyoPanel[hidden]{display:none}
+  #goyoPanel .goyo-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:9px}
+  #goyoPanel .goyo-tabs button{padding:7px 4px;border:1px solid var(--panel-edge);border-radius:4px;
+    background:#141009;color:var(--dim);font:11px/1.2 var(--serif);cursor:pointer}
+  #goyoPanel .goyo-tabs button[aria-selected="true"]{border-color:#8a763b;
+    background:linear-gradient(180deg,#463c23,#2b2416);color:#f8e9c8}
   #goyoPanel h3{margin:0 0 6px;font:13px/1.5 var(--serif);color:#e8c46e;letter-spacing:.06em}
   #goyoPanel p{margin:0 0 6px;font-size:11px;line-height:1.7;color:#e6dcc4}
   #goyoPanel .gp-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px}
@@ -476,7 +481,7 @@
     max-height:90dvh;overflow:auto;padding:26px 30px 20px;color:#302317;text-align:center;
     background:
       linear-gradient(rgba(216,201,168,.08),rgba(92,67,29,.09)),
-      url(assets/attendance_washi.png?v=20260724d) center/cover;
+      url(assets/attendance_washi.png?v=20260724e) center/cover;
     border:1px solid #8a7141;border-radius:4px;
     box-shadow:0 22px 72px rgba(0,0,0,.78),inset 0 0 30px rgba(76,51,20,.18)}
   .attendance-book::before{content:"";position:absolute;inset:8px;border:1px solid rgba(74,51,24,.38);
@@ -486,10 +491,13 @@
     letter-spacing:.28em;color:#352416;text-shadow:0 1px rgba(255,255,255,.3)}
   .attendance-sub{margin:0 0 18px;font:10px/1.5 var(--sans);letter-spacing:.2em;color:#725d3b}
   .attendance-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-  .attendance-cell{position:relative;min-width:0;aspect-ratio:.82;overflow:hidden;
+  .attendance-cell{position:relative;min-width:0;aspect-ratio:.82;overflow:hidden;padding:0;
     display:flex;align-items:center;justify-content:center;border:1px solid rgba(74,49,22,.55);
-    background:rgba(244,230,194,.16);box-shadow:inset 0 0 10px rgba(65,40,15,.08)}
+    background:rgba(244,230,194,.16);box-shadow:inset 0 0 10px rgba(65,40,15,.08);
+    color:inherit;font:inherit;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;appearance:none}
+  .attendance-cell:focus-visible{outline:2px solid #8d2d23;outline-offset:-3px}
   .attendance-cell.today{border-color:#8d2d23;box-shadow:inset 0 0 12px rgba(160,48,32,.13)}
+  .attendance-cell.selected{background:rgba(244,230,194,.3);box-shadow:inset 0 0 14px rgba(65,40,15,.16)}
   .attendance-cell.day-seven{border-color:rgba(123,88,28,.72)}
   .attendance-day{position:absolute;left:0;right:0;top:5px;z-index:4;
     font:700 clamp(8px,1.5vw,10px)/1 var(--serif);letter-spacing:.06em;color:#5d492d}
@@ -504,6 +512,7 @@
     display:flex;align-items:center;justify-content:center;pointer-events:none}
   .attendance-stamp{display:block;width:90%;max-width:88px;height:auto;pointer-events:none}
   .attendance-cell.today .attendance-stamp{opacity:0}
+  .attendance-cell.today .attendance-stamp.settled{opacity:1}
   .attendance-cell.today .attendance-stamp.landing{
     animation:attendanceStampLand .25s cubic-bezier(.18,.82,.26,1) both}
   .attendance-book.impact{animation:attendanceBookImpact .12s linear both}
@@ -526,6 +535,8 @@
   .attendance-reward-item img{display:block;width:54px;height:54px;object-fit:contain;flex:0 0 auto}
   .attendance-reward-item strong{font:700 clamp(12px,2vw,15px)/1.7 var(--serif);
     letter-spacing:.06em;color:#382719}
+  .attendance-reward-detail{max-width:620px;margin:6px auto 0;font:10.5px/1.7 var(--sans);
+    color:#5c452b;letter-spacing:.02em}
   .attendance-hint{margin:11px 0 0;font:9px/1 var(--sans);letter-spacing:.16em;color:#715d40}
   @media(max-width:700px){
     .onsho-overlay{padding:8px}
@@ -1203,11 +1214,15 @@
     <span id="onlineCount" hidden aria-hidden="true">1</span>
   </button>
   <button id="mapBtn" title="全体地図 (M)" aria-label="全体地図を開く">地図</button>
-  <button id="goyoHud" type="button" hidden title="今日の御用"
-    aria-label="今日の御用を開く"><span>御用</span><span class="gh-state"
+  <button id="goyoHud" type="button" hidden title="御用"
+    aria-label="御用を開く"><span>御用</span><span class="gh-state"
     id="goyoHudState">!</span><span class="gh-badge" id="goyoHudBadge"
     hidden>0</span></button>
-  <div id="goyoPanel" hidden role="dialog" aria-label="今日の御用">
+  <div id="goyoPanel" hidden role="dialog" aria-label="御用">
+    <div class="goyo-tabs" role="tablist" aria-label="御用の項目">
+      <button id="goyoQuestTab" type="button" role="tab" aria-selected="true">今日の御用</button>
+      <button id="goyoDailyTab" type="button" role="tab" aria-selected="false">デイリー</button>
+    </div>
     <h3 id="goyoPanelTitle"></h3>
     <p id="goyoPanelText"></p>
     <p id="goyoPanelReward"></p>
@@ -1424,8 +1439,9 @@
       <p class="attendance-sub">閻魔庁　七日巡回の印</p>
       <div class="attendance-grid" id="onshoGrid" aria-label="7日分の勤怠印"></div>
       <div class="attendance-reward">
-        <span>本日の品</span>
+        <span id="onshoRewardHeading">本日の品</span>
         <div class="attendance-reward-items" id="onshoReward"></div>
+        <p class="attendance-reward-detail" id="onshoRewardDetail"></p>
       </div>
       <p class="attendance-hint">画面をタップして閉じる</p>
     </div>
@@ -8182,7 +8198,7 @@ const openRecruitCount=()=>{
   return n;
 };
 /* ---- 御用窓口(画面右・地図ボタンの下の「御用」ボタン+3段パネル) ---- */
-let goyoHudKey='';
+let goyoHudKey='',goyoPanelTab='quest';
 function updateGoyoHud(){
   const st=goyoState();
   const state=!st.accepted?'!':st.claimed?'済':st.prog>=GOYO_N?'受取':`${st.prog}/${GOYO_N}`;
@@ -8202,10 +8218,9 @@ function updateGoyoHud(){
 }
 function renderGoyoPanel(){
   const gst=goyoState(),g=goyoToday(),rw=goyoReward();
-  $('goyoPanelTitle').textContent=`今日の御用: ${g.title}`;
-  $('goyoPanelText').textContent=g.text;
-  $('goyoPanelReward').textContent=
-    `ほうび: ${rw.gold}モン + ${rw.xp}徳 + 功徳札2(チームでクリアすると1.3倍)`;
+  const daily=goyoPanelTab==='daily';
+  $('goyoQuestTab').setAttribute('aria-selected',String(!daily));
+  $('goyoDailyTab').setAttribute('aria-selected',String(daily));
   const host=$('goyoPanelActions');
   host.textContent='';
   const mk=(label,fn)=>{
@@ -8221,6 +8236,23 @@ function renderGoyoPanel(){
     d.textContent=t;
     host.appendChild(d);
   };
+  if(daily){
+    const claimed=player.onsho?.date===jstDateKey(),cycle=player.onsho?.cycle||1;
+    $('goyoPanelTitle').textContent='デイリー: 入庁恩賞';
+    $('goyoPanelText').textContent='七日巡回の勤怠帳。各日の品と使い道をいつでも確認できる。';
+    $('goyoPanelReward').textContent=claimed
+      ?`本日は受取済み(${cycle}日目)`:'本日分は次の入庁時に自動で受け取る';
+    mk('勤怠帳を見る',()=>{
+      $('goyoPanel').hidden=true;
+      openOnshoArchive();
+    });
+    note('勤怠帳の品をタップすると詳しい説明が見られる');
+    return;
+  }
+  $('goyoPanelTitle').textContent=`今日の御用: ${g.title}`;
+  $('goyoPanelText').textContent=g.text;
+  $('goyoPanelReward').textContent=
+    `ほうび: ${rw.gold}モン + ${rw.xp}徳 + 功徳札2(チームでクリアすると1.3倍)`;
   // 上段: 今日の進みぐあいと受注・報酬
   if(gst.claimed)note('今日は達成ずみ。また明日！');
   else if(!gst.accepted)mk('受ける',goyoAccept);
@@ -8272,6 +8304,8 @@ function renderGoyoPanel(){
     else mk('なかまを募集する',startRecruit);
   }
 }
+$('goyoQuestTab').addEventListener('click',()=>{goyoPanelTab='quest';renderGoyoPanel();sfx.click();});
+$('goyoDailyTab').addEventListener('click',()=>{goyoPanelTab='daily';renderGoyoPanel();sfx.click();});
 $('goyoHud').addEventListener('click',()=>{
   const p=$('goyoPanel');
   p.hidden=!p.hidden;
@@ -8338,7 +8372,7 @@ function onshoGrant(cycle){
   }
   return lines;
 }
-const ONSHO_ASSET_VERSION='20260724d';
+const ONSHO_ASSET_VERSION='20260724e';
 const ONSHO_REWARD_ICONS={
   1:'potion_kanro.png',2:'kudoku_fuda.png',3:'scroll_fragment.png',4:'potion_idaten_spirit.png',
   5:'kudoku_fuda.png',6:'scroll_fragment.png',7:'dragon_blood.png'
@@ -8347,6 +8381,36 @@ const ONSHO_REWARD_LABELS={
   1:'甘露水×3',2:'功徳札+2',3:'かけら×2',4:'霊水×1',
   5:'功徳札+3',6:'かけら×3',7:'竜の血×1'
 };
+const ONSHO_REWARD_NAMES={
+  1:'甘露水×3',2:'功徳札+2',3:'巻物のかけら×2',4:'韋駄天の霊水×1',
+  5:'功徳札+3',6:'巻物のかけら×3',7:'竜の血×1'
+};
+const ONSHO_REWARD_DETAILS={
+  1:'傷を癒す水薬。徳位に合う大きさの甘露水を3本受け取る。',
+  2:'閻魔庁の交換所で、巻物のかけらなどと交換できる木札。',
+  3:'10個集めると、交換所で武器または防具の強化巻物1枚に束ねられる。',
+  4:'恩賞限定の非売品。使うと60分間、移動が速くなる。所持上限は5本。',
+  5:'閻魔庁の交換所で、巻物のかけらなどと交換できる木札。',
+  6:'10個集めると、交換所で武器または防具の強化巻物1枚に束ねられる。',
+  7:'鍛冶屋カナヤマの「移し打ち」で装備の強化値を移す素材。1回に3個使い、竜の間でも入手できる。'
+};
+function renderOnshoReward(day,names=[ONSHO_REWARD_NAMES[day]],heading=`${day}日目の品`){
+  $('onshoRewardHeading').textContent=heading;
+  const rewardEl=$('onshoReward');
+  rewardEl.replaceChildren(...names.map(name=>{
+    const item=document.createElement('span');
+    item.className='attendance-reward-item';
+    const icon=document.createElement('img');
+    icon.src=`assets/items/${name.startsWith('功徳札')?'kudoku_fuda.png':ONSHO_REWARD_ICONS[day]}?v=${ONSHO_ASSET_VERSION}`;
+    icon.alt='';icon.draggable=false;
+    const label=document.createElement('strong');
+    label.textContent=name;
+    item.append(icon,label);
+    return item;
+  }));
+  $('onshoRewardDetail').textContent=ONSHO_REWARD_DETAILS[day]
+    +(names.some(name=>name.includes('持ちきれない'))?' 所持上限を超えた分は功徳札へ自動で換えた。':'');
+}
 function closeOnshoPanel(){
   const panel=$('onshoPanel');
   if(panel.classList.contains('hidden'))return;
@@ -8354,37 +8418,40 @@ function closeOnshoPanel(){
   panel.querySelector('.attendance-book').classList.remove('impact');
   sfx.click();
 }
-function showOnshoPanel(cycle,rewards){
+function showOnshoPanel(cycle,rewards,{animate=true,stampedThrough=cycle}={}){
   const panel=$('onshoPanel'),grid=$('onshoGrid');
   grid.innerHTML=Array.from({length:7},(_,i)=>{
-    const day=i+1,stamped=day<=cycle,today=day===cycle;
+    const day=i+1,stamped=day<=stampedThrough,today=day===cycle;
     const stamp=stamped
       ?`<span class="attendance-stamp-wrap"><img class="attendance-stamp"
           src="assets/stamp_${day===7?'man':'kin'}.png?v=${ONSHO_ASSET_VERSION}"
           alt="${today?(day===7?'本日の満了印':'本日の勤怠印'):''}" draggable="false"></span>`
       :'';
-    return `<div class="attendance-cell${today?' today':''}${stamped?' stamped':' future'}${day===7?' day-seven':''}"
-        aria-label="${day}日目 ${ONSHO_REWARD_LABELS[day]} ${stamped?'受取済み':'未受取'}">
+    return `<button class="attendance-cell${today?' today selected':''}${stamped?' stamped':' future'}${day===7?' day-seven':''}"
+        type="button" data-onsho-day="${day}" aria-pressed="${today}"
+        aria-label="${day}日目 ${ONSHO_REWARD_NAMES[day]} ${stamped?'受取済み':'未受取'}。詳しく見る">
       <span class="attendance-day">${day}日目</span>
       <img class="attendance-item-icon" src="assets/items/${ONSHO_REWARD_ICONS[day]}?v=${ONSHO_ASSET_VERSION}"
         alt="" draggable="false">
-      <span class="attendance-cell-reward">${ONSHO_REWARD_LABELS[day]}</span>${stamp}</div>`;
+      <span class="attendance-cell-reward">${ONSHO_REWARD_LABELS[day]}</span>${stamp}</button>`;
   }).join('');
-  const rewardEl=$('onshoReward');
-  rewardEl.replaceChildren(...rewards.map(name=>{
-    const item=document.createElement('span');
-    item.className='attendance-reward-item';
-    const icon=document.createElement('img');
-    icon.src=`assets/items/${name.startsWith('功徳札')?'kudoku_fuda.png':ONSHO_REWARD_ICONS[cycle]}?v=${ONSHO_ASSET_VERSION}`;
-    icon.alt='';icon.draggable=false;
-    const label=document.createElement('strong');
-    label.textContent=name;
-    item.append(icon,label);
-    return item;
-  }));
+  renderOnshoReward(cycle,rewards,'本日の品');
+  for(const cell of grid.querySelectorAll('[data-onsho-day]')){
+    cell.addEventListener('click',ev=>{
+      ev.stopPropagation();
+      const day=Number(cell.dataset.onshoDay);
+      for(const other of grid.querySelectorAll('[data-onsho-day]')){
+        const selected=other===cell;
+        other.classList.toggle('selected',selected);
+        other.setAttribute('aria-pressed',String(selected));
+      }
+      renderOnshoReward(day);
+      sfx.click();
+    });
+  }
   panel.classList.remove('hidden');
   const landing=grid.querySelector('.attendance-cell.today .attendance-stamp');
-  if(landing){
+  if(landing&&animate){
     void landing.offsetWidth;
     landing.classList.add('landing');
     landing.addEventListener('animationend',()=>{
@@ -8397,11 +8464,18 @@ function showOnshoPanel(cycle,rewards){
       addShake(2.4,.12);
       sfx.stamp();
     },{once:true});
-  }
+  }else if(landing)landing.classList.add('settled');
   panel.focus({preventScroll:true});
+}
+function openOnshoArchive(){
+  const cycle=player.onsho?.cycle||1;
+  showOnshoPanel(cycle,[ONSHO_REWARD_NAMES[cycle]],{
+    animate:false,stampedThrough:player.onsho?cycle:0
+  });
 }
 $('onshoPanel').addEventListener('click',closeOnshoPanel);
 $('onshoPanel').addEventListener('keydown',ev=>{
+  if((ev.key==='Enter'||ev.key===' ')&&ev.target.closest?.('[data-onsho-day]'))return;
   if(ev.key!=='Escape'&&ev.key!=='Enter'&&ev.key!==' ')return;
   ev.preventDefault();ev.stopPropagation();closeOnshoPanel();
 });
