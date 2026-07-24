@@ -218,8 +218,8 @@
     border:1px solid rgba(232,199,106,.55);pointer-events:none}
 
   /* ---- chat (bottom-left) ---- */
-  #chatWrap{--chat-kb-lift:0px;position:absolute;left:12px;
-    bottom:calc(14px + var(--chat-kb-lift));z-index:6;display:flex;
+  #chatWrap{position:absolute;left:12px;
+    bottom:14px;z-index:6;display:flex;
     flex-direction:column;align-items:flex-start;gap:8px;font-family:var(--sans);
     touch-action:manipulation}
   #stage.chatOpen #log{bottom:300px}
@@ -402,6 +402,8 @@
      pointer判定がfineになる端末・ブラウザもあるため、ゲーム本体と同じ幅判定を併用する。 */
   /* 16pxはズーム防止に必須だが、余白を絞って入力欄(とカーソル)の背を低く保つ */
   @media (pointer:coarse),(max-width:700px){
+    /* inputへフォーカスする前に配置を確定し、予測変換中は祖先を一切動かさない */
+    :root.chatTyping #chatWrap{top:max(8px,env(safe-area-inset-top));bottom:auto}
     #chatIn{font-size:16px;padding:1px 8px}
     #chatInputRow{padding:4px 6px}
     #chatSend{padding:0 10px}
@@ -410,14 +412,14 @@
     #teamBar{padding:3px 6px}
   }
   /* 入力中(キーボード表示中)はチャット履歴を圧縮して入力欄を優先する */
-  :root.kbOpen #chatLog{height:56px}
-  :root.kbOpen #chatFloat{display:none}
+  :root.chatTyping #chatLog{height:56px}
+  :root.chatTyping #chatFloat{display:none}
   /* 横画面(縦が狭い)はチャット全体をさらにコンパクトに */
   @media (max-height:520px){
     #chatLog{height:64px}
-    #chatWrap{bottom:calc(max(60px,calc(env(safe-area-inset-bottom) + 54px)) + var(--chat-kb-lift))}
+    #chatWrap{bottom:max(60px,calc(env(safe-area-inset-bottom) + 54px))}
     #chatFloat{max-width:min(260px,40vw)}
-    :root.kbOpen #chatLog{height:0;padding:0;overflow:hidden}
+    :root.chatTyping #chatLog{height:0;padding:0;overflow:hidden}
   }
   #chatSend{background:linear-gradient(180deg,#3d3220,#241c11);border:1px solid var(--panel-edge);
     border-radius:3px;color:var(--gold);font-family:var(--serif);font-size:11.5px;
@@ -425,7 +427,7 @@
   #chatSend:hover{border-color:#6b5730}
   #chatSend:disabled{opacity:.45;cursor:default}
   @media (max-width:860px){
-    #chatWrap{bottom:calc(96px + var(--chat-kb-lift))}
+    #chatWrap{bottom:96px}
   }
 
   /* ---- bottom bar ---- */
@@ -1131,7 +1133,7 @@
     #plate .lv{margin-left:0}
     #log{bottom:150px;font-size:10.5px}
     /* スマホは💬ボタンの右に窓を並べ、縦幅も詰める(画面を塞がない) */
-    #chatWrap{bottom:calc(max(96px,calc(env(safe-area-inset-bottom) + 90px)) + var(--chat-kb-lift));
+    #chatWrap{bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px));
       flex-direction:row;align-items:flex-end;gap:6px}
     #chatToggle{order:0;flex:0 0 auto}
     #chatBox{order:1;width:min(300px,calc(100vw - 78px))}
@@ -1837,6 +1839,11 @@ const textInputFocused=()=>{
 function resize(force=false){
   // スマホは高DPI Canvasの塗りつぶし量が大きいため、見た目を保てる1.5倍で抑える。
   const nextMobile=window.matchMedia('(max-width:700px), (pointer:coarse)').matches;
+  // ホーム画面版iOSは予測候補の選択中にもresize/focusoutを通知することがある。
+  // チャット入力モード中はCanvasを含むレイアウトを完全に固定し、閉じた後に一度だけ反映する。
+  if(nextMobile&&document.documentElement.classList.contains('chatTyping')){
+    deferredResize=true;return;
+  }
   // ソフトウェアキーボードの開閉中はresize通知が連続する。Canvas再確保は入力終了後に1回だけ行う。
   if(!force&&nextMobile&&textInputFocused()){deferredResize=true;return;}
   const nextDpr=Math.min(nextMobile?1.5:2,window.devicePixelRatio||1);
@@ -9246,6 +9253,8 @@ function closeChat(){
   $('chatBox').hidden=true;
   $('stage').classList.remove('chatOpen');
   $('chatIn').blur();
+  document.documentElement.classList.remove('chatTyping');
+  if(deferredResize)queueResize();
 }
 function sendChat(){
   const input=$('chatIn');
@@ -9308,11 +9317,16 @@ $('chatSend').addEventListener('pointerdown',ev=>{
 $('chatSend').addEventListener('click',sendChat);
 const chatInput=$('chatIn');
 let chatImeComposing=false,chatImeEndedAt=-Infinity;
-let queueChatKeyboardAdjust=()=>{};
+// iOSでは予測候補を選ぶ間にvisualViewportが細かく変わる。
+// pointerdown時点で入力用レイアウトへ切り替え、フォーカス後は位置も寸法も変えない。
+const beginChatTyping=()=>{
+  if(MOBILE_RENDER)document.documentElement.classList.add('chatTyping');
+};
+chatInput.addEventListener('pointerdown',beginChatTyping,{passive:true});
+chatInput.addEventListener('focus',beginChatTyping);
 chatInput.addEventListener('compositionstart',()=>{chatImeComposing=true;});
 chatInput.addEventListener('compositionend',()=>{
   chatImeComposing=false;chatImeEndedAt=performance.now();
-  setTimeout(queueChatKeyboardAdjust,0);
 });
 chatInput.addEventListener('keydown',ev=>{
   ev.stopPropagation();  // 入力中にE/R/F等のスキルが暴発しないように
@@ -11069,51 +11083,6 @@ function howtoItemsHtml(){
           <li>転職すると汎用の印は消え、<b>E</b>が職の看板スキルになる</li>`;
 }
 $('howtoList').innerHTML=howtoItemsHtml();
-// スマホのキーボード表示で画面全体が上へずれるのを防ぐ:
-// ゲーム画面は固定のまま、縮んだ分だけチャット窓を持ち上げる(狩りの状況を見ながら打てる)。
-// iOS WebKitはフォーカス中のinputの祖先をtransformで動かすと、予測変換バーの出入りを契機に
-// 文字・キャレットの描画だけ止まることがある。transformは使わずbottomのCSS変数で移動する。
-if(window.visualViewport){
-  const vv=window.visualViewport;
-  let keyboardLift=0,keyboardAdjustFrame=0;
-  const adjustForKeyboard=()=>{
-    keyboardAdjustFrame=0;
-    const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
-    const open=document.activeElement===$('chatIn')&&kb>40;
-    // 入力中はチャット履歴を自動で圧縮(kbOpenクラス)。横画面でも入力欄が収まる
-    document.documentElement.classList.toggle('kbOpen',open);
-    // 予測候補を選んでいる最中は入力欄の位置を変えず、iOSの候補確定を中断させない。
-    if(open&&chatImeComposing&&keyboardLift>0)return;
-    const wrap=document.getElementById('chatWrap');
-    if(wrap){
-      let nextLift=0;
-      if(open){
-        // 入力欄がキーボードの真上に来る分だけ持ち上げる(上端は突き抜けない)
-        const r=wrap.getBoundingClientRect();
-        // 現在のbottom補正を戻した基準位置から、必要量を毎回計算する。
-        const baseBottom=r.bottom+keyboardLift,baseTop=r.top+keyboardLift;
-        const need=Math.max(0,baseBottom-(vv.height+vv.offsetTop-8));
-        nextLift=Math.round(Math.min(need,Math.max(0,baseTop-8)));
-      }
-      if(nextLift!==keyboardLift){
-        keyboardLift=nextLift;
-        wrap.style.setProperty('--chat-kb-lift',`${keyboardLift}px`);
-      }
-    }
-  };
-  const queueKeyboardAdjust=()=>{
-    if(keyboardAdjustFrame)return;
-    keyboardAdjustFrame=requestAnimationFrame(adjustForKeyboard);
-  };
-  queueChatKeyboardAdjust=queueKeyboardAdjust;
-  vv.addEventListener('resize',queueKeyboardAdjust,{passive:true});
-  vv.addEventListener('scroll',queueKeyboardAdjust,{passive:true});
-  document.addEventListener('focusin',ev=>{
-    if(ev.target===$('chatIn'))setTimeout(queueKeyboardAdjust,0);
-  });
-  // キーボードが閉じた通知が来ない端末があるため、フォーカスが外れたら必ず戻す
-  document.addEventListener('focusout',()=>setTimeout(queueKeyboardAdjust,120));
-}
 if(hasSaveData){
   $('startBtn').textContent=`再入庁する (徳位${player.lv})`;
   $('resetBtn').classList.remove('hidden');
