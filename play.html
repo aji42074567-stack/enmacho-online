@@ -2497,7 +2497,7 @@ const player={
   smithIntro:false,drakeKilledAt:0,         // 鍛冶屋の初回説明/竜を倒した出現枠
   fuda:0,kakera:0,                          // 功徳札/巻物のかけら(交換所で10個=巻物1枚)
   onsho:null,                               // 入庁恩賞「勤怠印」{date:JST日付,cycle:1..7}
-  fudaShop:null,                            // 交換所の月間実績 {month:'YYYY-MM',kakera:購入数}
+  fudaShop:null,                            // 旧・交換所の月間実績(月30個上限は2026-07-25撤廃。互換のため保持)
   goyo:null,                                // 今日の御用 {date,accepted,prog,claimed}
   cd:{bolt:0,heal:0,fire:0,potion:0},       // 印と回復薬のクールタイム(秒)
   target:null,talkTarget:null,gateTarget:null,atkCd:0,repath:0,swing:0,swingMax:0.25,swingKind:'melee',
@@ -8242,37 +8242,34 @@ $('goyoHud').addEventListener('click',()=>{
 });
 $('goyoPanelClose').addEventListener('click',()=>{$('goyoPanel').hidden=true;sfx.click();});
 /* ---- 交換所(功徳札の窓口。最小構成=かけら購入+束ね。chapter-gear-design §6) ---- */
-function kokanMonthState(){
-  const month=jstDateKey().slice(0,7);
-  if(player.fudaShop?.month!==month)player.fudaShop={month,kakera:0};
-  return player.fudaShop;
-}
 function renderKokan(){
-  const st=kokanMonthState();
+  // 月30個の上限は撤廃(2026-07-25、chapter-gear-design §6。価格=札2枚がブレーキ)
   const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
-  const kakeraLeft=Math.max(0,30-st.kakera);
+  const canKakera=Math.floor(player.fuda/2);   // いま何個換えられるか
+  const bundleLack=Math.max(0,10-player.kakera);
   let html=`<div class="itemrow"><span class="nm">功徳札 ×${player.fuda}　／　巻物のかけら ×${player.kakera}</span></div>`;
   html+=sec('功徳札と交換');
   html+=`<div class="itemrow"><span class="icn ferryman-coin-icon" aria-hidden="true">片</span>
-    <span class="nm">巻物のかけら 1個 <span class="fx">札2枚・今月あと${kakeraLeft}個</span></span>
-    <button class="buyb" data-kokan="kakera" ${player.fuda<2||kakeraLeft<1?'disabled':''}>換える</button></div>`;
+    <span class="nm">巻物のかけら 1個 <span class="fx">札2枚 → かけら1個${canKakera?`・いま${canKakera}個換えられる`:''}</span></span>
+    <button class="buyb" data-kokan="kakera" ${canKakera<1?'disabled':''}>${canKakera?`換える(${canKakera}個分)`:`札 ${player.fuda}/2`}</button></div>`;
   html+=sec('かけらを束ねる(10個で巻物1枚)');
-  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_weapon.png" alt="">
-    <span class="nm">武器強化の巻物 1枚 <span class="fx">かけら10個</span></span>
-    <button class="buyb" data-kokan="wscroll" ${player.kakera<10?'disabled':''}>束ねる</button></div>`;
-  html+=`<div class="itemrow"><img class="icn" src="assets/items/scroll_armor.png" alt="">
-    <span class="nm">防具強化の巻物 1枚 <span class="fx">かけら10個</span></span>
-    <button class="buyb" data-kokan="ascroll" ${player.kakera<10?'disabled':''}>束ねる</button></div>`;
-  html+=`<div class="sub">かけらへの交換は月30個まで(月が替わると回復)。月替わりの見た目装備は仕度中</div>`;
+  for(const [key,img,name] of [
+    ['wscroll','scroll_weapon','武器強化の巻物'],
+    ['ascroll','scroll_armor','防具強化の巻物'],
+  ]){
+    html+=`<div class="itemrow"><img class="icn" src="assets/items/${img}.png" alt="">
+      <span class="nm">${name} 1枚 <span class="fx">かけら ${player.kakera}/10${bundleLack?`(あと${bundleLack}個)`:'・束ねられる！'}</span></span>
+      <button class="buyb" data-kokan="${key}" ${bundleLack?'disabled':''}>${bundleLack?`あと${bundleLack}個`:'束ねる'}</button></div>`;
+  }
+  html+=`<div class="sub">月替わりの見た目装備は仕度中</div>`;
   $('kokanList').innerHTML=html;
   for(const b of $('kokanList').querySelectorAll('[data-kokan]'))
     b.addEventListener('click',()=>kokanExchange(b.getAttribute('data-kokan')));
 }
 function kokanExchange(item){
-  const st=kokanMonthState();
   if(item==='kakera'){
-    if(player.fuda<2||st.kakera>=30)return;
-    player.fuda-=2;player.kakera++;st.kakera++;
+    if(player.fuda<2)return;
+    player.fuda-=2;player.kakera++;
     log('功徳札2枚を巻物のかけら1個と換えた','gain');
   }else if(item==='wscroll'||item==='ascroll'){
     if(player.kakera<10)return;
