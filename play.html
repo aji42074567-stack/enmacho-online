@@ -417,6 +417,61 @@
   /* ---- overlays / panels ---- */
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(5,6,9,.82);z-index:10}
+  /* ---- 入庁恩賞・勤怠帳 ---- */
+  .onsho-overlay{z-index:18;box-sizing:border-box;padding:16px;cursor:pointer;
+    touch-action:manipulation;user-select:none;-webkit-user-select:none}
+  .attendance-book{position:relative;width:min(780px,calc(100vw - 32px));box-sizing:border-box;
+    max-height:90dvh;overflow:auto;padding:26px 30px 20px;color:#302317;text-align:center;
+    background:
+      linear-gradient(rgba(216,201,168,.08),rgba(92,67,29,.09)),
+      url(assets/attendance_washi.png?v=20260724b) center/cover;
+    border:1px solid #8a7141;border-radius:4px;
+    box-shadow:0 22px 72px rgba(0,0,0,.78),inset 0 0 30px rgba(76,51,20,.18)}
+  .attendance-book::before{content:"";position:absolute;inset:8px;border:1px solid rgba(74,51,24,.38);
+    pointer-events:none}
+  .attendance-kicker{font:700 9px/1 var(--sans);letter-spacing:.36em;color:#785625}
+  .attendance-book h2{margin:7px 0 4px;font:700 clamp(22px,4vw,30px)/1.2 var(--serif);
+    letter-spacing:.28em;color:#352416;text-shadow:0 1px rgba(255,255,255,.3)}
+  .attendance-sub{margin:0 0 18px;font:10px/1.5 var(--sans);letter-spacing:.2em;color:#725d3b}
+  .attendance-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+  .attendance-cell{position:relative;min-width:0;aspect-ratio:.82;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;border:1px solid rgba(74,49,22,.55);
+    background:rgba(244,230,194,.16);box-shadow:inset 0 0 10px rgba(65,40,15,.08)}
+  .attendance-cell.today{border-color:#8d2d23;box-shadow:inset 0 0 12px rgba(160,48,32,.13)}
+  .attendance-cell.day-seven{border-color:rgba(123,88,28,.72)}
+  .attendance-day{position:absolute;left:0;right:0;top:5px;z-index:2;
+    font:700 clamp(8px,1.5vw,10px)/1 var(--serif);letter-spacing:.06em;color:#5d492d}
+  .attendance-empty{font:18px/1 var(--serif);color:rgba(82,59,31,.26)}
+  .attendance-stamp{display:block;width:94%;max-width:96px;height:auto;pointer-events:none}
+  .attendance-cell.today .attendance-stamp{opacity:0}
+  .attendance-cell.today .attendance-stamp.landing{
+    animation:attendanceStampLand .25s cubic-bezier(.18,.82,.26,1) both}
+  .attendance-book.impact{animation:attendanceBookImpact .12s linear both}
+  @keyframes attendanceStampLand{
+    from{opacity:.38;transform:scale(1.6)}
+    to{opacity:1;transform:scale(1)}
+  }
+  @keyframes attendanceBookImpact{
+    0%,100%{transform:translate(0)}
+    25%{transform:translate(-2px,1px)}
+    50%{transform:translate(2px,-1px)}
+    75%{transform:translate(-1px,-1px)}
+  }
+  .attendance-reward{margin:17px 2px 0;padding:12px 10px 10px;
+    border-top:1px solid rgba(79,53,24,.48);border-bottom:1px solid rgba(79,53,24,.25)}
+  .attendance-reward span{display:block;margin-bottom:5px;font:700 9px/1 var(--sans);
+    letter-spacing:.28em;color:#8b3126}
+  .attendance-reward strong{font:700 clamp(12px,2vw,15px)/1.7 var(--serif);
+    letter-spacing:.06em;color:#382719}
+  .attendance-hint{margin:11px 0 0;font:9px/1 var(--sans);letter-spacing:.16em;color:#715d40}
+  @media(max-width:700px){
+    .onsho-overlay{padding:8px}
+    .attendance-book{width:calc(100vw - 16px);padding:21px 12px 16px}
+    .attendance-sub{margin-bottom:13px}
+    .attendance-grid{gap:3px}
+    .attendance-day{top:4px;font-size:7.5px}
+    .attendance-reward{margin-top:13px;padding:9px 5px 8px}
+  }
   /* ---- 全体地図 ---- */
   .world-map-sheet{position:relative;width:min(920px,calc(100vw - 36px));
     max-height:calc(100dvh - 36px);box-sizing:border-box;padding:22px 24px 18px;
@@ -1257,6 +1312,21 @@
     </div>
     <img class="boss-cutin-art" id="bossCutinArt" alt="" aria-hidden="true">
     <button class="boss-cutin-skip" id="bossCutinSkip" type="button">進む ›</button>
+  </section>
+
+  <section class="overlay onsho-overlay hidden" id="onshoPanel" role="dialog" aria-modal="true"
+    aria-labelledby="onshoTitle" aria-describedby="onshoReward" tabindex="0">
+    <div class="attendance-book">
+      <div class="attendance-kicker">入庁恩賞</div>
+      <h2 id="onshoTitle">勤怠帳</h2>
+      <p class="attendance-sub">閻魔庁　七日巡回の印</p>
+      <div class="attendance-grid" id="onshoGrid" aria-label="7日分の勤怠印"></div>
+      <div class="attendance-reward">
+        <span>本日の品</span>
+        <strong id="onshoReward"></strong>
+      </div>
+      <p class="attendance-hint">画面をタップして閉じる</p>
+    </div>
   </section>
 
   <div class="overlay hidden" id="death">
@@ -2764,6 +2834,7 @@ const sfx={
   heal:()=>{beep(460,920,.26,'triangle',.1);beep(690,1280,.3,'sine',.065,.06);},
   potion:()=>{beep(380,820,.18,'sine',.09);noiseBurst(.1,.045,2400,900,1,.05);},
   coin:()=>{beep(900,900,.07,'triangle',.1);beep(1200,1200,.09,'triangle',.09,.065);},
+  stamp:()=>{noiseBurst(.1,.13,520,150,.55);beep(155,76,.12,'sine',.12,.004);},
   lvup:()=>{[523,659,784,1046].forEach((f,i)=>beep(f,f,.19,'triangle',.105,i*.09));},
   click:()=>beep(900,700,.045,'sine',.045),
   swing:()=>{
@@ -7993,6 +8064,49 @@ function onshoGrant(cycle){
   }
   return lines;
 }
+const ONSHO_ASSET_VERSION='20260724b';
+function closeOnshoPanel(){
+  const panel=$('onshoPanel');
+  if(panel.classList.contains('hidden'))return;
+  panel.classList.add('hidden');
+  panel.querySelector('.attendance-book').classList.remove('impact');
+  sfx.click();
+}
+function showOnshoPanel(cycle,rewards){
+  const panel=$('onshoPanel'),grid=$('onshoGrid');
+  grid.innerHTML=Array.from({length:7},(_,i)=>{
+    const day=i+1,stamped=day<=cycle,today=day===cycle;
+    const stamp=stamped
+      ?`<img class="attendance-stamp" src="assets/stamp_${day===7?'man':'kin'}.png?v=${ONSHO_ASSET_VERSION}"
+          alt="${today?(day===7?'本日の満了印':'本日の勤怠印'):''}" draggable="false">`
+      :'<i class="attendance-empty" aria-hidden="true">・</i>';
+    return `<div class="attendance-cell${today?' today':''}${day===7?' day-seven':''}">
+      <span class="attendance-day">${day}日目</span>${stamp}</div>`;
+  }).join('');
+  $('onshoReward').textContent=rewards.join('　／　');
+  panel.classList.remove('hidden');
+  const landing=grid.querySelector('.attendance-cell.today .attendance-stamp');
+  if(landing){
+    void landing.offsetWidth;
+    landing.classList.add('landing');
+    landing.addEventListener('animationend',()=>{
+      if(panel.classList.contains('hidden'))return;
+      const book=panel.querySelector('.attendance-book');
+      if(settings.shake){
+        book.classList.add('impact');
+        book.addEventListener('animationend',()=>book.classList.remove('impact'),{once:true});
+      }
+      addShake(2.4,.12);
+      sfx.stamp();
+    },{once:true});
+  }
+  panel.focus({preventScroll:true});
+}
+$('onshoPanel').addEventListener('click',closeOnshoPanel);
+$('onshoPanel').addEventListener('keydown',ev=>{
+  if(ev.key!=='Escape'&&ev.key!=='Enter'&&ev.key!==' ')return;
+  ev.preventDefault();ev.stopPropagation();closeOnshoPanel();
+});
 function claimOnsho(){
   const today=jstDateKey();
   if(player.onsho?.date===today)return;
@@ -8007,6 +8121,8 @@ function claimOnsho(){
   if(cycle===7)log('七日勤め上げの満了印！ 明日からまた1日目じゃ','sys');
   sfx.coin();
   save();
+  // 受領・記録は研修中も従来どおり。演出パネルだけ修了後に表示する。
+  if(tutorialStep>=TUTORIAL_STEPS.length)showOnshoPanel(cycle,['功徳札+1',...lines]);
 }
 /* ---- 着任チェックリスト(初回の5段ガイド。retention-plan A-1) ---- */
 const TUTORIAL_STEPS=[
