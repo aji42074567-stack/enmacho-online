@@ -805,6 +805,15 @@
   .buyb:hover{border-color:var(--gold)}
   .buyb:disabled{opacity:.4;cursor:default}
   .buyb.on{border-color:var(--gold);color:var(--gold)}
+  .shop-consumable{flex-wrap:wrap}
+  .shop-consumable .nm{min-width:0}
+  .shop-buy-qty{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;
+    width:100%;box-sizing:border-box;padding-left:44px}
+  .shop-buy-qty .buyb{min-width:0;padding:6px 5px;line-height:1.15}
+  .shop-buy-qty .buyb b{display:block;font-size:12px}
+  .shop-buy-qty .buyb small{display:block;margin-top:3px;color:var(--gold);
+    font-size:9px;font-variant-numeric:tabular-nums}
+  .shop-buy-qty .buyb:disabled small{color:inherit}
   .goldrow{font-family:var(--sans);font-size:12px;color:var(--dim);margin-top:12px;
     font-variant-numeric:tabular-nums}
   .settings-list{display:flex;flex-direction:column;gap:14px;text-align:left}
@@ -1885,16 +1894,16 @@ const itemNameHtml=id=>{
 const SHOP_STOCK=['long_sword','bastard','leather','chain','plate','kasa','oni_helm','kote','oni_kote','waraji','suneate','juzu','magatama'];
 const HEAL_POTION_DELAY=1;
 const HEAL_POTIONS={
-  s:{name:'甘露水 S',field:'potions', heal:65, price:30, delay:HEAL_POTION_DELAY},
-  m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,delay:HEAL_POTION_DELAY},
-  l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,delay:HEAL_POTION_DELAY},
+  s:{name:'甘露水 S',field:'potions', heal:65, price:30, cap:50,delay:HEAL_POTION_DELAY},
+  m:{name:'甘露水 M',field:'potionsM',heal:180,price:100,cap:30,delay:HEAL_POTION_DELAY},
+  l:{name:'甘露水 L',field:'potionsL',heal:420,price:280,cap:20,delay:HEAL_POTION_DELAY},
 };
 const QUICK_ITEM_IDS=['heal_s','heal_m','heal_l','haste','reisui','crit','gmdash'];
 const defaultQuickItems=tier=>[
   QUICK_ITEM_IDS.includes(`heal_${tier}`)?`heal_${tier}`:'heal_s',
   'haste','crit',
 ];
-const HASTE_PRICE=300,CRIT_PRICE=300;
+const HASTE_PRICE=300,CRIT_PRICE=300,BUFF_POTION_CAP=20;
 
 /* ================= 冥職 ================= */
 const MEISHOKU={
@@ -3587,25 +3596,44 @@ function applySharedDamage(result,m){
 /* ================= パネル(店・会話・装備) ================= */
 const $=id=>document.getElementById(id);
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+const SHOP_BUY_QTYS=[1,5,10];
+function shopConsumable(id){
+  if(id.startsWith('potion-'))return HEAL_POTIONS[id.slice('potion-'.length)]||null;
+  if(id==='haste')return {name:'韋駄天の水',field:'hastePots',price:HASTE_PRICE,cap:BUFF_POTION_CAP};
+  if(id==='crit')return {name:'修羅の酒',field:'critPots',price:CRIT_PRICE,cap:BUFF_POTION_CAP};
+  return null;
+}
+function shopBuyQtyHtml(id,item){
+  const count=Math.max(0,player[item.field]|0);
+  const buttons=SHOP_BUY_QTYS.map(qty=>{
+    const cost=item.price*qty;
+    const disabled=count+qty>item.cap||player.gold<cost;
+    return `<button class="buyb" data-buy="${id}" data-buy-qty="${qty}" ${disabled?'disabled':''}
+      title="${esc(item.name)}を${qty}個・${cost}モンで買う"><b>${qty}個</b><small>${cost}モン</small></button>`;
+  }).join('');
+  return `<div class="shop-buy-qty" role="group" aria-label="${esc(item.name)}の購入数">${buttons}</div>`;
+}
 function renderShop(){
   const list=$('shopList');
   const sec=nm=>`<div class="itemrow" style="border-bottom:none;padding-bottom:2px"><span class="fx">─ ${nm} ─</span></div>`;
   let html='';
   html+=sec('薬');
   for(const [tier,p] of Object.entries(HEAL_POTIONS)){
-    html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_kanro.png" alt="">
-      <span class="nm">${p.name} <span class="fx">HP+${p.heal} / 使用後${p.delay}秒</span></span>
-      <span class="pr">${p.price} モン</span>
-      <button class="buyb" data-buy="potion-${tier}" ${player.gold<p.price?'disabled':''}>買う</button></div>`;
+    html+=`<div class="itemrow shop-consumable"><img class="icn" src="assets/items/potion_kanro.png" alt="">
+      <span class="nm">${p.name} <span class="fx">HP+${p.heal} / 使用後${p.delay}秒 / 所持 ${player[p.field]}/${p.cap}</span></span>
+      <span class="pr">1個 ${p.price} モン</span>
+      ${shopBuyQtyHtml(`potion-${tier}`,p)}</div>`;
   }
-  html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_idaten.png" alt="">
-    <span class="nm">韋駄天の水 <span class="fx">5分 移動と攻撃が速くなる</span></span>
-    <span class="pr">${HASTE_PRICE} モン</span>
-    <button class="buyb" data-buy="haste" ${player.gold<HASTE_PRICE?'disabled':''}>買う</button></div>`;
-  html+=`<div class="itemrow"><img class="icn" src="assets/items/potion_shura.png" alt="">
-    <span class="nm">修羅の酒 <span class="fx">5分 会心率+25%</span></span>
-    <span class="pr">${CRIT_PRICE} モン</span>
-    <button class="buyb" data-buy="crit" ${player.gold<CRIT_PRICE?'disabled':''}>買う</button></div>`;
+  const haste=shopConsumable('haste');
+  html+=`<div class="itemrow shop-consumable"><img class="icn" src="assets/items/potion_idaten.png" alt="">
+    <span class="nm">韋駄天の水 <span class="fx">5分 移動と攻撃が速くなる / 所持 ${player.hastePots}/${haste.cap}</span></span>
+    <span class="pr">1個 ${HASTE_PRICE} モン</span>
+    ${shopBuyQtyHtml('haste',haste)}</div>`;
+  const crit=shopConsumable('crit');
+  html+=`<div class="itemrow shop-consumable"><img class="icn" src="assets/items/potion_shura.png" alt="">
+    <span class="nm">修羅の酒 <span class="fx">5分 会心率+25% / 所持 ${player.critPots}/${crit.cap}</span></span>
+    <span class="pr">1個 ${CRIT_PRICE} モン</span>
+    ${shopBuyQtyHtml('crit',crit)}</div>`;
   for(const [slot,nm] of SLOTS){
     const ids=SHOP_STOCK.filter(id=>ITEMS[id].slot===slot);
     if(!ids.length)continue;
@@ -3622,7 +3650,7 @@ function renderShop(){
   list.innerHTML=html;
   $('shopGold').textContent=player.gold;
   for(const b of list.querySelectorAll('[data-buy]')){
-    b.addEventListener('click',()=>buy(b.getAttribute('data-buy')));
+    b.addEventListener('click',()=>buy(b.getAttribute('data-buy'),Number(b.getAttribute('data-buy-qty'))||1));
   }
 }
 /* ---- 鍛冶屋 カナヤマ ---- */
@@ -3731,20 +3759,19 @@ function enhance(kind){
   }
   save();renderSmith();
 }
-function buy(id){
-  if(id.startsWith('potion-')){
-    const p=HEAL_POTIONS[id.slice(-1)];
-    if(!p||player.gold<p.price)return;
-    player.gold-=p.price;player[p.field]++;
-    log(`${p.name}を買った`,'gain');
-  }else if(id==='haste'){
-    if(player.gold<HASTE_PRICE)return;
-    player.gold-=HASTE_PRICE;player.hastePots++;
-    log('韋駄天の水を買った','gain');
-  }else if(id==='crit'){
-    if(player.gold<CRIT_PRICE)return;
-    player.gold-=CRIT_PRICE;player.critPots++;
-    log('修羅の酒を買った','gain');
+function buy(id,qty=1){
+  const consumable=shopConsumable(id);
+  if(consumable){
+    if(!SHOP_BUY_QTYS.includes(qty))return;
+    const count=Math.max(0,player[consumable.field]|0);
+    const cost=consumable.price*qty;
+    if(count+qty>consumable.cap){
+      log(`${consumable.name}は${consumable.cap}個までしか持てない`,'sys');
+      renderShop();return;
+    }
+    if(player.gold<cost)return;
+    player.gold-=cost;player[consumable.field]=count+qty;
+    log(`${consumable.name}を${qty}個買った（${cost}モン）`,'gain');
   }else{
     const it=ITEMS[id];
     if(!it||player.items.includes(id)||player.gold<it.price)return;
