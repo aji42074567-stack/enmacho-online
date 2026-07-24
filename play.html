@@ -476,7 +476,7 @@
     max-height:90dvh;overflow:auto;padding:26px 30px 20px;color:#302317;text-align:center;
     background:
       linear-gradient(rgba(216,201,168,.08),rgba(92,67,29,.09)),
-      url(assets/attendance_washi.png?v=20260724c) center/cover;
+      url(assets/attendance_washi.png?v=20260724d) center/cover;
     border:1px solid #8a7141;border-radius:4px;
     box-shadow:0 22px 72px rgba(0,0,0,.78),inset 0 0 30px rgba(76,51,20,.18)}
   .attendance-book::before{content:"";position:absolute;inset:8px;border:1px solid rgba(74,51,24,.38);
@@ -491,10 +491,18 @@
     background:rgba(244,230,194,.16);box-shadow:inset 0 0 10px rgba(65,40,15,.08)}
   .attendance-cell.today{border-color:#8d2d23;box-shadow:inset 0 0 12px rgba(160,48,32,.13)}
   .attendance-cell.day-seven{border-color:rgba(123,88,28,.72)}
-  .attendance-day{position:absolute;left:0;right:0;top:5px;z-index:2;
+  .attendance-day{position:absolute;left:0;right:0;top:5px;z-index:4;
     font:700 clamp(8px,1.5vw,10px)/1 var(--serif);letter-spacing:.06em;color:#5d492d}
-  .attendance-empty{font:18px/1 var(--serif);color:rgba(82,59,31,.26)}
-  .attendance-stamp{display:block;width:94%;max-width:96px;height:auto;pointer-events:none}
+  .attendance-item-icon{display:block;width:72%;height:70%;margin-top:7px;object-fit:contain;
+    pointer-events:none;transition:opacity .15s}
+  .attendance-cell.stamped .attendance-item-icon{opacity:.72}
+  .attendance-cell.future .attendance-item-icon{opacity:.66;filter:saturate(.72)}
+  .attendance-cell-reward{position:absolute;left:1px;right:1px;bottom:4px;z-index:4;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:700 clamp(6.5px,1.25vw,8px)/1 var(--serif);letter-spacing:-.02em;color:#4e3b26}
+  .attendance-stamp-wrap{position:absolute;inset:16px 1px 13px;z-index:3;
+    display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .attendance-stamp{display:block;width:90%;max-width:88px;height:auto;pointer-events:none}
   .attendance-cell.today .attendance-stamp{opacity:0}
   .attendance-cell.today .attendance-stamp.landing{
     animation:attendanceStampLand .25s cubic-bezier(.18,.82,.26,1) both}
@@ -525,6 +533,9 @@
     .attendance-sub{margin-bottom:13px}
     .attendance-grid{gap:3px}
     .attendance-day{top:4px;font-size:7.5px}
+    .attendance-item-icon{width:76%;height:68%;margin-top:6px}
+    .attendance-cell-reward{bottom:3px;font-size:6px}
+    .attendance-stamp-wrap{inset:14px 0 11px}
     .attendance-reward{margin-top:13px;padding:9px 5px 8px}
     .attendance-reward-items{gap:5px 10px}
     .attendance-reward-item{gap:4px}
@@ -8327,10 +8338,14 @@ function onshoGrant(cycle){
   }
   return lines;
 }
-const ONSHO_ASSET_VERSION='20260724c';
+const ONSHO_ASSET_VERSION='20260724d';
 const ONSHO_REWARD_ICONS={
   1:'potion_kanro.png',2:'kudoku_fuda.png',3:'scroll_fragment.png',4:'potion_idaten_spirit.png',
   5:'kudoku_fuda.png',6:'scroll_fragment.png',7:'dragon_blood.png'
+};
+const ONSHO_REWARD_LABELS={
+  1:'甘露水×3',2:'功徳札+2',3:'かけら×2',4:'霊水×1',
+  5:'功徳札+3',6:'かけら×3',7:'竜の血×1'
 };
 function closeOnshoPanel(){
   const panel=$('onshoPanel');
@@ -8344,11 +8359,16 @@ function showOnshoPanel(cycle,rewards){
   grid.innerHTML=Array.from({length:7},(_,i)=>{
     const day=i+1,stamped=day<=cycle,today=day===cycle;
     const stamp=stamped
-      ?`<img class="attendance-stamp" src="assets/stamp_${day===7?'man':'kin'}.png?v=${ONSHO_ASSET_VERSION}"
-          alt="${today?(day===7?'本日の満了印':'本日の勤怠印'):''}" draggable="false">`
-      :'<i class="attendance-empty" aria-hidden="true">・</i>';
-    return `<div class="attendance-cell${today?' today':''}${day===7?' day-seven':''}">
-      <span class="attendance-day">${day}日目</span>${stamp}</div>`;
+      ?`<span class="attendance-stamp-wrap"><img class="attendance-stamp"
+          src="assets/stamp_${day===7?'man':'kin'}.png?v=${ONSHO_ASSET_VERSION}"
+          alt="${today?(day===7?'本日の満了印':'本日の勤怠印'):''}" draggable="false"></span>`
+      :'';
+    return `<div class="attendance-cell${today?' today':''}${stamped?' stamped':' future'}${day===7?' day-seven':''}"
+        aria-label="${day}日目 ${ONSHO_REWARD_LABELS[day]} ${stamped?'受取済み':'未受取'}">
+      <span class="attendance-day">${day}日目</span>
+      <img class="attendance-item-icon" src="assets/items/${ONSHO_REWARD_ICONS[day]}?v=${ONSHO_ASSET_VERSION}"
+        alt="" draggable="false">
+      <span class="attendance-cell-reward">${ONSHO_REWARD_LABELS[day]}</span>${stamp}</div>`;
   }).join('');
   const rewardEl=$('onshoReward');
   rewardEl.replaceChildren(...rewards.map(name=>{
