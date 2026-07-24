@@ -3385,7 +3385,6 @@ function renderSmith(){
       <button class="buyb" data-senh="${r.k}" ${lack?'disabled':''}>強化</button></div>`;
   }
   html+=renderUtsushiuchi();
-  html+=`<div class="sub">竜の血 所持: ${player.dragonBlood}個(移し打ちで使う)</div>`;
   list.innerHTML=html;
   $('smithGold').textContent=player.gold;
   for(const b of list.querySelectorAll('[data-senh]')){
