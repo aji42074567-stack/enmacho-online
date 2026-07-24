@@ -619,13 +619,6 @@
     bottom:max(calc(10vh + 14px),env(safe-area-inset-bottom));border:0;background:none;
     color:#9f988d;font:11px/1 var(--sans);letter-spacing:.18em;cursor:pointer;padding:10px}
   .boss-cutin-skip:hover,.boss-cutin-skip:focus-visible{color:#fff;outline:1px solid var(--boss-accent)}
-  .boss-cutin-play{position:absolute;z-index:7;left:50%;top:50%;display:none;align-items:center;
-    gap:12px;transform:translate(-50%,-50%);padding:13px 18px;border:1px solid var(--boss-accent);
-    border-radius:999px;background:rgba(2,3,5,.88);color:#fff3da;box-shadow:0 5px 28px #000;
-    font:600 12px/1 var(--sans);letter-spacing:.1em;white-space:nowrap;pointer-events:none}
-  .boss-cutin-play b{font-size:20px;color:var(--boss-accent)}
-  .boss-cutin.video-awaiting-tap .boss-cutin-play,
-  .boss-cutin.video-starting .boss-cutin-play{display:flex}
   @keyframes bossBarIn{from{transform:scaleY(0);transform-origin:center}to{transform:scaleY(1)}}
   @keyframes bossStreakIn{from{opacity:0;transform:translateX(-16%)}to{opacity:.24;transform:none}}
   @keyframes bossCopyIn{from{opacity:0;transform:translateX(-70px)}to{opacity:1;transform:none}}
@@ -1390,12 +1383,9 @@
   <section class="boss-cutin hidden" id="bossCutin" role="dialog" aria-modal="true"
     aria-labelledby="bossCutinName" aria-describedby="bossCutinMessage" data-boss="oni">
     <i class="boss-cutin-streak" aria-hidden="true"></i>
-    <video class="boss-cutin-video hidden" id="bossCutinVideo" playsinline webkit-playsinline
-      muted preload="auto"
+    <video class="boss-cutin-video hidden" id="bossCutinVideo" autoplay muted
+      playsinline webkit-playsinline preload="auto"
       aria-hidden="true"></video>
-    <div class="boss-cutin-play" id="bossCutinPlay" aria-hidden="true">
-      <b>▶</b><span id="bossCutinPlayText">タップで動画を再生</span>
-    </div>
     <div class="boss-cutin-copy">
       <div class="boss-cutin-kicker" id="bossCutinKicker">因果顕現</div>
       <h2 id="bossCutinName">鬼王 オニオウ</h2>
@@ -3045,6 +3035,10 @@ function applyAudioSettings(){
   if(bgmGain){
     bgmGain.gain.cancelScheduledValues(t);
     bgmGain.gain.setTargetAtTime(musicReady?0:v*0.9,t,0.04);
+  }
+  if(bossCutinAudioGain){
+    bossCutinAudioGain.gain.cancelScheduledValues(t);
+    bossCutinAudioGain.gain.setTargetAtTime(bossCutinAudioVolume(),t,0.025);
   }
 }
 function applyVisualSettings(){
@@ -5972,24 +5966,28 @@ const BOSS_CUTINS={
   cave3:{boss:'oni',kicker:'試練の洞窟 最深部　／　因果顕現',
     name:'鬼王 オニオウ',epithet:'怒りの成れの果て',art:'assets/mob_orc_blue.png',
     video:'assets/boss_oni_intro.mp4',
+    audio:'assets/boss_oni_intro.m4a',
     textAt:{lead:4.35,tail:5.65},
     messageLead:'その怒りは誰かを傷つけた。',
     messageTail:'だが、痛みを越えた者は以前より強くなった。傷つけた罪と、生まれた強さ——因果は善悪だけでは割り切れない。'},
   muen3:{boss:'gashao',kicker:'無縁塚 最深部　／　因果顕現',
     name:'骨王 ガシャオウ',epithet:'孤独の成れの果て',art:'assets/mob_skeleton.png',
     video:'assets/boss_gashao_intro.mp4',
+    audio:'assets/boss_gashao_intro.m4a',
     textAt:{lead:3.75,tail:5.15},
     messageLead:'孤独に耐え切れなかった。',
     messageTail:'それだけで悪と呼べるのか。誰の胸にも同じ空洞はある。違ったのは、差し伸べる手がなかったことだけだ。'},
   dg5:{boss:'drake',kicker:'竜の洞窟 最深部　／　因果顕現',
     name:'業龍 ゴウリュウ',epithet:'災厄にして、最後の守護者',art:'assets/mob_drake.png',
     video:'assets/boss_dragon_intro.mp4',
+    audio:'assets/boss_dragon_intro.m4a',
     mobileVideoPosition:'40% center',
     textAt:{lead:3.4,tail:4.8},
     messageLead:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。',
     messageTail:'災厄であることと、守護者であることは両立する。'},
 };
-let bossCutinActive=false,bossCutinScene=null,bossCutinAwaitingTap=false;
+let bossCutinActive=false,bossCutinAudioSource=null,bossCutinAudioGain=null,bossCutinAudioToken=0;
+const bossCutinAudioCache=new Map();
 const bossCutinButtonLabel=playing=>MOBILE_RENDER
   ?(playing?'タップでスキップ ›':'タップして進む ›')
   :(playing?'スキップ ›':'進む ›');
@@ -6000,12 +5998,50 @@ function duckBossCutinBgm(duck){
   if(musicGain){musicGain.gain.cancelScheduledValues(t);musicGain.gain.setTargetAtTime(v*.12,t,.12);}
   if(bgmGain){bgmGain.gain.cancelScheduledValues(t);bgmGain.gain.setTargetAtTime(musicReady?0:v*.1,t,.12);}
 }
+const bossCutinAudioVolume=()=>clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
+function loadBossCutinAudio(scene){
+  if(!scene.audio)return Promise.reject(new Error('boss cut-in audio missing'));
+  const cached=bossCutinAudioCache.get(scene.audio);
+  if(cached)return cached;
+  const ac=audio();
+  if(!ac)return Promise.reject(new Error('audio context unavailable'));
+  const request=fetch(scene.audio)
+    .then(r=>{if(!r.ok)throw new Error(scene.audio);return r.arrayBuffer();})
+    .then(b=>new Promise((ok,ng)=>ac.decodeAudioData(b,ok,ng)))
+    .catch(error=>{bossCutinAudioCache.delete(scene.audio);throw error;});
+  bossCutinAudioCache.set(scene.audio,request);
+  return request;
+}
+function stopBossCutinAudio(restoreBgm=true){
+  bossCutinAudioToken++;
+  if(bossCutinAudioSource){
+    try{bossCutinAudioSource.stop();}catch(e){}
+    bossCutinAudioSource.disconnect();bossCutinAudioSource=null;
+  }
+  if(bossCutinAudioGain){bossCutinAudioGain.disconnect();bossCutinAudioGain=null;}
+  if(restoreBgm)duckBossCutinBgm(false);
+}
+function playBossCutinAudio(scene,video){
+  stopBossCutinAudio(false);
+  const volume=bossCutinAudioVolume();
+  if(volume<=0||!scene.audio)return;
+  const token=bossCutinAudioToken;
+  loadBossCutinAudio(scene).then(buffer=>{
+    if(!bossCutinActive||token!==bossCutinAudioToken||video.paused)return;
+    const ac=audio();if(!ac)return;
+    const source=ac.createBufferSource(),gain=ac.createGain();
+    source.buffer=buffer;gain.gain.value=volume;
+    source.connect(gain).connect(ac.destination);
+    const offset=Math.min(Math.max(0,video.currentTime||0),Math.max(0,buffer.duration-.05));
+    bossCutinAudioSource=source;bossCutinAudioGain=gain;
+    source.start(0,offset);duckBossCutinBgm(true);
+  }).catch(()=>{});
+}
 function stopBossCutinVideo(){
   const video=$('bossCutinVideo');
   video.onplaying=video.onended=video.onerror=null;
   video.pause();video.removeAttribute('src');video.load();video.classList.add('hidden');
-  bossCutinScene=null;bossCutinAwaitingTap=false;
-  duckBossCutinBgm(false);
+  stopBossCutinAudio();
 }
 function dismissBossCutin(){
   if(!bossCutinActive)return;
@@ -6016,56 +6052,31 @@ function dismissBossCutin(){
 function fallbackBossCutinVideo(panel){
   if(!bossCutinActive)return;
   stopBossCutinVideo();
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap','video-starting');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
   $('bossCutinSkip').textContent=bossCutinButtonLabel(false);
 }
-function awaitBossCutinVideoTap(scene,panel){
-  if(!bossCutinActive)return;
-  bossCutinScene=scene;bossCutinAwaitingTap=true;
-  panel.classList.remove('video-starting');panel.classList.add('video-awaiting-tap');
-  $('bossCutinPlayText').textContent=MOBILE_RENDER?'タップで動画を再生':'動画を再生';
-  $('bossCutinSkip').textContent=MOBILE_RENDER?'タップで動画を再生 ▶':'動画を再生 ▶';
-}
-function playBossCutinVideo(scene,panel,userInitiated=false){
+function playBossCutinVideo(scene,panel){
   const video=$('bossCutinVideo');
-  bossCutinScene=scene;bossCutinAwaitingTap=false;
-  panel.classList.remove('video-awaiting-tap');panel.classList.add('video-starting');
-  $('bossCutinPlayText').textContent='動画を読み込み中…';
   video.classList.remove('hidden');
+  // iOS自動再生用に映像要素はmuted。音声はonplayingからゲーム音声と同期再生する。
+  video.defaultMuted=true;video.muted=true;video.setAttribute('muted','');
   if(video.getAttribute('src')!==scene.video){video.src=scene.video;video.currentTime=0;}
-  const volume=clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
-  // iOS/Safariはユーザー操作の外で音付き再生を拒否する。
-  // スマホの初回は無音で動画を優先し、再生自体も拒否されたらタップ再試行に切り替える。
-  video.volume=volume;
-  video.defaultMuted=volume<=0||(MOBILE_RENDER&&!userInitiated);
-  video.muted=video.defaultMuted;
-  if(video.muted)video.setAttribute('muted','');else video.removeAttribute('muted');
+  if(bossCutinAudioVolume()>0)loadBossCutinAudio(scene).catch(()=>{});
   video.onplaying=()=>{
     if(!bossCutinActive){video.pause();return;}
-    bossCutinAwaitingTap=false;panel.classList.remove('video-awaiting-tap','video-starting');
     panel.classList.add('video-ready','video-playing');
     $('bossCutinSkip').textContent=bossCutinButtonLabel(true);
-    if(!video.muted)duckBossCutinBgm(true);
+    playBossCutinAudio(scene,video);
   };
   video.onended=()=>{
     if(!bossCutinActive)return;
+    stopBossCutinAudio();
     panel.classList.add('video-ended');
     $('bossCutinSkip').textContent=bossCutinButtonLabel(false);
   };
   video.onerror=()=>fallbackBossCutinVideo(panel);
   const attempt=video.play();
-  if(attempt)attempt.catch(()=>{
-    if(!bossCutinActive||video.getAttribute('src')!==scene.video)return;
-    // PCの自動再生規制や、タップ時の音付き再生失敗にも無音で再試行する。
-    video.muted=true;
-    video.defaultMuted=true;video.setAttribute('muted','');
-    const mutedAttempt=video.play();
-    if(mutedAttempt)mutedAttempt.catch(error=>{
-      if(!bossCutinActive||video.getAttribute('src')!==scene.video)return;
-      if(error?.name==='NotAllowedError')awaitBossCutinVideoTap(scene,panel);
-      else fallbackBossCutinVideo(panel);
-    });
-  });
+  if(attempt)attempt.catch(()=>fallbackBossCutinVideo(panel));
 }
 function showBossCutinForZone(zoneName){
   const scene=BOSS_CUTINS[zoneName];
@@ -6074,9 +6085,8 @@ function showBossCutinForZone(zoneName){
   player.attackDur=0;player.attackT=0;player.combatT=0;
   const panel=$('bossCutin');
   const useVideo=!!scene.video;
-  const deferVideoStart=MOBILE_RENDER||matchMedia('(prefers-reduced-motion: reduce)').matches;
   const textAt=scene.textAt||{};
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap','video-starting');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
   panel.classList.toggle('has-video',useVideo);
   panel.style.setProperty('--boss-kicker-at',`${textAt.kicker||.35}s`);
   panel.style.setProperty('--boss-name-at',`${textAt.name||.85}s`);
@@ -6095,18 +6105,9 @@ function showBossCutinForZone(zoneName){
   bossCutinActive=true;
   panel.classList.add('hidden');void panel.offsetWidth;panel.classList.remove('hidden');
   $('bossCutinSkip').focus({preventScroll:true});
-  if(useVideo){
-    if(deferVideoStart)awaitBossCutinVideoTap(scene,panel);
-    else playBossCutinVideo(scene,panel);
-  }
+  if(useVideo)playBossCutinVideo(scene,panel);
 }
-$('bossCutin').addEventListener('click',()=>{
-  if(bossCutinAwaitingTap&&bossCutinScene){
-    playBossCutinVideo(bossCutinScene,$('bossCutin'),true);
-    return;
-  }
-  dismissBossCutin();
-});
+$('bossCutin').addEventListener('click',dismissBossCutin);
 function switchZone(z,px,py){
   if(z==='rinne_coast'||z==='rinne_wilds')z='rinne';
   const W2=worldByZone(z);
