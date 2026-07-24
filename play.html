@@ -512,6 +512,13 @@
     bottom:max(calc(10vh + 14px),env(safe-area-inset-bottom));border:0;background:none;
     color:#9f988d;font:11px/1 var(--sans);letter-spacing:.18em;cursor:pointer;padding:10px}
   .boss-cutin-skip:hover,.boss-cutin-skip:focus-visible{color:#fff;outline:1px solid var(--boss-accent)}
+  .boss-cutin-play{position:absolute;z-index:7;left:50%;top:50%;display:none;align-items:center;
+    gap:12px;transform:translate(-50%,-50%);padding:13px 18px;border:1px solid var(--boss-accent);
+    border-radius:999px;background:rgba(2,3,5,.88);color:#fff3da;box-shadow:0 5px 28px #000;
+    font:600 12px/1 var(--sans);letter-spacing:.1em;white-space:nowrap;pointer-events:none}
+  .boss-cutin-play b{font-size:20px;color:var(--boss-accent)}
+  .boss-cutin.video-awaiting-tap .boss-cutin-play,
+  .boss-cutin.video-starting .boss-cutin-play{display:flex}
   @keyframes bossBarIn{from{transform:scaleY(0);transform-origin:center}to{transform:scaleY(1)}}
   @keyframes bossStreakIn{from{opacity:0;transform:translateX(-16%)}to{opacity:.24;transform:none}}
   @keyframes bossCopyIn{from{opacity:0;transform:translateX(-70px)}to{opacity:1;transform:none}}
@@ -1236,6 +1243,9 @@
     <video class="boss-cutin-video hidden" id="bossCutinVideo" playsinline webkit-playsinline
       muted preload="auto"
       aria-hidden="true"></video>
+    <div class="boss-cutin-play" id="bossCutinPlay" aria-hidden="true">
+      <b>▶</b><span id="bossCutinPlayText">タップで動画を再生</span>
+    </div>
     <div class="boss-cutin-copy">
       <div class="boss-cutin-kicker" id="bossCutinKicker">因果顕現</div>
       <h2 id="bossCutinName">鬼王 オニオウ</h2>
@@ -5791,19 +5801,21 @@ function dismissBossCutin(){
 function fallbackBossCutinVideo(panel){
   if(!bossCutinActive)return;
   stopBossCutinVideo();
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap','video-starting');
   $('bossCutinSkip').textContent=bossCutinButtonLabel(false);
 }
 function awaitBossCutinVideoTap(scene,panel){
   if(!bossCutinActive)return;
   bossCutinScene=scene;bossCutinAwaitingTap=true;
-  panel.classList.add('video-awaiting-tap');
+  panel.classList.remove('video-starting');panel.classList.add('video-awaiting-tap');
+  $('bossCutinPlayText').textContent=MOBILE_RENDER?'タップで動画を再生':'動画を再生';
   $('bossCutinSkip').textContent=MOBILE_RENDER?'タップで動画を再生 ▶':'動画を再生 ▶';
 }
 function playBossCutinVideo(scene,panel,userInitiated=false){
   const video=$('bossCutinVideo');
   bossCutinScene=scene;bossCutinAwaitingTap=false;
-  panel.classList.remove('video-awaiting-tap');
+  panel.classList.remove('video-awaiting-tap');panel.classList.add('video-starting');
+  $('bossCutinPlayText').textContent='動画を読み込み中…';
   video.classList.remove('hidden');
   if(video.getAttribute('src')!==scene.video){video.src=scene.video;video.currentTime=0;}
   const volume=clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
@@ -5815,7 +5827,7 @@ function playBossCutinVideo(scene,panel,userInitiated=false){
   if(video.muted)video.setAttribute('muted','');else video.removeAttribute('muted');
   video.onplaying=()=>{
     if(!bossCutinActive){video.pause();return;}
-    bossCutinAwaitingTap=false;panel.classList.remove('video-awaiting-tap');
+    bossCutinAwaitingTap=false;panel.classList.remove('video-awaiting-tap','video-starting');
     panel.classList.add('video-ready','video-playing');
     $('bossCutinSkip').textContent=bossCutinButtonLabel(true);
     if(!video.muted)duckBossCutinBgm(true);
@@ -5846,9 +5858,10 @@ function showBossCutinForZone(zoneName){
   player.path=[];player.target=null;player.talkTarget=null;player.pendingHit=null;
   player.attackDur=0;player.attackT=0;player.combatT=0;
   const panel=$('bossCutin');
-  const useVideo=!!scene.video&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const useVideo=!!scene.video;
+  const deferVideoStart=MOBILE_RENDER||matchMedia('(prefers-reduced-motion: reduce)').matches;
   const textAt=scene.textAt||{};
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap','video-starting');
   panel.classList.toggle('has-video',useVideo);
   panel.style.setProperty('--boss-kicker-at',`${textAt.kicker||.35}s`);
   panel.style.setProperty('--boss-name-at',`${textAt.name||.85}s`);
@@ -5867,7 +5880,10 @@ function showBossCutinForZone(zoneName){
   bossCutinActive=true;
   panel.classList.add('hidden');void panel.offsetWidth;panel.classList.remove('hidden');
   $('bossCutinSkip').focus({preventScroll:true});
-  if(useVideo)playBossCutinVideo(scene,panel);
+  if(useVideo){
+    if(deferVideoStart)awaitBossCutinVideoTap(scene,panel);
+    else playBossCutinVideo(scene,panel);
+  }
 }
 $('bossCutin').addEventListener('click',()=>{
   if(bossCutinAwaitingTap&&bossCutinScene){
