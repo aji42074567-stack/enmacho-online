@@ -1233,7 +1233,8 @@
   <section class="boss-cutin hidden" id="bossCutin" role="dialog" aria-modal="true"
     aria-labelledby="bossCutinName" aria-describedby="bossCutinMessage" data-boss="oni">
     <i class="boss-cutin-streak" aria-hidden="true"></i>
-    <video class="boss-cutin-video hidden" id="bossCutinVideo" playsinline preload="auto"
+    <video class="boss-cutin-video hidden" id="bossCutinVideo" playsinline webkit-playsinline
+      muted preload="auto"
       aria-hidden="true"></video>
     <div class="boss-cutin-copy">
       <div class="boss-cutin-kicker" id="bossCutinKicker">因果顕現</div>
@@ -5731,7 +5732,7 @@ const BOSS_CUTINS={
     messageLead:'恐れられたその力は、さらに大きな災いを遠ざけ、島の秩序を保っていた。',
     messageTail:'災厄であることと、守護者であることは両立する。'},
 };
-let bossCutinActive=false;
+let bossCutinActive=false,bossCutinScene=null,bossCutinAwaitingTap=false;
 const bossCutinButtonLabel=playing=>MOBILE_RENDER
   ?(playing?'タップでスキップ ›':'タップして進む ›')
   :(playing?'スキップ ›':'進む ›');
@@ -5746,6 +5747,7 @@ function stopBossCutinVideo(){
   const video=$('bossCutinVideo');
   video.onplaying=video.onended=video.onerror=null;
   video.pause();video.removeAttribute('src');video.load();video.classList.add('hidden');
+  bossCutinScene=null;bossCutinAwaitingTap=false;
   duckBossCutinBgm(false);
 }
 function dismissBossCutin(){
@@ -5757,17 +5759,31 @@ function dismissBossCutin(){
 function fallbackBossCutinVideo(panel){
   if(!bossCutinActive)return;
   stopBossCutinVideo();
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap');
   $('bossCutinSkip').textContent=bossCutinButtonLabel(false);
 }
-function playBossCutinVideo(scene,panel){
+function awaitBossCutinVideoTap(scene,panel){
+  if(!bossCutinActive)return;
+  bossCutinScene=scene;bossCutinAwaitingTap=true;
+  panel.classList.add('video-awaiting-tap');
+  $('bossCutinSkip').textContent=MOBILE_RENDER?'タップで動画を再生 ▶':'動画を再生 ▶';
+}
+function playBossCutinVideo(scene,panel,userInitiated=false){
   const video=$('bossCutinVideo');
+  bossCutinScene=scene;bossCutinAwaitingTap=false;
+  panel.classList.remove('video-awaiting-tap');
   video.classList.remove('hidden');
-  video.src=scene.video;video.currentTime=0;
-  video.volume=clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
-  video.muted=video.volume<=0;
+  if(video.getAttribute('src')!==scene.video){video.src=scene.video;video.currentTime=0;}
+  const volume=clamp((effVol('sfx')*.7+effVol('bgm')*.3)/100,0,1);
+  // iOS/Safariはユーザー操作の外で音付き再生を拒否する。
+  // スマホの初回は無音で動画を優先し、再生自体も拒否されたらタップ再試行に切り替える。
+  video.volume=volume;
+  video.defaultMuted=volume<=0||(MOBILE_RENDER&&!userInitiated);
+  video.muted=video.defaultMuted;
+  if(video.muted)video.setAttribute('muted','');else video.removeAttribute('muted');
   video.onplaying=()=>{
     if(!bossCutinActive){video.pause();return;}
+    bossCutinAwaitingTap=false;panel.classList.remove('video-awaiting-tap');
     panel.classList.add('video-ready','video-playing');
     $('bossCutinSkip').textContent=bossCutinButtonLabel(true);
     if(!video.muted)duckBossCutinBgm(true);
@@ -5780,10 +5796,16 @@ function playBossCutinVideo(scene,panel){
   video.onerror=()=>fallbackBossCutinVideo(panel);
   const attempt=video.play();
   if(attempt)attempt.catch(()=>{
-    if(!bossCutinActive)return;
+    if(!bossCutinActive||video.getAttribute('src')!==scene.video)return;
+    // PCの自動再生規制や、タップ時の音付き再生失敗にも無音で再試行する。
     video.muted=true;
+    video.defaultMuted=true;video.setAttribute('muted','');
     const mutedAttempt=video.play();
-    if(mutedAttempt)mutedAttempt.catch(()=>fallbackBossCutinVideo(panel));
+    if(mutedAttempt)mutedAttempt.catch(error=>{
+      if(!bossCutinActive||video.getAttribute('src')!==scene.video)return;
+      if(error?.name==='NotAllowedError')awaitBossCutinVideoTap(scene,panel);
+      else fallbackBossCutinVideo(panel);
+    });
   });
 }
 function showBossCutinForZone(zoneName){
@@ -5794,7 +5816,7 @@ function showBossCutinForZone(zoneName){
   const panel=$('bossCutin');
   const useVideo=!!scene.video&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
   const textAt=scene.textAt||{};
-  panel.classList.remove('has-video','video-ready','video-playing','video-ended');
+  panel.classList.remove('has-video','video-ready','video-playing','video-ended','video-awaiting-tap');
   panel.classList.toggle('has-video',useVideo);
   panel.style.setProperty('--boss-kicker-at',`${textAt.kicker||.35}s`);
   panel.style.setProperty('--boss-name-at',`${textAt.name||.85}s`);
@@ -5815,7 +5837,13 @@ function showBossCutinForZone(zoneName){
   $('bossCutinSkip').focus({preventScroll:true});
   if(useVideo)playBossCutinVideo(scene,panel);
 }
-$('bossCutin').addEventListener('click',dismissBossCutin);
+$('bossCutin').addEventListener('click',()=>{
+  if(bossCutinAwaitingTap&&bossCutinScene){
+    playBossCutinVideo(bossCutinScene,$('bossCutin'),true);
+    return;
+  }
+  dismissBossCutin();
+});
 function switchZone(z,px,py){
   if(z==='rinne_coast'||z==='rinne_wilds')z='rinne';
   const W2=worldByZone(z);
