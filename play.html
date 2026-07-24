@@ -1802,7 +1802,8 @@ const ENMA_FIELD_ENTRIES=[
   townPoint(26,46),townPoint(27,46),townPoint(28,46),townPoint(29,46),
 ];
 const ENMA_LINKS=[
-  ...ENMA_FIELD_ENTRIES.map(at=>({from:'field',at,to:'enma1',entry:{x:39,y:41}})),
+  // 庁外の4マス入口は従来の判定を維持する。
+  ...ENMA_FIELD_ENTRIES.map(at=>({from:'field',at,to:'enma1',entry:{x:39,y:41},keepTrigger:true})),
   {from:'enma1',at:{x:40,y:43},   to:'field', entry:townPoint(27.5,47.5),label:'外へ',  tone:'exit'},
   {from:'enma1',at:{x:23,y:20},   to:'enma2',entry:{x:39,y:41},label:'二階へ',tone:'up'},
   {from:'enma2',at:{x:40,y:43},   to:'enma1',entry:{x:22,y:21},label:'一階へ',tone:'down'},
@@ -1815,6 +1816,14 @@ const ZONE_LINKS=CAVE_LINKS.concat(ENMA_LINKS);
 const CAVE_DEPTH={cave:1,cave2:2,cave3:3,dg1:1,dg2:2,dg3:3,dg4:4,dg5:5,muen1:1,muen2:2,muen3:3};
 const CAVE_ENTRY={x:13,y:30};
 const CAVE_EXIT={x:11,y:30};
+const ZONE_TRIGGER_HALF_SIZE=1;   // 中心から各軸1マス=2×2の4マス判定
+function inFourTileZoneTrigger(entity,at){
+  return Math.abs(entity.x-at.x)<ZONE_TRIGGER_HALF_SIZE
+    &&Math.abs(entity.y-at.y)<ZONE_TRIGGER_HALF_SIZE;
+}
+function zoneLinkTriggered(entity,link){
+  return link.keepTrigger?dist(entity,link.at)<0.9:inFourTileZoneTrigger(entity,link.at);
+}
 const ELEV_PX=22;   // 高台1段ぶんの見た目の高さ
 // 添付資料の赤い島を北が上になるようピクセル境界から直接トレースした外周。
 // u=(x-y)/2 が東西、v=(x+y)/2 が南北。県境線を除いた本島外周を54点へ簡略化し、
@@ -1918,13 +1927,10 @@ function placeLargeBuilding(bx,by,bw,bh,kind){
   });
 }
 placeLargeBuilding(townX(24),townY(42),7,5,'enmacho');           // 町の核となる閻魔庁本殿
-// 本殿の正面階段を左側にも広げ、四つの光るマスすべてから入庁できる。
+// 本殿の正面階段を左側にも広げ、4マスすべてから入庁できる。
 for(const [x,y] of townTiles([[26,45],[27,45],[28,45],[26,46],[27,46],[28,46],[29,46]]))
   blocked[y*FIELD_SIZE+x]=0;
-for(let i=0;i<ENMA_FIELD_ENTRIES.length;i++){
-  const at=ENMA_FIELD_ENTRIES[i];
-  props.push({x:at.x,y:at.y,kind:'hallportal',label:i===1?'入庁':'',tone:'entry'});
-}
+// 庁外の入口マーカーは描画せず、ENMA_LINKSの4マス判定だけを残す。
 placeBuilding(townX(36),townY(46),'smithy','#30343a','#25282d');   // 青屋根の家を鍛冶屋へ置換
 placeBuilding(townX(35),townY(51),'shop','#7a5a2a','#645022');
 placeBuilding(townX(27),townY(53),'tavern','#7a2f26','#63241d');   // 酒場「千本亭」(町の左・井戸の近く)
@@ -4795,13 +4801,13 @@ function update(dt){
         player.face=vpad.dx>=0?1:-1;
       }
     }else if(player.attackDur<=0)moveAlong(player,dt,speedNow());  // 攻撃中は足を止める
-    if(zone==='field'&&dist(player,CAVE_TRIG)<0.9){
+    if(zone==='field'&&inFourTileZoneTrigger(player,CAVE_TRIG)){
       switchZone('cave',CAVE_ENTRY.x,CAVE_ENTRY.y);
-    }else if(zone==='cave'&&dist(player,CAVE_EXIT)<0.8){
+    }else if(zone==='cave'&&inFourTileZoneTrigger(player,CAVE_EXIT)){
       switchZone('field',CAVE_TRIG.x-1.2,CAVE_TRIG.y+1.4);
     }else{
       for(const L of ZONE_LINKS){
-        if(zone===L.from&&dist(player,L.at)<0.9){
+        if(zone===L.from&&zoneLinkTriggered(player,L)){
           if(L.to==='dg1'&&!canEnterDragonCave()){blockDragonGate();break;}
           const entry=typeof L.entry==='function'?L.entry():L.entry;
           if(entry)switchZone(L.to,entry.x,entry.y);
